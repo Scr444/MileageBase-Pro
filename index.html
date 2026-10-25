@@ -456,6 +456,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const box = $('gpsLine'); if (!box) return;
     const words = { driving: 'logging your drive', parked: 'parked, GPS off', starting: 'waiting for GPS', stopped: 'not logging' };
     box.textContent = `GPS: ${MI(gpsLive.meters).toFixed(1)} mi so far · ${words[gpsLive.mode] || gpsLive.mode}`;
+    const pm = $('privMiles'); if (pm) pm.textContent = MI(gpsLive.meters).toFixed(1) + ' mi';
     const odo = $('cMiles');
     if (odo && !odo.dataset.touched && gpsLive.meters > 0) {
       odo.value = S.openTrip.startMiles + Math.round(MI(gpsLive.meters));
@@ -481,23 +482,38 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   const saveS = () => store.set('settings', S);
 
   // Rows exactly as they go on the sheet
+  // Sheet rows. Private journeys get no row of their own: their miles show in the Private column of the
+  // next business row (or one closing "Private" row), so nothing about where or when goes on the sheet.
   function sheetRows(k) {
     const M = months[k] || blankMonth();
-    const trips = [...M.trips].sort((a, b) => (a.startDate + a.id).localeCompare(b.startDate + b.id));
-    let prev = M.startMiles ?? (trips[0] ? trips[0].startMiles : null);
-    const rows = trips.map(t => {
-      const gap = prev != null && t.startMiles != null ? Math.max(0, t.startMiles - prev) : 0;
+    const trips = [...M.trips].sort((a, b) => ((a.startMiles ?? 0) - (b.startMiles ?? 0)) || String(a.startDate).localeCompare(String(b.startDate)));
+    const first = trips[0];
+    let prev = M.startMiles ?? (first ? first.startMiles : null);
+    const rows = [], list = [];
+    let privRun = 0; // private journey miles since the last business row
+    trips.forEach(t => {
       const run = Math.max(0, (t.finishMiles ?? 0) - (t.startMiles ?? 0));
-      const isPriv = t.type === 'priv';
-      const priv = isPriv ? gap + run : gap, bus = isPriv ? 0 : run;
-      prev = t.finishMiles ?? prev;
-      const P = t.type === 'priv';
-      return { id: t.id, type: t.type, desc: P ? 'Private' : t.desc, startPc: P ? '' : t.startPc, sitePc: P ? '' : t.sitePc, job: P ? '' : t.job, driver: S.driver,
-               startDate: t.startDate, finishMiles: t.finishMiles, finishDate: t.finishDate, priv, bus, back: t.backPc };
+      if (t.type === 'priv') {
+        privRun += run;
+        list.push({ id: t.id, type: 'priv', priv: run, bus: 0 });
+        return;
+      }
+      const gap = prev != null && t.startMiles != null ? Math.max(0, t.startMiles - prev) : 0;
+      const row = { id: t.id, desc: t.desc, startPc: t.startPc, sitePc: t.sitePc, job: t.job, driver: S.driver,
+                    startDate: t.startDate, finishMiles: t.finishMiles, finishDate: t.finishDate, priv: gap, bus: run, untracked: Math.max(0, gap - privRun) };
+      rows.push(row); list.push(row);
+      prev = t.finishMiles ?? prev; privRun = 0;
     });
-    if (M.endMiles != null && prev != null && M.endMiles > prev)
-      rows.push({ desc: 'Private miles to month end', finishMiles: M.endMiles, finishDate: lastDay(k), priv: M.endMiles - prev, bus: 0, driver: S.driver });
-    return { rows, startMiles: M.startMiles ?? (trips[0] ? trips[0].startMiles : null) };
+    const last = trips[trips.length - 1];
+    const reached = last ? Math.max(prev ?? 0, last.finishMiles ?? 0) : prev;
+    if (M.endMiles != null && prev != null && M.endMiles > prev) {
+      const r = { desc: 'Private', finishMiles: M.endMiles, finishDate: lastDay(k), priv: M.endMiles - prev, bus: 0, driver: S.driver };
+      rows.push(r); list.push({ ...r, desc: 'Private miles to month end', untracked: Math.max(0, M.endMiles - reached) });
+    } else if (privRun > 0) {
+      const base = prev ?? (trips.find(t => t.type === 'priv') || {}).startMiles ?? 0;
+      rows.push({ desc: 'Private', priv: Math.max(privRun, reached - base), bus: 0, driver: S.driver });
+    }
+    return { rows, list, startMiles: M.startMiles ?? (first ? first.startMiles : null) };
   }
   function suggestedStart() { // odometer to pre-fill when starting a trip
     return S.lastFinish ?? months[viewM]?.startMiles ?? null;
@@ -520,12 +536,78 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     f.append(el('label', { className: 'lbl', htmlFor: id, textContent: label }), Object.assign(el('input', { id }), attrs));
     return f;
   }
+  function batteryBanner(c) {
+    if (!needBattery) return;
+    const bat = el('div', { className: 'banner', style: 'display:flex;flex-direction:column;gap:8px' });
+    bat.append(el('span', { textContent: 'Set the battery setting to Unrestricted, or your phone may stop the GPS logging mid-trip.' }));
+    const go = el('button', { className: 'secondary', type: 'button', textContent: 'Open battery setting' });
+    go.onclick = async () => { try { await TR().openBattery(); } catch (e) {} setTimeout(checkBattery, 4000); };
+    bat.append(go); c.append(bat);
+  }
+  function renderPrivCard(c, t) { // a private journey: miles only
+    c.append(el('span', { className: 'lbl', textContent: 'Private journey' }));
+    const big = el('div', { className: 'route', id: 'privMiles', textContent: TR() ? '0.0 mi' : '' });
+    c.append(big);
+    if (TR()) { c.append(el('p', { className: 'hint', id: 'gpsLine', textContent: 'GPS: checking…' })); batteryBanner(c); setTimeout(refreshGps, 0); }
+    const form = el('form', { style: 'display:flex;flex-direction:column;gap:12px' });
+    if (!TR()) form.append(field('Miles driven', 'pDone', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }));
+    form.append(el('p', { className: 'hint', textContent: 'Only the miles are kept. They go in the Private column.' }));
+    const err = el('p', { className: 'err', hidden: true }); form.append(err);
+    form.append(el('button', { className: 'primary', type: 'submit', textContent: 'Finish journey' }));
+    form.onsubmit = async e => {
+      e.preventDefault();
+      let miles;
+      if (TR()) { try { const st = await TR().stop(); miles = Math.round(MI(st.meters)); } catch (er) { miles = 0; } }
+      else { miles = num($('pDone').value); if (miles == null || miles < 0) { err.textContent = 'Enter the miles.'; err.hidden = false; return; } miles = Math.round(miles); }
+      const k = t.startDate; await loadMonth(k);
+      months[k].trips.push({ id: t.id, type: 'priv', startDate: k, startMiles: t.startMiles, finishMiles: t.startMiles + miles });
+      S.lastFinish = Math.max(S.lastFinish ?? 0, t.startMiles + miles); S.openTrip = null;
+      await saveMonth(k); await saveS();
+      viewM = k; await renderMonth(); renderTripCard();
+      toast(`Private: ${miles} miles`);
+    };
+    c.append(form);
+    const cancel = el('button', { className: 'secondary danger', type: 'button', textContent: 'Discard' });
+    let armed = false;
+    cancel.onclick = async () => {
+      if (!armed) { armed = true; cancel.textContent = 'Tap again to discard'; setTimeout(() => { armed = false; cancel.textContent = 'Discard'; }, 4000); return; }
+      if (TR()) { try { await TR().stop(); } catch (e) {} }
+      S.openTrip = null; await saveS(); renderTripCard(); toast('Discarded');
+    };
+    c.append(cancel);
+  }
+  function privStart(form) {
+    const sug = suggestedStart();
+    if (sug == null) form.append(field('Odometer now (first time only)', 'nMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }));
+    form.append(el('p', { className: 'hint', textContent: 'Nothing is recorded except the miles. No places, no times. They go in the Private column.' }));
+    const err = el('p', { className: 'err', hidden: true }); form.append(err);
+    form.append(el('button', { className: 'primary', type: 'submit', textContent: 'Start private journey' }));
+    form.onsubmit = async e => {
+      e.preventDefault();
+      const miles = sug ?? num($('nMiles').value);
+      if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
+      const k = mKey(today()); await loadMonth(k);
+      if (months[k].startMiles == null) { months[k].startMiles = S.lastFinish ?? miles; await saveMonth(k); }
+      let gpsMsg = '';
+      if (TR()) {
+        try {
+          const pm = await TR().permissions();
+          if (!pm.location) gpsMsg = ' GPS is off: allow location to log miles.';
+          else { await TR().start({ reset: true }); await checkBattery(); }
+        } catch (er) { gpsMsg = ' GPS logging did not start: ' + (er.message || er); }
+      }
+      S.openTrip = { id: uid(), type: 'priv', startDate: k, startMiles: miles }; newType = 'bus';
+      await saveS(); renderTripCard();
+      toast('Private journey started.' + gpsMsg);
+    };
+  }
   function renderTripCard() {
     const c = $('tripCard'); c.innerHTML = ''; c.classList.toggle('live', !!S.openTrip);
     if (S.openTrip) {
       const t = S.openTrip;
-      c.append(el('span', { className: 'lbl', textContent: t.type === 'priv' ? 'On a private trip' : 'On a business trip' }));
-      c.append(t.type === 'priv' ? el('div', { className: 'route', textContent: 'Private' }) : el('div', { className: 'route' }, [t.startPc, el('i', { textContent: '→' }), t.sitePc]));
+      if (t.type === 'priv') { renderPrivCard(c, t); return; }
+      c.append(el('span', { className: 'lbl', textContent: 'On a business trip' }));
+      c.append(el('div', { className: 'route' }, [t.startPc, el('i', { textContent: '→' }), t.sitePc]));
       const meta = el('div', { className: 'meta' });
       meta.append(el('span', { textContent: 'Since ' + fmtD(t.startDate) }));
       if (t.job) meta.append(el('span', { textContent: 'Job ' + t.job }));
@@ -541,13 +623,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
           catch (e) { fix.textContent = 'Set site postcode to where I am'; toast('GPS: ' + (e.message || e)); }
         };
         if (fix) c.append(fix);
-        if (needBattery) {
-          const bat = el('div', { className: 'banner', style: 'display:flex;flex-direction:column;gap:8px' });
-          bat.append(el('span', { textContent: 'Set the battery setting to Unrestricted, or your phone may stop the GPS logging mid-trip.' }));
-          const go = el('button', { className: 'secondary', type: 'button', textContent: 'Open battery setting' });
-          go.onclick = async () => { try { await TR().openBattery(); } catch (e) {} setTimeout(checkBattery, 4000); };
-          bat.append(go); c.append(bat);
-        }
+        batteryBanner(c);
         setTimeout(refreshGps, 0);
       }
       const form = el('form', { className: 'card', style: 'background:var(--bg);padding:14px' });
@@ -596,6 +672,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       return b; });
     kind.append(...kb); form.append(kind);
     const priv = newType === 'priv';
+    if (priv) { privStart(form); c.append(form); return; }
     const startAt = S.office;
     if (!priv) {
     const from = field('Start postcode', 'nFrom', { className: 'pc', value: pc(startAt), required: true, autocapitalize: 'characters', autocomplete: 'off' });
@@ -653,13 +730,13 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const sug = prevM?.endMiles ?? null;
     $('startHint').textContent = M.startMiles == null
       ? (sug != null ? `Last month ended on ${sug}.` : 'Set automatically from your first trip if left blank.') : '';
-    const { rows } = sheetRows(viewM);
+    const { rows, list: items } = sheetRows(viewM);
     const list = $('tripList'); list.innerHTML = '';
     let bus = 0, priv = 0;
     rows.forEach(r => { bus += r.bus; priv += r.priv; });
     $('tBus').textContent = bus; $('tPriv').textContent = priv;
-    if (!rows.length) list.append(el('p', { className: 'empty', textContent: 'No trips this month yet. Start one above.' }));
-    rows.forEach(r => list.append(tripItem(r)));
+    if (!items.length) list.append(el('p', { className: 'empty', textContent: 'No trips this month yet. Start one above.' }));
+    items.forEach(r => list.append(tripItem(r)));
     const fl = $('fuelList'); fl.innerHTML = '';
     let litres = 0;
     if (!M.fuel.length) fl.append(el('p', { className: 'empty', textContent: 'No fuel logged this month.' }));
@@ -686,12 +763,14 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   function tripItem(r) {
     const it = el('div', { className: 'item' });
     const head = el('button', { type: 'button', className: 'item-head' });
+    const P = r.type === 'priv';
     head.append(
-      el('span', { className: 'r', textContent: r.type === 'priv' ? 'Private' : r.id ? `${r.startPc || '?'} → ${r.sitePc || '?'}` : r.desc }),
-      el('span', { className: 'd', textContent: [fmtD(r.startDate) + (r.finishDate && r.finishDate !== r.startDate ? ' – ' + fmtD(r.finishDate) : ''), r.job ? 'Job ' + r.job : '', r.id && r.type !== 'priv' ? r.desc : ''].filter(Boolean).join(' · ') || fmtD(r.finishDate) }),
-      el('span', { className: 'm', innerHTML: '' }));
+      el('span', { className: 'r', textContent: P ? 'Private journey' : r.id ? `${r.startPc || '?'} → ${r.sitePc || '?'}` : r.desc }),
+      el('span', { className: 'd', textContent: P ? 'Miles only' : [fmtD(r.startDate) + (r.finishDate && r.finishDate !== r.startDate ? ' – ' + fmtD(r.finishDate) : ''), r.job ? 'Job ' + r.job : '', r.id ? r.desc : ''].filter(Boolean).join(' · ') || fmtD(r.finishDate) }),
+      el('span', { className: 'm' }));
     const m = head.querySelector('.m');
-    m.append(String(r.bus || r.priv), el('small', { textContent: r.type === 'priv' ? 'private trip' : r.bus ? (r.priv ? `business · +${r.priv} private` : 'business') : 'private' }));
+    const extra = r.untracked ? ` · +${r.untracked} not logged` : '';
+    m.append(String(P ? r.priv : r.id ? r.bus : (r.untracked ?? r.priv)), el('small', { textContent: P ? 'private' : r.id ? 'business' + extra : 'private' }));
     it.append(head);
     if (!r.id) { head.disabled = true; head.style.cursor = 'default'; return it; }
     if (editing === r.id) it.append(editForm(r.id));
@@ -702,6 +781,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   function editForm(id) {
     const M = months[viewM]; const t = M.trips.find(x => x.id === id);
     const f = el('form', { className: 'card', style: 'background:var(--bg);padding:14px' });
+    if (t.type === 'priv') return privEditForm(M, t, f);
     const add = (row) => f.append(row);
     let r = el('div', { className: 'row' });
     if (t.type !== 'priv') { r.append(field('Start postcode', 'eFrom', { className: 'pc', value: t.startPc }), field('Site postcode', 'eSite', { className: 'pc', value: t.sitePc })); add(r); }
@@ -734,6 +814,25 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     del.onclick = async () => {
       if (!armed) { armed = true; del.textContent = 'Tap again to delete'; return; }
       M.trips = M.trips.filter(x => x.id !== id); await saveMonth(viewM); await recalcLast(); editing = null; renderMonth(); toast('Trip deleted');
+    };
+    return f;
+  }
+  function privEditForm(M, t, f) {
+    f.append(field('Private miles', 'pMiles', { className: 'odo', inputMode: 'numeric', value: (t.finishMiles ?? 0) - (t.startMiles ?? 0) }));
+    const err = el('p', { className: 'err', hidden: true }); f.append(err);
+    const save = el('button', { className: 'primary', type: 'submit', textContent: 'Save' });
+    const del = el('button', { className: 'secondary danger', type: 'button', textContent: 'Delete' });
+    f.append(el('div', { className: 'btns' }, [save, del]));
+    f.onsubmit = async e => {
+      e.preventDefault();
+      const v = num($('pMiles').value); if (v == null || v < 0) { err.textContent = 'Enter the miles.'; err.hidden = false; return; }
+      t.finishMiles = (t.startMiles ?? 0) + Math.round(v);
+      await saveMonth(viewM); await recalcLast(); editing = null; renderMonth(); toast('Saved');
+    };
+    let armed = false;
+    del.onclick = async () => {
+      if (!armed) { armed = true; del.textContent = 'Tap again to delete'; return; }
+      M.trips = M.trips.filter(x => x.id !== t.id); await saveMonth(viewM); await recalcLast(); editing = null; renderMonth(); toast('Deleted');
     };
     return f;
   }
