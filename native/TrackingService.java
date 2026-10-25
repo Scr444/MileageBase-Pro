@@ -83,7 +83,9 @@ public class TrackingService extends Service {
             if (Build.VERSION.SDK_INT >= 29) startForeground(NOTE_ID, note(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
             else startForeground(NOTE_ID, note());
         } catch (Exception e) {
-            p.edit().putString("mode", "stopped").apply();
+            // Android refused to start logging in the background: ask for a tap instead
+            p.edit().putBoolean("active", false).putString("mode", "stopped").apply();
+            ReminderReceiver.notify(this, ReminderReceiver.ID_CAR, "Trip logging", "Tap to start logging this trip.", "autostart", false);
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -96,9 +98,30 @@ public class TrackingService extends Service {
             long now = System.currentTimeMillis();
             lastDriving = 0; lastMoving = now - PARK_AFTER_MS + WAKE_GRACE_MS * 2;
             drive();
+            handler.postDelayed(nag, 60_000L);
         }
+        WidgetProvider.refresh(this);
         return START_STICKY;
     }
+
+    // Reminders while logging: sort an automatic trip, and a trip left open for a week.
+    private final Runnable nag = new Runnable() {
+        @Override public void run() {
+            SharedPreferences p = prefs(TrackingService.this);
+            long now = System.currentTimeMillis(), since = p.getLong("since", now);
+            if (!p.getBoolean("tripOpen", false) && now - since > 3_600_000L && now - p.getLong("nagSort", 0) > 6 * 3_600_000L) {
+                p.edit().putLong("nagSort", now).apply();
+                ReminderReceiver.notify(TrackingService.this, ReminderReceiver.ID_OPEN, "Trip logging, not sorted yet",
+                        "Open MileageBase Pro and mark it Business or Private.", "open", false);
+            }
+            if (now - since > 7 * 86_400_000L && now - p.getLong("nagOpen", 0) > 86_400_000L) {
+                p.edit().putLong("nagOpen", now).apply();
+                ReminderReceiver.notify(TrackingService.this, ReminderReceiver.ID_OPEN, "Trip open for " + ((now - since) / 86_400_000L) + " days",
+                        "If you're back, open MileageBase Pro and finish it.", "finish", false);
+            }
+            handler.postDelayed(this, 3_600_000L);
+        }
+    };
 
     // ---------- modes ----------
     private void drive() {
@@ -249,12 +272,14 @@ public class TrackingService extends Service {
         notedMiles = miles;
         NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (nm != null) { try { nm.notify(NOTE_ID, note()); } catch (Exception e) { /* ignore */ } }
+        WidgetProvider.refresh(this);
     }
 
     @Override public void onDestroy() {
         running = false;
         if (handler != null) handler.removeCallbacksAndMessages(null);
         if (lm != null) stopAll();
+        WidgetProvider.refresh(this);
         super.onDestroy();
     }
 }

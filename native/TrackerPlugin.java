@@ -30,12 +30,126 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @CapacitorPlugin(
     name = "Tracker",
+    requestCodes = { TrackerPlugin.CAR_REQUEST },
     permissions = {
+        @Permission(alias = "bluetooth", strings = { "android.permission.BLUETOOTH_CONNECT" }),
         @Permission(alias = "location", strings = { Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION }),
         @Permission(alias = "notifications", strings = { "android.permission.POST_NOTIFICATIONS" })
     }
 )
 public class TrackerPlugin extends Plugin {
+    static final int CAR_REQUEST = 4242;
+    private PluginCall carCall;
+
+    @Override
+    public void load() { ReminderReceiver.schedule(getContext()); }
+
+    /** A tap on the widget or a reminder, waiting to be handled by the app. */
+    @PluginMethod
+    public void takeAction(PluginCall call) {
+        SharedPreferences p = TrackingService.prefs(getContext());
+        JSObject r = new JSObject();
+        r.put("action", p.getString("pendingAction", ""));
+        r.put("auto", p.getBoolean("auto", false));
+        r.put("since", p.getLong("since", 0L));
+        p.edit().remove("pendingAction").apply();
+        call.resolve(r);
+    }
+
+    /** What the widget and reminders should know about the app's open trip. */
+    @PluginMethod
+    public void sync(PluginCall call) {
+        boolean open = Boolean.TRUE.equals(call.getBoolean("tripOpen", false));
+        SharedPreferences.Editor e = TrackingService.prefs(getContext()).edit()
+                .putBoolean("tripOpen", open).putString("label", call.getString("label", ""));
+        if (open) e.putBoolean("auto", false);
+        e.apply();
+        WidgetProvider.refresh(getContext());
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void linkCar(PluginCall call) {
+        if (Build.VERSION.SDK_INT < 26) { call.reject("Needs Android 8 or newer", "unsupported"); return; }
+        if (Build.VERSION.SDK_INT >= 31 && getPermissionState("bluetooth") != PermissionState.GRANTED) {
+            requestPermissionForAlias("bluetooth", call, "btDone");
+            return;
+        }
+        doLink(call);
+    }
+
+    @PermissionCallback
+    private void btDone(PluginCall call) {
+        if (getPermissionState("bluetooth") != PermissionState.GRANTED) { call.reject("Nearby devices permission is off", "no_permission"); return; }
+        doLink(call);
+    }
+
+    private void doLink(PluginCall call) {
+        if (Build.VERSION.SDK_INT < 26) { call.reject("Needs Android 8 or newer", "unsupported"); return; }
+        carCall = call;
+        CarLink.choose(getActivity(), CAR_REQUEST, new CarLink.Done() {
+            @Override public void ok() { /* the chooser is showing */ }
+            @Override public void fail(String why) { if (carCall != null) { carCall.reject(why, "link_failed"); carCall = null; } }
+        });
+    }
+
+    @Override
+    protected void handleOnActivityResult(int requestCode, int resultCode, Intent data) {
+        super.handleOnActivityResult(requestCode, resultCode, data);
+        if (requestCode != CAR_REQUEST || carCall == null) return;
+        PluginCall call = carCall; carCall = null;
+        String cars = Build.VERSION.SDK_INT >= 26 ? CarLink.cars(getContext()) : "";
+        TrackingService.prefs(getContext()).edit().putString("cars", cars).apply();
+        JSObject r = new JSObject();
+        r.put("cars", cars);
+        r.put("linked", resultCode == android.app.Activity.RESULT_OK);
+        call.resolve(r);
+    }
+
+    @PluginMethod
+    public void cars(PluginCall call) {
+        String cars = Build.VERSION.SDK_INT >= 26 ? CarLink.cars(getContext()) : "";
+        TrackingService.prefs(getContext()).edit().putString("cars", cars).apply();
+        JSObject r = new JSObject();
+        r.put("cars", cars);
+        r.put("bluetooth", Build.VERSION.SDK_INT < 31 || getPermissionState("bluetooth") == PermissionState.GRANTED);
+        r.put("background", backgroundOk());
+        call.resolve(r);
+    }
+
+    @PluginMethod
+    public void forgetCars(PluginCall call) {
+        if (Build.VERSION.SDK_INT >= 26) CarLink.forget(getContext());
+        TrackingService.prefs(getContext()).edit().putString("cars", "").apply();
+        call.resolve();
+    }
+
+    private boolean backgroundOk() {
+        if (Build.VERSION.SDK_INT < 29) return locationOk();
+        return ContextCompat.checkSelfPermission(getContext(), "android.permission.ACCESS_BACKGROUND_LOCATION") == PackageManager.PERMISSION_GRANTED;
+    }
+
+    @PluginMethod
+    public void openAppSettings(PluginCall call) {
+        try {
+            Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getContext().getPackageName()));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(i);
+            call.resolve();
+        } catch (Exception e) { call.reject("Could not open settings", "no_settings"); }
+    }
+
+    /** Hands the site postcode to whatever satnav app is installed. */
+    @PluginMethod
+    public void openNav(PluginCall call) {
+        String q = call.getString("q", "");
+        try {
+            Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=" + Uri.encode(q)));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(Intent.createChooser(i, "Navigate with").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            call.resolve();
+        } catch (Exception e) { call.reject("No satnav app found", "no_app"); }
+    }
 
     private boolean locationOk() { return getPermissionState("location") == PermissionState.GRANTED; }
 
@@ -61,7 +175,7 @@ public class TrackerPlugin extends Plugin {
         Context c = getContext();
         boolean reset = Boolean.TRUE.equals(call.getBoolean("reset", true));
         SharedPreferences.Editor e = TrackingService.prefs(c).edit().putBoolean("active", true).putString("mode", "starting");
-        if (reset) { e.putLong("meters", Double.doubleToLongBits(0)); TrackingService.routeFile(c).delete(); }
+        if (reset) { e.putLong("meters", Double.doubleToLongBits(0)).putLong("since", System.currentTimeMillis()).putBoolean("auto", false); TrackingService.routeFile(c).delete(); }
         e.apply();
         try {
             ContextCompat.startForegroundService(c, new Intent(c, TrackingService.class));

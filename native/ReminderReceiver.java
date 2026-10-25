@@ -44,8 +44,26 @@ public class ReminderReceiver extends BroadcastReceiver {
             try { addr = d.getAddress(); } catch (SecurityException e) { return; }
             String cars = "," + p.getString("cars", "") + ",";
             if (addr == null || !cars.contains("," + addr + ",")) return;
-            if (p.getBoolean("tripOpen", false) || p.getBoolean("active", false)) return;
-            notify(c, ID_CAR, "In the car", "No trip open. Start one?", "open", true);
+            if (p.getBoolean("active", false)) return; // already logging
+            autoStart(c);
+        }
+    }
+
+    /** Starts logging with no tap. If Android won't allow it from the background, asks with a notification instead. */
+    static void autoStart(Context c) {
+        SharedPreferences p = TrackingService.prefs(c);
+        boolean wasOpen = p.getBoolean("tripOpen", false);
+        SharedPreferences.Editor e = p.edit().putBoolean("active", true).putString("mode", "starting");
+        if (!wasOpen) {
+            e.putLong("meters", Double.doubleToLongBits(0)).putLong("since", System.currentTimeMillis()).putBoolean("auto", true);
+            TrackingService.routeFile(c).delete();
+        }
+        e.apply();
+        try {
+            androidx.core.content.ContextCompat.startForegroundService(c, new Intent(c, TrackingService.class));
+        } catch (Exception ex) {
+            p.edit().putBoolean("active", false).putString("mode", "stopped").apply();
+            notify(c, ID_CAR, "In the car", "Tap to start logging this trip.", "autostart", false);
         }
     }
 
