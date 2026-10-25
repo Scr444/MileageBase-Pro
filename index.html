@@ -453,11 +453,61 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     while (i < str.length) { la += dec(); lo += dec(); pts.push([la / 1e5, lo / 1e5]); }
     return pts;
   }
+  const parsePts = txt => String(txt || '').split('\n').map(l => l.split(',').map(Number)).filter(p => p.length === 2 && isFinite(p[0]) && isFinite(p[1]));
+  const llCache = {};
+  async function postcodeLL(code) { // a postcode's position, for the map
+    code = pc(code); if (!code) return null;
+    if (llCache[code]) return llCache[code];
+    try { const j = await (await fetch('https://api.postcodes.io/postcodes/' + encodeURIComponent(code))).json();
+      if (j && j.result) return (llCache[code] = [j.result.latitude, j.result.longitude]); } catch (e) {}
+    return null;
+  }
+  const TILE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+  const TILE_OPT = { maxZoom: 19, subdomains: 'abcd', attribution: '© OpenStreetMap contributors © CARTO' };
+  const dot = (L, ll, fill, r = 6) => L.circleMarker(ll, { radius: r, color: '#fff', weight: 2, fillColor: fill, fillOpacity: 1 });
+  let live = null; // the open trip's live map
+  async function initLiveMap(box, t) {
+    live = null;
+    try {
+      const L = await loadLeaflet(); if (!box.isConnected) return;
+      const map = L.map(box, { zoomControl: true }); L.tileLayer(TILE_URL, TILE_OPT).addTo(map);
+      const priv = t.type === 'priv';
+      const st = { map, L, box, priv, fitted: false, here: null, ahead: null, start: null, site: null,
+        line: L.polyline([], { color: priv ? '#7b8790' : '#1f6feb', weight: 5, opacity: .9 }).addTo(map) };
+      live = st;
+      if (!priv) {
+        st.start = await postcodeLL(t.startPc); st.site = await postcodeLL(t.sitePc);
+        if (st.start) dot(L, st.start, '#2f9e44').addTo(map).bindTooltip('Start · ' + t.startPc);
+        if (st.site) L.circleMarker(st.site, { radius: 8, color: '#d9480f', weight: 3, fillColor: '#fff', fillOpacity: 1 }).addTo(map).bindTooltip('Site · ' + t.sitePc);
+      }
+      const c = st.start || st.site || [53.6, -1.7];
+      map.setView(c, 9); setTimeout(() => map.invalidateSize(), 200);
+      updateLive();
+    } catch (e) { box.textContent = 'The map shows in the installed app.'; box.style.display = 'grid'; box.style.placeItems = 'center'; box.style.color = 'var(--muted)'; }
+  }
+  async function updateLive() {
+    const st = live; if (!st || !st.box.isConnected) return;
+    let pts = [];
+    if (TR()) { try { pts = parsePts((await TR().route()).points); } catch (e) {} }
+    const L = st.L; st.line.setLatLngs(pts);
+    const cur = pts[pts.length - 1];
+    if (cur && !st.priv && pts.length) {
+      if (!st.startDot && !st.start) st.startDot = dot(L, pts[0], '#2f9e44').addTo(st.map);
+    }
+    if (cur) {
+      if (st.here) st.here.setLatLng(cur); else st.here = dot(L, cur, '#1f6feb', 8).addTo(st.map).bindTooltip('You');
+      if (st.site) { const seg = [cur, st.site]; if (st.ahead) st.ahead.setLatLngs(seg); else st.ahead = L.polyline(seg, { color: '#1f6feb', weight: 3, opacity: .7, dashArray: '6 8' }).addTo(st.map); }
+    }
+    if (!st.fitted) {
+      const all = pts.concat([st.start, st.site].filter(Boolean));
+      if (all.length > 1) { st.map.fitBounds(L.latLngBounds(all), { padding: [28, 28] }); st.fitted = pts.length > 0; }
+    }
+  }
   async function takeRoute() { // read the recorded route from the phone, packed small
     const T = TR(); if (!T) return null;
     try {
       const r = await T.route();
-      const pts = String(r.points || '').split('\n').map(l => l.split(',').map(Number)).filter(p => p.length === 2 && isFinite(p[0]) && isFinite(p[1]));
+      const pts = parsePts(r.points);
       return pts.length > 1 ? encodeRoute(simplify(pts, 12)) : null;
     } catch (e) { return null; }
   }
@@ -476,8 +526,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     try {
       const L = await loadLeaflet();
       const map = L.map(box, { zoomControl: true, attributionControl: true });
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19, subdomains: 'abcd', attribution: '© OpenStreetMap contributors © CARTO' }).addTo(map);
+      L.tileLayer(TILE_URL, TILE_OPT).addTo(map);
       const cs = getComputedStyle(document.documentElement);
       const col = { bus: '#1f6feb', priv: '#7b8790' };
       let bounds = null;
@@ -532,6 +581,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const words = { driving: 'logging your drive', parked: 'parked, GPS off', starting: 'waiting for GPS', stopped: 'not logging' };
     box.textContent = `GPS: ${MI(gpsLive.meters).toFixed(1)} mi so far · ${words[gpsLive.mode] || gpsLive.mode}`;
     const pm = $('privMiles'); if (pm) pm.textContent = MI(gpsLive.meters).toFixed(1) + ' mi';
+    updateLive();
     const odo = $('cMiles');
     if (odo && !odo.dataset.touched && gpsLive.meters > 0) {
       odo.value = S.openTrip.startMiles + Math.round(MI(gpsLive.meters));
@@ -623,7 +673,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     c.append(el('span', { className: 'lbl', textContent: 'Private journey' }));
     const big = el('div', { className: 'route', id: 'privMiles', textContent: TR() ? '0.0 mi' : '' });
     c.append(big);
-    if (TR()) { c.append(el('p', { className: 'hint', id: 'gpsLine', textContent: 'GPS: checking…' })); batteryBanner(c); setTimeout(refreshGps, 0); }
+    if (TR()) { const box = el('div', { className: 'map' }); c.append(box); initLiveMap(box, t); c.append(el('p', { className: 'hint', id: 'gpsLine', textContent: 'GPS: checking…' })); batteryBanner(c); setTimeout(refreshGps, 0); }
     const form = el('form', { style: 'display:flex;flex-direction:column;gap:12px' });
     if (!TR()) form.append(field('Miles driven', 'pDone', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }));
     form.append(el('p', { className: 'hint', textContent: 'The sheet only gets the miles, in the Private column.' }));
@@ -691,6 +741,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       if (t.desc) meta.append(el('span', { textContent: t.desc }));
       c.append(meta);
       if (TR()) {
+        const box = el('div', { className: 'map' }); c.append(box); initLiveMap(box, t);
         c.append(el('p', { className: 'hint', id: 'gpsLine', textContent: 'GPS: checking…' }));
         const fix = t.type === 'priv' ? null : el('button', { className: 'secondary', type: 'button', textContent: 'Set site postcode to where I am' });
         if (fix) fix.onclick = async () => {
