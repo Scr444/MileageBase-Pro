@@ -414,6 +414,60 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   }
   const safeName = s => s.replace(/[^\w\- ().]+/g, '_').trim();
 
+  // ---------- GPS (app only) ----------
+  const TR = () => NATIVE ? plug('Tracker') : null;
+  const MI = m => (Number(m) || 0) / 1609.344;
+  let gpsLive = null, needBattery = false;
+  async function gpsPostcode() { // where the phone is now, as a postcode
+    const T = TR(); if (!T) throw new Error('GPS works in the installed app');
+    const p = await T.permissions(); if (!p.location) throw new Error('location permission is off');
+    const f = await T.getLocation();
+    let j;
+    try { j = await (await fetch(`https://api.postcodes.io/postcodes?lon=${f.lon}&lat=${f.lat}&limit=1&radius=2000&widesearch=true`)).json(); }
+    catch (e) { throw new Error('no signal to look up the postcode'); }
+    const code = j && j.result && j.result[0] && j.result[0].postcode;
+    if (!code) throw new Error('no postcode found here');
+    return code;
+  }
+  function gpsChip(inputId, auto) { // a "Here" chip that fills the box from GPS
+    const b = el('button', { type: 'button', className: 'chip', textContent: 'Here (GPS)' });
+    b.setAttribute('aria-pressed', 'false');
+    let typed = false;
+    const run = async (manual) => {
+      b.textContent = 'Finding…';
+      try {
+        const code = await gpsPostcode();
+        if (!manual && typed) { b.textContent = 'Here (GPS)'; return; }
+        const inp = $(inputId); if (!inp) return;
+        inp.value = code; b.textContent = 'Here · ' + code;
+        b.parentElement && b.parentElement.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c === b)));
+      } catch (e) { b.textContent = 'Here (GPS)'; if (manual) toast('GPS: ' + (e.message || e)); }
+    };
+    b.onclick = () => run(true);
+    if (auto && TR()) setTimeout(() => {
+      const inp = $(inputId); if (inp) inp.addEventListener('input', () => { typed = true; }, { once: true });
+      run(false);
+    }, 0);
+    return b;
+  }
+  async function refreshGps() { // live miles on the open trip
+    const T = TR(); if (!T || !S.openTrip) return;
+    try { gpsLive = await T.status(); } catch (e) { return; }
+    const box = $('gpsLine'); if (!box) return;
+    const words = { driving: 'logging your drive', parked: 'parked, GPS off', starting: 'waiting for GPS', stopped: 'not logging' };
+    box.textContent = `GPS: ${MI(gpsLive.meters).toFixed(1)} mi so far · ${words[gpsLive.mode] || gpsLive.mode}`;
+    const odo = $('cMiles');
+    if (odo && !odo.dataset.touched && gpsLive.meters > 0) {
+      odo.value = S.openTrip.startMiles + Math.round(MI(gpsLive.meters));
+      const h = $('cHint'); if (h) h.textContent = 'Worked out from GPS. Check the dash and change it if you want it exact.';
+    }
+  }
+  setInterval(refreshGps, 5000);
+  async function checkBattery() {
+    const T = TR(); if (!T) return;
+    try { const b = await T.batteryOk(); const was = needBattery; needBattery = !b.ok; if (was !== needBattery) renderTripCard(); } catch (e) {}
+  }
+
   // ---------- state ----------
   const DEFAULTS = { name: '', driver: '', reg: '', office: 'HD8 0RW', home: '', lastFinish: null, openTrip: null };
   let S = { ...DEFAULTS };
@@ -477,12 +531,32 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       meta.append(el('span', { textContent: 'Started at ' + t.startMiles }));
       if (t.desc) meta.append(el('span', { textContent: t.desc }));
       c.append(meta);
+      if (TR()) {
+        c.append(el('p', { className: 'hint', id: 'gpsLine', textContent: 'GPS: checking…' }));
+        const fix = el('button', { className: 'secondary', type: 'button', textContent: 'Set site postcode to where I am' });
+        fix.onclick = async () => {
+          fix.textContent = 'Finding…';
+          try { const code = await gpsPostcode(); S.openTrip.sitePc = code; await saveS(); renderTripCard(); toast('Site postcode set to ' + code); }
+          catch (e) { fix.textContent = 'Set site postcode to where I am'; toast('GPS: ' + (e.message || e)); }
+        };
+        c.append(fix);
+        if (needBattery) {
+          const bat = el('div', { className: 'banner', style: 'display:flex;flex-direction:column;gap:8px' });
+          bat.append(el('span', { textContent: 'Set the battery setting to Unrestricted, or your phone may stop the GPS logging mid-trip.' }));
+          const go = el('button', { className: 'secondary', type: 'button', textContent: 'Open battery setting' });
+          go.onclick = async () => { try { await TR().openBattery(); } catch (e) {} setTimeout(checkBattery, 4000); };
+          bat.append(go); c.append(bat);
+        }
+        setTimeout(refreshGps, 0);
+      }
       const form = el('form', { className: 'card', style: 'background:var(--bg);padding:14px' });
       form.append(el('h2', { textContent: 'Back home or at the office' }));
       const row = el('div', { className: 'row' });
       row.append(field('Finish date', 'cDate', { type: 'date', value: today(), required: true }),
                  field('Odometer now', 'cMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }));
+      row.querySelector('#cMiles').addEventListener('input', e => { e.target.dataset.touched = '1'; });
       form.append(row);
+      form.append(el('p', { className: 'hint', id: 'cHint', textContent: TR() ? 'Fills in from GPS as you drive.' : 'Read it off the dash.' }));
       const err = el('p', { className: 'err', hidden: true }); form.append(err);
       form.append(el('button', { className: 'primary', type: 'submit', textContent: 'Finish trip' }));
       form.onsubmit = async e => {
@@ -491,18 +565,21 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
         if (miles < t.startMiles) { err.textContent = `That's lower than the start reading (${t.startMiles}). Check the odometer.`; err.hidden = false; return; }
         if (date < t.startDate) { err.textContent = 'Finish date is before the start date.'; err.hidden = false; return; }
+        let gpsMiles = null;
+        if (TR()) { try { const st = await TR().stop(); gpsMiles = Math.round(MI(st.meters) * 10) / 10; } catch (e) {} }
         const k = mKey(t.startDate); await loadMonth(k);
-        months[k].trips.push({ ...t, finishMiles: miles, finishDate: date });
+        months[k].trips.push({ ...t, finishMiles: miles, finishDate: date, gpsMiles });
         S.lastFinish = Math.max(S.lastFinish ?? 0, miles); S.openTrip = null;
         await saveMonth(k); await saveS();
         viewM = k; await renderMonth(); renderTripCard();
-        toast(`Trip saved: ${miles - t.startMiles} business miles`);
+        toast(`Trip saved: ${miles - t.startMiles} ${t.type === 'priv' ? 'private' : 'business'} miles`);
       };
       c.append(form);
       const cancel = el('button', { className: 'secondary danger', type: 'button', textContent: 'Discard this trip' });
       let armed = false;
       cancel.onclick = async () => {
         if (!armed) { armed = true; cancel.textContent = 'Tap again to discard'; setTimeout(() => { armed = false; cancel.textContent = 'Discard this trip'; }, 4000); return; }
+        if (TR()) { try { await TR().stop(); } catch (e) {} }
         S.openTrip = null; await saveS(); renderTripCard(); toast('Trip discarded');
       };
       c.append(cancel);
@@ -520,7 +597,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const priv = newType === 'priv';
     const startAt = priv ? (S.home || S.office) : S.office;
     const from = field('Start postcode', 'nFrom', { className: 'pc', value: pc(startAt), required: true, autocapitalize: 'characters', autocomplete: 'off' });
-    from.append(placeChips('nFrom', startAt));
+    const chipsFrom = placeChips('nFrom', startAt); if (TR()) chipsFrom.append(gpsChip('nFrom', true));
+    from.append(chipsFrom);
     form.append(from);
     const to = field(priv ? 'Going to' : 'Site postcode', 'nSite', { className: 'pc', required: true, autocapitalize: 'characters', autocomplete: 'off', placeholder: priv ? 'Postcode' : 'BS11 8AX' });
     if (priv) to.append(placeChips('nSite', ''));
@@ -549,8 +627,16 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
                   startDate: $('nDate').value, desc: $('nDesc').value.trim(), startMiles: miles };
       const k = mKey(t.startDate); await loadMonth(k);
       if (months[k].startMiles == null) { months[k].startMiles = S.lastFinish ?? miles; await saveMonth(k); }
+      let gpsMsg = '';
+      if (TR()) {
+        try {
+          const pm = await TR().permissions();
+          if (!pm.location) gpsMsg = ' GPS is off: allow location to log miles.';
+          else { await TR().start({ reset: true }); await checkBattery(); }
+        } catch (e) { gpsMsg = ' GPS logging did not start: ' + (e.message || e); }
+      }
       S.openTrip = t; newType = 'bus'; await saveS(); renderTripCard(); if (k === viewM) renderMonth();
-      toast('Trip started. Finish it when you get back.');
+      toast('Trip started.' + (gpsMsg || ' Finish it when you get back.'));
     };
     c.append(form);
   }
@@ -731,6 +817,9 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     await initStore();
     const saved = await store.get('settings'); if (saved) S = { ...S, ...saved };
     await loadMonth(shiftM(viewM, -1));
+    if (S.openTrip && TR()) { // keep logging after the phone or app restarts
+      try { const st = await TR().status(); if (!st.active) await TR().start({ reset: false }); await checkBattery(); } catch (e) {}
+    }
     fillSettings(); renderTripCard(); await renderMonth();
     if (!S.name && !S.reg) $('settingsBox').open = true;
   })();
