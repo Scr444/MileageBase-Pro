@@ -1,0 +1,719 @@
+<!doctype html>
+<html lang="en-GB"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1c2326">
+<link rel="manifest" href="manifest.webmanifest">
+<title>MileageBase Pro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one narrow column, built like a van logbook — current trip on top, the month's sheet below, settings last. */
+:root {
+  --bg: #f3f4f2; --surface: #ffffff; --band: #e3e6e6; --ink: #1c2326; --muted: #5d676c;
+  --line: #d3d8da; --yellow: #f4c814; --on-yellow: #1c2326; --red: #b42318; --ok: #2f6b3a;
+  --display: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
+  --body: "Barlow", "Segoe UI", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #14181a; --surface: #1d2326; --band: #262d31; --ink: #e8ecec; --muted: #9aa5aa;
+  --line: #343d42; --yellow: #f5cc2e; --on-yellow: #14181a; --red: #f08a7e; --ok: #8fd19c; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #14181a; --surface: #1d2326; --band: #262d31; --ink: #e8ecec; --muted: #9aa5aa;
+  --line: #343d42; --yellow: #f5cc2e; --on-yellow: #14181a; --red: #f08a7e; --ok: #8fd19c; color-scheme: dark }
+
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+[hidden] { display: none !important; }
+body { margin: 0; -webkit-tap-highlight-color: transparent; background: var(--bg); color: var(--ink); font: 16px/1.45 var(--body); }
+.wrap { max-width: 560px; margin: 0 auto; padding-block: 16px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 18px; }
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font: 700 30px/1 var(--display); letter-spacing: .01em; margin: 0; text-transform: uppercase; }
+h1 span { background: var(--yellow); color: var(--on-yellow); padding: 0 6px; }
+.reg { font: 600 15px var(--mono); border: 2px solid var(--ink); padding: 1px 8px; border-radius: 4px; letter-spacing: .06em; }
+h2 { font: 700 20px/1.1 var(--display); text-transform: uppercase; letter-spacing: .03em; margin: 0; text-wrap: balance; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.card.live { border: 2px solid var(--yellow); }
+.lbl { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+input, select { font: 500 17px var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; width: 100%; box-sizing: border-box; min-width: 0; }
+input.pc { text-transform: uppercase; font-family: var(--mono); letter-spacing: .03em; }
+input.odo { font-family: var(--mono); font-size: 20px; letter-spacing: .08em; }
+input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+.hint { font-size: 14px; color: var(--muted); margin: 0; }
+.err { font-size: 14px; color: var(--red); margin: 0; font-weight: 600; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip { font: 600 15px var(--body); border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 999px; padding: 7px 14px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--yellow); color: var(--on-yellow); border-color: var(--yellow); }
+button.primary { font: 700 19px var(--display); text-transform: uppercase; letter-spacing: .05em; background: var(--ink); color: var(--bg); border: 0; border-radius: 8px; padding: 13px 16px; cursor: pointer; }
+button.secondary { font: 600 15px var(--body); background: transparent; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 9px 14px; cursor: pointer; }
+button.danger { color: var(--red); border-color: var(--red); }
+.btns { display: flex; gap: 10px; flex-wrap: wrap; }
+.btns > * { flex: 1 1 auto; }
+.route { font: 600 22px/1.2 var(--mono); letter-spacing: .03em; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.route i { font-style: normal; color: var(--muted); font-family: var(--body); }
+.meta { display: flex; gap: 6px 16px; flex-wrap: wrap; color: var(--muted); font-size: 15px; }
+.monthbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.monthbar button { font: 700 22px var(--display); width: 44px; height: 44px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.monthbar h2 { font-size: 26px; }
+.totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.totals div { background: var(--band); padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.totals b { font: 600 22px var(--mono); font-variant-numeric: tabular-nums; }
+.list { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.item { border-bottom: 1px solid var(--line); padding: 12px 0; display: flex; flex-direction: column; gap: 10px; }
+.item-head { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: start; background: none; border: 0; color: inherit; text-align: left; padding: 0; cursor: pointer; font: inherit; width: 100%; }
+.item-head .r { font: 600 16px var(--mono); }
+.item-head .d { font-size: 14px; color: var(--muted); grid-column: 1; }
+.item-head .m { font: 600 17px var(--mono); text-align: right; font-variant-numeric: tabular-nums; grid-row: 1 / span 2; grid-column: 2; }
+.item-head .m small { display: block; font: 500 12px var(--body); color: var(--muted); }
+.empty { color: var(--muted); font-size: 15px; padding: 12px 0; margin: 0; }
+.banner { font-size: 14px; background: var(--band); border-radius: 8px; padding: 10px 12px; margin: 0; }
+details.card > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+details.card > summary::after { content: "+"; font: 700 22px var(--display); }
+details.card[open] > summary::after { content: "–"; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-weight: 600; max-width: calc(100% - 32px); box-sizing: border-box; }
+@media (max-width: 380px) { .row { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: no-preference) { .card { transition: border-color .2s; } }
+</style>
+</head><body>
+<div class="wrap">
+  <header>
+    <h1><span>MileageBase</span> Pro</h1>
+    <span class="reg" id="regBadge" hidden></span>
+  </header>
+  <p class="banner" id="storeNote" hidden></p>
+  <section id="tripCard" class="card"><p class="hint">Loading your log…</p></section>
+
+  <section class="card" aria-labelledby="monthTitle">
+    <div class="monthbar">
+      <button type="button" id="prevM" aria-label="Previous month">‹</button>
+      <h2 id="monthTitle">—</h2>
+      <button type="button" id="nextM" aria-label="Next month">›</button>
+    </div>
+    <div class="field">
+      <label class="lbl" for="startMiles">Start miles (odometer on the 1st)</label>
+      <input id="startMiles" class="odo" inputmode="numeric" autocomplete="off">
+      <p class="hint" id="startHint"></p>
+    </div>
+    <div class="totals">
+      <div><span class="lbl">Business</span><b id="tBus">0</b></div>
+      <div><span class="lbl">Private</span><b id="tPriv">0</b></div>
+      <div><span class="lbl">Fuel L</span><b id="tFuel">0</b></div>
+    </div>
+    <div>
+      <span class="lbl">Trips</span>
+      <div class="list" id="tripList"></div>
+    </div>
+    <div>
+      <span class="lbl">Fuel</span>
+      <div class="list" id="fuelList"></div>
+    </div>
+    <form id="fuelForm" class="card" style="background:var(--bg)">
+      <h2>Add fuel</h2>
+      <div class="row">
+        <div class="field"><label class="lbl" for="fDate">Date</label><input id="fDate" type="date" required></div>
+        <div class="field"><label class="lbl" for="fLitres">Litres</label><input id="fLitres" inputmode="decimal" required></div>
+      </div>
+      <div class="row">
+        <div class="field"><label class="lbl" for="fType">For</label><select id="fType"><option value="bus">Business</option><option value="priv">Private</option></select></div>
+        <div class="field"><label class="lbl" for="fPaid">Paid by</label><input id="fPaid" placeholder="Fuel card"></div>
+      </div>
+      <button class="primary" type="submit">Add fuel</button>
+    </form>
+    <div class="field">
+      <label class="lbl" for="endMiles">Odometer at month end (optional)</label>
+      <input id="endMiles" class="odo" inputmode="numeric" autocomplete="off">
+      <p class="hint">Any miles after your last trip go on the sheet as private.</p>
+    </div>
+    <button class="primary" type="button" id="exportBtn">Download sheet (.xlsx)</button>
+    <p class="hint" id="exportNote">Same layout as the paper Mileage Record Sheet, filled in.</p>
+    <button class="secondary" type="button" id="shareBtn" hidden>Share the sheet</button>
+  </section>
+
+  <details class="card" id="settingsBox">
+    <summary><h2>Your details</h2></summary>
+    <form id="settingsForm" style="display:flex;flex-direction:column;gap:14px">
+      <div class="row">
+        <div class="field"><label class="lbl" for="sName">Name</label><input id="sName" autocomplete="name"></div>
+        <div class="field"><label class="lbl" for="sDriver">Driver initials</label><input id="sDriver" maxlength="4" class="pc"></div>
+      </div>
+      <div class="field"><label class="lbl" for="sReg">Vehicle registration</label><input id="sReg" class="pc"></div>
+      <div class="row">
+        <div class="field"><label class="lbl" for="sOffice">Office postcode</label><input id="sOffice" class="pc"></div>
+        <div class="field"><label class="lbl" for="sHome">Home postcode</label><input id="sHome" class="pc"></div>
+      </div>
+      <button class="primary" type="submit">Save details</button>
+    </form>
+    <div style="display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:14px">
+      <h2>Backup</h2>
+      <p class="hint" id="backupHint">Your whole log is one file on this phone. Share it to your laptop or email to keep a copy.</p>
+      <div class="btns">
+        <button class="secondary" type="button" id="backupBtn">Share backup file</button>
+        <button class="secondary" type="button" id="restoreBtn">Restore from backup</button>
+      </div>
+      <input type="file" id="restoreFile" accept=".json,application/json" hidden>
+      <p class="hint" id="restoreMsg" hidden></p>
+      <button class="secondary danger" type="button" id="restoreGo" hidden>Replace my log with this backup</button>
+    </div>
+  </details>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+// Builds the Mileage Record Sheet as an .xlsx (no libraries). Layout copies the paper form.
+// data: {name, reg, monthLabel, startMiles, office, rows:[{desc,startPc,sitePc,job,driver,startDate,finishMiles,finishDate,priv,bus}],
+//        fuel:[{date,litresPriv,litresBus,paidBy}]}  dates are 'YYYY-MM-DD'
+function buildMileageXlsx(data) {
+  const esc = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const serial = d => { const [y, m, dd] = d.split('-').map(Number); return Date.UTC(y, m - 1, dd) / 86400000 + 25569; };
+
+  // ---- styles ----
+  // fonts: 0 Arial 9, 1 Arial 9 bold, 2 Arial 9 bold red, 3 Arial 10, 4 Arial 10 bold
+  // fills: 0 none, 1 gray125, 2 grey, 3 yellow
+  // borders: 0 none, 1 thin all
+  // numFmts: 164 dd/mm/yy, 165 0, 166 0.0
+  const X = []; const xf = s => { X.push(s); return X.length - 1; };
+  const al = (h, v, wrap) => `<alignment horizontal="${h}" vertical="${v}"${wrap ? ' wrapText="1"' : ''}/>`;
+  const mk = (font, fill, border, numFmt, align) =>
+    `<xf numFmtId="${numFmt}" fontId="${font}" fillId="${fill}" borderId="${border}" xfId="0"` +
+    `${numFmt ? ' applyNumberFormat="1"' : ''} applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1">${align}</xf>`;
+  const S = {
+    plain: xf(mk(0, 0, 0, 0, al('left', 'bottom'))),
+    banner: xf(mk(2, 3, 0, 0, al('center', 'center'))),
+    head: xf(mk(0, 0, 1, 0, al('center', 'center', true))),
+    headY: xf(mk(2, 3, 1, 0, al('center', 'top'))),
+    headB: xf(mk(1, 0, 1, 0, al('center', 'center', true))),
+    txt: xf(mk(3, 0, 1, 0, al('center', 'center'))),
+    txtL: xf(mk(3, 0, 1, 0, al('left', 'center', true))),
+    txtY: xf(mk(3, 0, 1, 0, al('center', 'center'))),
+    txtG: xf(mk(3, 2, 1, 0, al('center', 'center'))),
+    dateG: xf(mk(3, 2, 1, 164, al('center', 'center'))),
+    numW: xf(mk(3, 0, 1, 165, al('center', 'center'))),
+    numG: xf(mk(3, 2, 1, 165, al('center', 'center'))),
+    litG: xf(mk(3, 2, 1, 166, al('center', 'center'))),
+    totLbl: xf(mk(0, 2, 1, 0, al('right', 'bottom'))),
+    totW: xf(mk(4, 0, 1, 165, al('center', 'center'))),
+    totG: xf(mk(4, 2, 1, 166, al('center', 'center'))),
+    smLbl: xf(mk(0, 0, 1, 0, al('center', 'center'))),
+    smVal: xf(mk(4, 2, 1, 165, al('center', 'center'))),
+  };
+  const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="3"><numFmt numFmtId="164" formatCode="dd/mm/yy"/><numFmt numFmtId="165" formatCode="0"/><numFmt numFmtId="166" formatCode="0.0"/></numFmts>
+<fonts count="5"><font><sz val="9"/><name val="Arial"/></font><font><b/><sz val="9"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FFFF0000"/><name val="Arial"/></font><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><name val="Arial"/></font></fonts>
+<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9D9D9"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/><bgColor indexed="64"/></patternFill></fill></fills>
+<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color auto="1"/></left><right style="thin"><color auto="1"/></right><top style="thin"><color auto="1"/></top><bottom style="thin"><color auto="1"/></bottom><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="${X.length}">${X.join('')}</cellXfs>
+<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>`;
+
+  // ---- cells ----
+  const COLS = 'ABCDEFGHIJKLMN'.split('');
+  const grid = {}; // ref -> xml
+  const put = (ref, s, v, kind) => {
+    let inner = '', t = '';
+    if (v === undefined || v === null || v === '') inner = '';
+    else if (kind === 'f') inner = `<f>${esc(v.f)}</f><v>${v.v}</v>`;
+    else if (typeof v === 'number') inner = `<v>${v}</v>`;
+    else { t = ' t="inlineStr"'; inner = `<is><t xml:space="preserve">${esc(v)}</t></is>`; }
+    grid[ref] = `<c r="${ref}" s="${s}"${t}>${inner}</c>`;
+  };
+  const merges = [];
+  const box = (a, b, s) => { // style every cell of a merged range so borders draw
+    const [c1, r1] = [a.charCodeAt(0), +a.slice(1)], [c2, r2] = [b.charCodeAt(0), +b.slice(1)];
+    for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) { const ref = String.fromCharCode(c) + r; if (!grid[ref]) put(ref, s); }
+    if (a !== b) merges.push(`${a}:${b}`);
+  };
+  const dots = '.......................................';
+
+  // Row 1-2: header band
+  put('A1', S.plain, 'MILEAGE RECORD SHEET');
+  put('D1', S.banner, 'PLEASE PUT POSTCODES IN.'); box('D1', 'F1', S.banner);
+  put('K1', S.plain, 'MONTH :- ' + (data.monthLabel || dots)); box('K1', 'N1', S.plain);
+  put('A2', S.plain, 'Name: ' + (data.name || dots));
+  put('F2', S.smLbl, 'START MILES');
+  put('G2', S.smVal, data.startMiles === '' || data.startMiles == null ? '' : Number(data.startMiles));
+  put('J2', S.plain, 'VEHICLE REGISTRATION :- ' + (data.reg || dots)); box('J2', 'N2', S.plain);
+
+  // Rows 3-4: column headings
+  const office = (data.office || 'HD8 0RW').toUpperCase().trim().replace(/\s+/g, '-');
+  const h2 = (col, text, s) => { put(col + '3', s || S.head, text); box(col + '3', col + '4', s || S.head); };
+  h2('A', office + ' - OFFICE POSTCODE.', S.headB);
+  h2('B', 'START\nPOSTCODE'); h2('C', 'SITE\nPOSTCODE'); h2('D', 'Job\nNumber');
+  h2('E', 'DRIVER', S.headY);
+  h2('F', 'START\nDATE'); h2('G', 'FINISH\nMILES'); h2('H', 'FINISH\nDATE');
+  put('I3', S.head, 'TOTAL MILES'); box('I3', 'J3', S.head); put('I4', S.head, 'Private'); put('J4', S.head, 'Business');
+  h2('K', 'FUEL\nDATE');
+  put('L3', S.head, 'LITRES'); box('L3', 'M3', S.head); put('L4', S.head, 'Private'); put('M4', S.head, 'Business');
+  h2('N', 'PAID\nBY ...');
+
+  // Body rows: at least 19, more if needed
+  const rows = data.rows || [], fuel = data.fuel || [];
+  const n = Math.max(19, rows.length, fuel.length);
+  const first = 5, last = first + n - 1, tot = last + 1;
+  for (let i = 0; i < n; i++) {
+    const r = first + i, t = rows[i] || {}, f = fuel[i] || {};
+    put('A' + r, S.txtL, t.desc); put('B' + r, S.txt, (t.startPc || '').toUpperCase()); put('C' + r, S.txt, (t.sitePc || '').toUpperCase());
+    put('D' + r, S.txt, t.job); put('E' + r, S.txtY, t.driver);
+    put('F' + r, t.startDate ? S.dateG : S.txtG, t.startDate ? serial(t.startDate) : '');
+    put('G' + r, S.numG, t.finishMiles === '' || t.finishMiles == null ? '' : Number(t.finishMiles));
+    put('H' + r, t.finishDate ? S.dateG : S.txtG, t.finishDate ? serial(t.finishDate) : '');
+    put('I' + r, S.numW, t.priv ? Number(t.priv) : (t.startDate || t.finishMiles ? 0 : ''));
+    put('J' + r, S.numW, t.bus ? Number(t.bus) : (t.startDate || t.finishMiles ? 0 : ''));
+    put('K' + r, f.date ? S.dateG : S.txtG, f.date ? serial(f.date) : '');
+    put('L' + r, S.litG, f.litresPriv ? Number(f.litresPriv) : '');
+    put('M' + r, S.litG, f.litresBus ? Number(f.litresBus) : '');
+    put('N' + r, S.txtG, f.paidBy);
+  }
+  // Totals row
+  const sum = (col, k, arr) => arr.reduce((a, x) => a + (Number(x[k]) || 0), 0);
+  ['A', 'B', 'C', 'D', 'E'].forEach(c => put(c + tot, c === 'E' ? S.txtY : S.txt, ''));
+  put('F' + tot, S.txtG, ''); put('G' + tot, S.txtG, '');
+  put('H' + tot, S.totLbl, 'TOTAL');
+  put('I' + tot, S.totW, { f: `SUM(I${first}:I${last})`, v: sum('I', 'priv', rows) }, 'f');
+  put('J' + tot, S.totW, { f: `SUM(J${first}:J${last})`, v: sum('J', 'bus', rows) }, 'f');
+  put('K' + tot, S.totLbl, 'TOTAL');
+  put('L' + tot, S.totG, { f: `SUM(L${first}:L${last})`, v: Math.round(sum('L', 'litresPriv', fuel) * 10) / 10 }, 'f');
+  put('M' + tot, S.totG, { f: `SUM(M${first}:M${last})`, v: Math.round(sum('M', 'litresBus', fuel) * 10) / 10 }, 'f');
+  put('N' + tot, S.txtG, '');
+
+  // ---- sheet xml ----
+  const widths = [40, 13, 13, 10, 8, 12, 11, 10, 9, 9, 10, 9, 9, 9];
+  const heights = { 1: 18, 2: 24, 3: 16, 4: 16 };
+  let sheetRows = '';
+  for (let r = 1; r <= tot; r++) {
+    const cells = COLS.map(c => grid[c + r]).filter(Boolean).join('');
+    const ht = heights[r] || 26;
+    sheetRows += `<row r="${r}" ht="${ht}" customHeight="1">${cells}</row>`;
+  }
+  const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>
+<sheetViews><sheetView workbookViewId="0" zoomScale="100"><selection activeCell="A5" sqref="A5"/></sheetView></sheetViews>
+<sheetFormatPr defaultRowHeight="15"/>
+<cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols>
+<sheetData>${sheetRows}</sheetData>
+<mergeCells count="${merges.length}">${merges.map(m => `<mergeCell ref="${m}"/>`).join('')}</mergeCells>
+<printOptions horizontalCentered="1"/>
+<pageMargins left="0.3" right="0.3" top="0.4" bottom="0.4" header="0.2" footer="0.2"/>
+<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="1"/>
+</worksheet>`;
+
+  const files = {
+    '[Content_Types].xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`,
+    '_rels/.rels': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
+    'xl/workbook.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Mileage" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">Mileage!$A$1:$N$${tot}</definedName></definedNames><calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>`,
+    'xl/_rels/workbook.xml.rels': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
+    'xl/styles.xml': styles,
+    'xl/worksheets/sheet1.xml': sheet,
+  };
+  return zipStore(files);
+}
+
+// Minimal ZIP writer (stored, no compression) — valid for .xlsx
+function zipStore(files) {
+  const enc = new TextEncoder();
+  const table = zipStore.t || (zipStore.t = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })());
+  const crc = b => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = table[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+  const parts = [], central = []; let offset = 0;
+  const u16 = (a, v) => a.push(v & 255, (v >>> 8) & 255);
+  const u32 = (a, v) => a.push(v & 255, (v >>> 8) & 255, (v >>> 16) & 255, (v >>> 24) & 255);
+  for (const name of Object.keys(files)) {
+    const nb = enc.encode(name), db = enc.encode(files[name]), c = crc(db);
+    const h = []; u32(h, 0x04034b50); u16(h, 20); u16(h, 0x0800); u16(h, 0); u16(h, 0); u16(h, 0x21);
+    u32(h, c); u32(h, db.length); u32(h, db.length); u16(h, nb.length); u16(h, 0);
+    parts.push(Uint8Array.from(h), nb, db);
+    const ch = []; u32(ch, 0x02014b50); u16(ch, 20); u16(ch, 20); u16(ch, 0x0800); u16(ch, 0); u16(ch, 0); u16(ch, 0x21);
+    u32(ch, c); u32(ch, db.length); u32(ch, db.length); u16(ch, nb.length); u16(ch, 0); u16(ch, 0); u16(ch, 0); u16(ch, 0); u32(ch, 0); u32(ch, offset);
+    central.push(Uint8Array.from(ch), nb);
+    offset += h.length + nb.length + db.length;
+  }
+  const cdSize = central.reduce((a, b) => a + b.length, 0);
+  const e = []; u32(e, 0x06054b50); u16(e, 0); u16(e, 0); u16(e, Object.keys(files).length); u16(e, Object.keys(files).length); u32(e, cdSize); u32(e, offset); u16(e, 0);
+  const all = [...parts, ...central, Uint8Array.from(e)];
+  const out = new Uint8Array(all.reduce((a, b) => a + b.length, 0)); let p = 0;
+  for (const a of all) { out.set(a, p); p += a.length; }
+  return out;
+}
+if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
+
+</script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const pad = n => String(n).padStart(2, '0');
+  const today = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+  const mKey = d => d.slice(0, 7);
+  const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const mLabel = k => `${MONTHS[+k.slice(5) - 1]} ${k.slice(0, 4)}`;
+  const shiftM = (k, n) => { let y = +k.slice(0, 4), m = +k.slice(5) - 1 + n; y += Math.floor(m / 12); m = ((m % 12) + 12) % 12; return `${y}-${pad(m + 1)}`; };
+  const lastDay = k => { const y = +k.slice(0, 4), m = +k.slice(5); return `${k}-${pad(new Date(y, m, 0).getDate())}`; };
+  const fmtD = d => d ? new Date(d + 'T12:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
+  const num = v => { const n = parseFloat(String(v ?? '').replace(/[, ]/g, '')); return isFinite(n) ? n : null; };
+  const pc = v => String(v || '').toUpperCase().replace(/\s+/g, ' ').trim();
+  const uid = () => Math.random().toString(36).slice(2, 10);
+  const el = (tag, props = {}, kids = []) => { const e = document.createElement(tag); Object.assign(e, props); kids.forEach(k => e.append(k)); return e; };
+  let toastT; const toast = msg => { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); };
+
+  // ---------- storage: one JSON file in Documents/MileageBase Pro on the phone ----------
+  const NATIVE = !!window.androidBridge || !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+  const PL = {};
+  function plug(name) { const C = window.Capacitor; if (!C) return null; if (PL[name]) return PL[name];
+    if (C.registerPlugin) { try { PL[name] = C.registerPlugin(name); return PL[name]; } catch (e) {} }
+    if (C.Plugins && C.Plugins[name]) { PL[name] = C.Plugins[name]; return PL[name]; }
+    if (C.nativePromise) { PL[name] = new Proxy({}, { get: (_, m) => m === 'addListener' ? ((ev, cb) => C.nativeCallback(name, 'addListener', { eventName: ev }, cb)) : (o => C.nativePromise(name, m, o || {})) }); return PL[name]; }
+    return null; }
+  const FS = () => plug('Filesystem');
+  const DIR = 'MileageBase Pro', FILE = 'mileage-log.json', LS = 'mbp:log';
+  let DATA = {};
+  async function fsWrite(path, data, base64) { const f = FS(); if (!f) throw new Error('no file access');
+    const o = { path: DIR + '/' + path, data, directory: 'DOCUMENTS', recursive: true }; if (!base64) o.encoding = 'utf8'; return f.writeFile(o); }
+  const fileText = () => JSON.stringify({ app: 'MileageBase Pro', version: 1, saved: new Date().toISOString(), ...DATA });
+  async function saveAll() {
+    const txt = fileText();
+    if (!NATIVE) { try { localStorage.setItem(LS, txt); } catch (e) {} return; }
+    await fsWrite(FILE + '.tmp', txt); // write a copy first so a dead battery can't wreck the log
+    try { await FS().deleteFile({ path: DIR + '/' + FILE, directory: 'DOCUMENTS' }); } catch (e) {}
+    try { await FS().rename({ from: DIR + '/' + FILE + '.tmp', to: DIR + '/' + FILE, directory: 'DOCUMENTS', toDirectory: 'DOCUMENTS' }); }
+    catch (e) { await fsWrite(FILE, txt); }
+  }
+  const strip = o => { const d = { ...o }; delete d.app; delete d.version; delete d.saved; return d; };
+  const store = {
+    async get(k) { return DATA[k] ?? null; },
+    async set(k, v) { DATA[k] = v; try { await saveAll(); } catch (e) { toast('Could not save: ' + (e.message || e)); } } };
+  async function initStore() {
+    if (NATIVE) {
+      const f = FS();
+      try { if (f.requestPermissions) await f.requestPermissions(); } catch (e) {}
+      try { await f.mkdir({ path: DIR, directory: 'DOCUMENTS', recursive: true }); } catch (e) {}
+      for (const name of [FILE, FILE + '.tmp']) {
+        try { const r = await f.readFile({ path: DIR + '/' + name, directory: 'DOCUMENTS', encoding: 'utf8' }); DATA = strip(JSON.parse(r.data)); return; } catch (e) {}
+      }
+      return;
+    }
+    try { DATA = strip(JSON.parse(localStorage.getItem(LS) || '{}')); } catch (e) { DATA = {}; }
+    const n = $('storeNote'); n.hidden = false;
+    n.textContent = 'Running in a browser, so your log is saved in this browser only. Install the app to keep it as a file on your phone.';
+  }
+  function download(name, blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000); }
+  const b64 = bytes => { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s); };
+  async function shareFile(name, data, base64) { // copy into the app cache, then Android's share sheet
+    const F = FS(), Sh = plug('Share'); if (!F || !Sh) throw new Error('sharing is not available');
+    const o = { path: 'share/' + name, data, directory: 'CACHE', recursive: true }; if (!base64) o.encoding = 'utf8';
+    await F.writeFile(o);
+    const uri = (await F.getUri({ path: 'share/' + name, directory: 'CACHE' })).uri;
+    await Sh.share({ title: name, dialogTitle: name, files: [uri] });
+  }
+  const safeName = s => s.replace(/[^\w\- ().]+/g, '_').trim();
+
+  // ---------- state ----------
+  const DEFAULTS = { name: '', driver: '', reg: '', office: 'HD8 0RW', home: '', lastFinish: null, openTrip: null };
+  let S = { ...DEFAULTS };
+  const months = {};
+  let viewM = mKey(today());
+  let editing = null; // trip id being edited
+  const blankMonth = () => ({ startMiles: null, endMiles: null, trips: [], fuel: [] });
+  async function loadMonth(k) { if (!months[k]) months[k] = (await store.get('m-' + k)) || blankMonth(); return months[k]; }
+  const saveMonth = k => store.set('m-' + k, months[k]);
+  const saveS = () => store.set('settings', S);
+
+  // Rows exactly as they go on the sheet
+  function sheetRows(k) {
+    const M = months[k] || blankMonth();
+    const trips = [...M.trips].sort((a, b) => (a.startDate + a.id).localeCompare(b.startDate + b.id));
+    let prev = M.startMiles ?? (trips[0] ? trips[0].startMiles : null);
+    const rows = trips.map(t => {
+      const priv = prev != null && t.startMiles != null ? Math.max(0, t.startMiles - prev) : 0;
+      const bus = Math.max(0, (t.finishMiles ?? 0) - (t.startMiles ?? 0));
+      prev = t.finishMiles ?? prev;
+      return { id: t.id, desc: t.desc, startPc: t.startPc, sitePc: t.sitePc, job: t.job, driver: S.driver,
+               startDate: t.startDate, finishMiles: t.finishMiles, finishDate: t.finishDate, priv, bus, back: t.backPc };
+    });
+    if (M.endMiles != null && prev != null && M.endMiles > prev)
+      rows.push({ desc: 'Private miles to month end', finishMiles: M.endMiles, finishDate: lastDay(k), priv: M.endMiles - prev, bus: 0, driver: S.driver });
+    return { rows, startMiles: M.startMiles ?? (trips[0] ? trips[0].startMiles : null) };
+  }
+  function suggestedStart() { // odometer to pre-fill when starting a trip
+    return S.lastFinish ?? months[viewM]?.startMiles ?? null;
+  }
+
+  // ---------- trip card ----------
+  function placeChips(inputId, current) {
+    const wrap = el('div', { className: 'chips' });
+    const opts = [['Office', S.office], ['Home', S.home]].filter(o => o[1]);
+    opts.forEach(([name, code]) => {
+      const b = el('button', { type: 'button', className: 'chip', textContent: `${name} · ${pc(code)}` });
+      b.setAttribute('aria-pressed', String(pc(current) === pc(code)));
+      b.onclick = () => { $(inputId).value = pc(code); wrap.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c === b))); };
+      wrap.append(b);
+    });
+    return wrap;
+  }
+  function field(label, id, attrs = {}) {
+    const f = el('div', { className: 'field' });
+    f.append(el('label', { className: 'lbl', htmlFor: id, textContent: label }), Object.assign(el('input', { id }), attrs));
+    return f;
+  }
+  function renderTripCard() {
+    const c = $('tripCard'); c.innerHTML = ''; c.classList.toggle('live', !!S.openTrip);
+    if (S.openTrip) {
+      const t = S.openTrip;
+      c.append(el('span', { className: 'lbl', textContent: 'On a trip' }));
+      c.append(el('div', { className: 'route' }, [t.startPc, el('i', { textContent: '→' }), t.sitePc]));
+      const meta = el('div', { className: 'meta' });
+      meta.append(el('span', { textContent: 'Since ' + fmtD(t.startDate) }));
+      if (t.job) meta.append(el('span', { textContent: 'Job ' + t.job }));
+      meta.append(el('span', { textContent: 'Started at ' + t.startMiles }));
+      if (t.desc) meta.append(el('span', { textContent: t.desc }));
+      c.append(meta);
+      const form = el('form', { className: 'card', style: 'background:var(--bg);padding:14px' });
+      form.append(el('h2', { textContent: 'Back home or at the office' }));
+      const row = el('div', { className: 'row' });
+      row.append(field('Finish date', 'cDate', { type: 'date', value: today(), required: true }),
+                 field('Odometer now', 'cMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }));
+      form.append(row);
+      const err = el('p', { className: 'err', hidden: true }); form.append(err);
+      form.append(el('button', { className: 'primary', type: 'submit', textContent: 'Finish trip' }));
+      form.onsubmit = async e => {
+        e.preventDefault();
+        const miles = num($('cMiles').value), date = $('cDate').value;
+        if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
+        if (miles < t.startMiles) { err.textContent = `That's lower than the start reading (${t.startMiles}). Check the odometer.`; err.hidden = false; return; }
+        if (date < t.startDate) { err.textContent = 'Finish date is before the start date.'; err.hidden = false; return; }
+        const k = mKey(t.startDate); await loadMonth(k);
+        months[k].trips.push({ ...t, finishMiles: miles, finishDate: date });
+        S.lastFinish = Math.max(S.lastFinish ?? 0, miles); S.openTrip = null;
+        await saveMonth(k); await saveS();
+        viewM = k; await renderMonth(); renderTripCard();
+        toast(`Trip saved: ${miles - t.startMiles} business miles`);
+      };
+      c.append(form);
+      const cancel = el('button', { className: 'secondary danger', type: 'button', textContent: 'Discard this trip' });
+      let armed = false;
+      cancel.onclick = async () => {
+        if (!armed) { armed = true; cancel.textContent = 'Tap again to discard'; setTimeout(() => { armed = false; cancel.textContent = 'Discard this trip'; }, 4000); return; }
+        S.openTrip = null; await saveS(); renderTripCard(); toast('Trip discarded');
+      };
+      c.append(cancel);
+      return;
+    }
+    c.append(el('h2', { textContent: 'Start a trip' }));
+    const form = el('form', { style: 'display:flex;flex-direction:column;gap:14px' });
+    const from = field('Start postcode', 'nFrom', { className: 'pc', value: pc(S.office), required: true, autocapitalize: 'characters', autocomplete: 'off' });
+    from.append(placeChips('nFrom', S.office));
+    form.append(from);
+    form.append(field('Site postcode', 'nSite', { className: 'pc', required: true, autocapitalize: 'characters', autocomplete: 'off', placeholder: 'BS11 8AX' }));
+    const r1 = el('div', { className: 'row' });
+    r1.append(field('Job number', 'nJob', { inputMode: 'numeric', autocomplete: 'off' }), field('Start date', 'nDate', { type: 'date', value: today(), required: true }));
+    form.append(r1);
+    form.append(field('Site name (optional)', 'nDesc', { placeholder: 'e.g. Avonmouth DC', autocomplete: 'off' }));
+    const odo = field('Odometer now', 'nMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' });
+    const sug = suggestedStart();
+    odo.querySelector('input').value = sug ?? '';
+    odo.append(el('p', { className: 'hint', textContent: sug != null
+      ? `Filled in from your last trip. If you've driven since, change it and the difference goes on the sheet as private miles.`
+      : 'Read it off the dash. After this, each trip carries on from the last one.' }));
+    form.append(odo);
+    const err = el('p', { className: 'err', hidden: true }); form.append(err);
+    form.append(el('button', { className: 'primary', type: 'submit', textContent: 'Start trip' }));
+    form.onsubmit = async e => {
+      e.preventDefault();
+      const miles = num($('nMiles').value);
+      if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
+      if (S.lastFinish != null && miles < S.lastFinish) { err.textContent = `That's lower than your last finish reading (${S.lastFinish}). Check the odometer.`; err.hidden = false; return; }
+      const t = { id: uid(), startPc: pc($('nFrom').value), sitePc: pc($('nSite').value), job: $('nJob').value.trim(),
+                  startDate: $('nDate').value, desc: $('nDesc').value.trim(), startMiles: miles };
+      const k = mKey(t.startDate); await loadMonth(k);
+      if (months[k].startMiles == null) { months[k].startMiles = S.lastFinish ?? miles; await saveMonth(k); }
+      S.openTrip = t; await saveS(); renderTripCard(); if (k === viewM) renderMonth();
+      toast('Trip started. Finish it when you get back.');
+    };
+    c.append(form);
+  }
+
+  // ---------- month ----------
+  async function renderMonth() {
+    const M = await loadMonth(viewM);
+    $('monthTitle').textContent = mLabel(viewM);
+    $('startMiles').value = M.startMiles ?? '';
+    $('endMiles').value = M.endMiles ?? '';
+    const prevM = months[shiftM(viewM, -1)];
+    const sug = prevM?.endMiles ?? null;
+    $('startHint').textContent = M.startMiles == null
+      ? (sug != null ? `Last month ended on ${sug}.` : 'Set automatically from your first trip if left blank.') : '';
+    const { rows } = sheetRows(viewM);
+    const list = $('tripList'); list.innerHTML = '';
+    let bus = 0, priv = 0;
+    rows.forEach(r => { bus += r.bus; priv += r.priv; });
+    $('tBus').textContent = bus; $('tPriv').textContent = priv;
+    if (!rows.length) list.append(el('p', { className: 'empty', textContent: 'No trips this month yet. Start one above.' }));
+    rows.forEach(r => list.append(tripItem(r)));
+    const fl = $('fuelList'); fl.innerHTML = '';
+    let litres = 0;
+    if (!M.fuel.length) fl.append(el('p', { className: 'empty', textContent: 'No fuel logged this month.' }));
+    [...M.fuel].sort((a, b) => a.date.localeCompare(b.date)).forEach(f => {
+      litres += (f.litresBus || 0) + (f.litresPriv || 0);
+      const it = el('div', { className: 'item' });
+      const head = el('div', { className: 'item-head' });
+      head.append(el('span', { className: 'r', textContent: fmtD(f.date) }),
+        el('span', { className: 'd', textContent: (f.litresPriv ? 'Private' : 'Business') + (f.paidBy ? ' · ' + f.paidBy : '') }),
+        el('span', { className: 'm', textContent: (f.litresBus || f.litresPriv) + ' L' }));
+      const del = el('button', { type: 'button', className: 'secondary danger', textContent: 'Remove' });
+      let armed = false;
+      del.onclick = async () => {
+        if (!armed) { armed = true; del.textContent = 'Tap again to remove'; return; }
+        M.fuel = M.fuel.filter(x => x.id !== f.id); await saveMonth(viewM); renderMonth();
+      };
+      it.append(head, el('div', { className: 'btns' }, [del]));
+      fl.append(it);
+    });
+    $('tFuel').textContent = Math.round(litres * 10) / 10;
+    if (!$('fDate').value) $('fDate').value = today();
+  }
+
+  function tripItem(r) {
+    const it = el('div', { className: 'item' });
+    const head = el('button', { type: 'button', className: 'item-head' });
+    head.append(
+      el('span', { className: 'r', textContent: r.id ? `${r.startPc || '?'} → ${r.sitePc || '?'}` : r.desc }),
+      el('span', { className: 'd', textContent: [fmtD(r.startDate) + (r.finishDate && r.finishDate !== r.startDate ? ' – ' + fmtD(r.finishDate) : ''), r.job ? 'Job ' + r.job : '', r.id ? r.desc : ''].filter(Boolean).join(' · ') || fmtD(r.finishDate) }),
+      el('span', { className: 'm', innerHTML: '' }));
+    const m = head.querySelector('.m');
+    m.append(String(r.bus || r.priv), el('small', { textContent: r.bus ? (r.priv ? `business · +${r.priv} private` : 'business') : 'private' }));
+    it.append(head);
+    if (!r.id) { head.disabled = true; head.style.cursor = 'default'; return it; }
+    if (editing === r.id) it.append(editForm(r.id));
+    head.onclick = () => { editing = editing === r.id ? null : r.id; renderMonth(); };
+    return it;
+  }
+
+  function editForm(id) {
+    const M = months[viewM]; const t = M.trips.find(x => x.id === id);
+    const f = el('form', { className: 'card', style: 'background:var(--bg);padding:14px' });
+    const add = (row) => f.append(row);
+    let r = el('div', { className: 'row' });
+    r.append(field('Start postcode', 'eFrom', { className: 'pc', value: t.startPc }), field('Site postcode', 'eSite', { className: 'pc', value: t.sitePc })); add(r);
+    r = el('div', { className: 'row' });
+    r.append(field('Start date', 'eSD', { type: 'date', value: t.startDate }), field('Finish date', 'eFD', { type: 'date', value: t.finishDate })); add(r);
+    r = el('div', { className: 'row' });
+    r.append(field('Start miles', 'eSM', { className: 'odo', inputMode: 'numeric', value: t.startMiles }), field('Finish miles', 'eFM', { className: 'odo', inputMode: 'numeric', value: t.finishMiles })); add(r);
+    r = el('div', { className: 'row' });
+    r.append(field('Job number', 'eJob', { value: t.job || '' }), field('Site name', 'eDesc', { value: t.desc || '' })); add(r);
+    const err = el('p', { className: 'err', hidden: true }); add(err);
+    const save = el('button', { className: 'primary', type: 'submit', textContent: 'Save changes' });
+    const del = el('button', { className: 'secondary danger', type: 'button', textContent: 'Delete trip' });
+    add(el('div', { className: 'btns' }, [save, del]));
+    f.onsubmit = async e => {
+      e.preventDefault();
+      const sm = num($('eSM').value), fm = num($('eFM').value);
+      if (sm == null || fm == null || fm < sm) { err.textContent = 'Finish miles must be at or above start miles.'; err.hidden = false; return; }
+      Object.assign(t, { startPc: pc($('eFrom').value), sitePc: pc($('eSite').value), startDate: $('eSD').value, finishDate: $('eFD').value,
+                         startMiles: sm, finishMiles: fm, job: $('eJob').value.trim(), desc: $('eDesc').value.trim() });
+      const nk = mKey(t.startDate);
+      if (nk !== viewM) { M.trips = M.trips.filter(x => x.id !== id); await loadMonth(nk); months[nk].trips.push(t); await saveMonth(nk); }
+      await saveMonth(viewM); await recalcLast(); editing = null; renderMonth(); toast('Trip updated');
+    };
+    let armed = false;
+    del.onclick = async () => {
+      if (!armed) { armed = true; del.textContent = 'Tap again to delete'; return; }
+      M.trips = M.trips.filter(x => x.id !== id); await saveMonth(viewM); await recalcLast(); editing = null; renderMonth(); toast('Trip deleted');
+    };
+    return f;
+  }
+  async function recalcLast() {
+    let best = null;
+    Object.values(months).forEach(M => M.trips.forEach(t => { if (t.finishMiles != null) best = Math.max(best ?? 0, t.finishMiles); }));
+    S.lastFinish = best; await saveS();
+  }
+
+  // ---------- wiring ----------
+  $('prevM').onclick = async () => { viewM = shiftM(viewM, -1); editing = null; await renderMonth(); };
+  $('nextM').onclick = async () => { viewM = shiftM(viewM, 1); editing = null; await renderMonth(); };
+  $('startMiles').onchange = async () => { months[viewM].startMiles = num($('startMiles').value); await saveMonth(viewM); renderMonth(); toast('Start miles saved'); };
+  $('endMiles').onchange = async () => { months[viewM].endMiles = num($('endMiles').value); await saveMonth(viewM); renderMonth(); toast('Month-end reading saved'); };
+  $('fuelForm').onsubmit = async e => {
+    e.preventDefault();
+    const L = num($('fLitres').value); if (L == null || L <= 0) { toast('Enter the litres'); return; }
+    const d = $('fDate').value || today(); const k = mKey(d); await loadMonth(k);
+    const isPriv = $('fType').value === 'priv';
+    months[k].fuel.push({ id: uid(), date: d, litresBus: isPriv ? 0 : L, litresPriv: isPriv ? L : 0, paidBy: $('fPaid').value.trim() });
+    await saveMonth(k); $('fLitres').value = ''; viewM = k; renderMonth(); toast(`${L} L added`);
+  };
+  $('settingsForm').onsubmit = async e => {
+    e.preventDefault();
+    Object.assign(S, { name: $('sName').value.trim(), driver: pc($('sDriver').value), reg: pc($('sReg').value), office: pc($('sOffice').value) || 'HD8 0RW', home: pc($('sHome').value) });
+    await saveS(); fillSettings(); renderTripCard(); renderMonth(); $('settingsBox').open = false; toast('Details saved');
+  };
+  function fillSettings() {
+    $('sName').value = S.name; $('sDriver').value = S.driver; $('sReg').value = S.reg; $('sOffice').value = S.office; $('sHome').value = S.home;
+    $('regBadge').hidden = !S.reg; $('regBadge').textContent = S.reg;
+  }
+  let lastSheet = null;
+  $('exportBtn').onclick = async () => {
+    const note = $('exportNote');
+    const { rows, startMiles } = sheetRows(viewM);
+    const bytes = buildMileageXlsx({ name: S.name, reg: S.reg, monthLabel: mLabel(viewM), startMiles, office: S.office,
+      rows, fuel: months[viewM].fuel.slice().sort((a, b) => a.date.localeCompare(b.date)) });
+    const name = safeName(`Mileage ${mLabel(viewM)}${S.name ? ' - ' + S.name : ''}.xlsx`);
+    const open = S.openTrip && mKey(S.openTrip.startDate) === viewM ? ' Your current trip is not on it yet, finish it first.' : '';
+    if (!NATIVE) { download(name, new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); note.textContent = 'Downloaded ' + name + '.' + open; return; }
+    try {
+      const data = b64(bytes);
+      await fsWrite('Sheets/' + name, data, true);
+      lastSheet = { name, data };
+      note.textContent = `Saved ${name} in Documents/${DIR}/Sheets.` + open;
+      $('shareBtn').hidden = false;
+      toast('Sheet saved');
+    } catch (e) { note.textContent = 'Could not save the sheet: ' + (e.message || e); }
+  };
+  $('shareBtn').onclick = async () => {
+    if (!lastSheet) return;
+    try { await shareFile(lastSheet.name, lastSheet.data, true); } catch (e) { if (!/cancel/i.test(String(e && e.message || e))) toast('Could not share: ' + (e.message || e)); }
+  };
+  $('backupBtn').onclick = async () => {
+    const txt = fileText(), name = `MileageBase backup ${today()}.json`;
+    if (!NATIVE) { download(name, new Blob([txt], { type: 'application/json' })); return; }
+    try { await shareFile(name, txt, false); } catch (e) { if (!/cancel/i.test(String(e && e.message || e))) toast('Could not share: ' + (e.message || e)); }
+  };
+  let pending = null;
+  $('restoreBtn').onclick = () => $('restoreFile').click();
+  $('restoreFile').onchange = async e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    const msg = $('restoreMsg'); msg.hidden = false; $('restoreGo').hidden = true; pending = null;
+    try {
+      const d = strip(JSON.parse(await f.text()));
+      const ms = Object.keys(d).filter(k => /^m-\d{4}-\d{2}$/.test(k));
+      if (!d.settings && !ms.length) throw new Error('not a MileageBase backup');
+      const trips = ms.reduce((n, k) => n + ((d[k].trips || []).length), 0);
+      pending = d;
+      msg.textContent = `${f.name}: ${trips} trips over ${ms.length} month${ms.length === 1 ? '' : 's'}. Restoring replaces everything in the app now.`;
+      $('restoreGo').hidden = false;
+    } catch (err) { msg.textContent = 'That file could not be read as a MileageBase backup.'; }
+  };
+  $('restoreGo').onclick = async () => {
+    if (!pending) return;
+    DATA = pending; pending = null; await saveAll();
+    Object.keys(months).forEach(k => delete months[k]);
+    S = { ...DEFAULTS, ...(DATA.settings || {}) };
+    $('restoreGo').hidden = true; $('restoreMsg').textContent = 'Backup restored.';
+    await loadMonth(shiftM(viewM, -1)); fillSettings(); renderTripCard(); await renderMonth(); toast('Backup restored');
+  };
+
+  (async () => {
+    await initStore();
+    const saved = await store.get('settings'); if (saved) S = { ...S, ...saved };
+    await loadMonth(shiftM(viewM, -1));
+    fillSettings(); renderTripCard(); await renderMonth();
+    if (!S.name && !S.reg) $('settingsBox').open = true;
+  })();
+})();
+</script>
+</body></html>

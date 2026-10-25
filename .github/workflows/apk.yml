@@ -1,0 +1,82 @@
+name: Build Android app
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Capacitor
+        run: npm install
+
+      - name: Copy the app into www
+        run: |
+          mkdir -p www
+          cp index.html www/
+          cp icon-192.png icon-512.png www/ || true
+          cp manifest.webmanifest www/ || true
+          cp node_modules/@capacitor/core/dist/capacitor.js www/ || echo 'no capacitor.js - app uses the native bridge directly'
+
+      - name: Create the Android project
+        run: npx cap add android
+
+      - name: Storage permission and app icon
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick
+          M=android/app/src/main/AndroidManifest.xml
+          sed -i 's#<application#<application android:requestLegacyExternalStorage="true"#' $M
+          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n    <uses-permission </manifest>#' $M
+          RES=android/app/src/main/res
+          rm -rf $RES/mipmap-anydpi-v26
+          for d in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
+            n=${d%%:*}; s=${d##*:}
+            mkdir -p $RES/mipmap-$n
+            convert icon-512.png -resize ${s}x${s} $RES/mipmap-$n/ic_launcher.png
+            cp $RES/mipmap-$n/ic_launcher.png $RES/mipmap-$n/ic_launcher_round.png
+            cp $RES/mipmap-$n/ic_launcher.png $RES/mipmap-$n/ic_launcher_foreground.png
+          done
+          cat $M
+
+      - name: Sync
+        run: npx cap sync android
+
+      - name: Build signed APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon \
+            -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/release.jks \
+            -Pandroid.injected.signing.store.password=levelsurvey2026 \
+            -Pandroid.injected.signing.key.alias=levelsurvey \
+            -Pandroid.injected.signing.key.password=levelsurvey2026
+          cp app/build/outputs/apk/release/app-release.apk $GITHUB_WORKSPACE/MileageBase-Pro.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MileageBase-Pro-apk
+          path: MileageBase-Pro.apk
+
+      - name: Publish as a release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: MileageBase Pro (build ${{ github.run_number }})
+          files: MileageBase-Pro.apk
+          make_latest: true

@@ -1,0 +1,6 @@
+{
+  "appId": "uk.mileagebase.app",
+  "appName": "MileageBase Pro",
+  "webDir": "www",
+  "android": { "allowMixedContent": false }
+}
