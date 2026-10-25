@@ -61,10 +61,14 @@ public class TrackerPlugin extends Plugin {
     public void sync(PluginCall call) {
         boolean open = Boolean.TRUE.equals(call.getBoolean("tripOpen", false));
         SharedPreferences.Editor e = TrackingService.prefs(getContext()).edit()
-                .putBoolean("tripOpen", open).putString("label", call.getString("label", ""));
+                .putBoolean("tripOpen", open).putString("label", call.getString("label", ""))
+                .putInt("expectedMi", call.getInt("expectedMi", 0)).putString("weekText", call.getString("weekText", ""));
         if (open) e.putBoolean("auto", false);
         e.apply();
         WidgetProvider.refresh(getContext());
+        if (TrackingService.prefs(getContext()).getBoolean("active", false)) {
+            try { ContextCompat.startForegroundService(getContext(), new Intent(getContext(), TrackingService.class)); } catch (Exception ex) { /* refreshed next time */ }
+        }
         call.resolve();
     }
 

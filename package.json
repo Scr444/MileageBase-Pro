@@ -1,8 +1,8 @@
 {
-  "name": "odo",
+  "name": "drivr",
   "version": "1.0.0",
   "private": true,
-  "description": "Odo mileage log (Android build)",
+  "description": "DrivR mileage log (Android build)",
   "dependencies": {
     "@capacitor/android": "^6.2.0",
     "@capacitor/cli": "^6.2.0",
@@ -13,8 +13,7 @@
     "tesseract.js": "5.1.1",
     "tesseract.js-core": "5.1.1",
     "@tesseract.js-data/eng": "1.0.0",
-    "@fontsource/chakra-petch": "5.0.13",
-    "@fontsource/archivo": "5.0.20",
-    "@fontsource/jetbrains-mono": "5.0.20"
+    "@fontsource/jetbrains-mono": "5.0.20",
+    "@fontsource/plus-jakarta-sans": "5.0.20"
   }
 }

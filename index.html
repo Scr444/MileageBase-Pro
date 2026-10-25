@@ -2,195 +2,205 @@
 <html lang="en-GB"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0e1113">
+<meta name="theme-color" content="#f4f6fb">
 <link rel="manifest" href="manifest.webmanifest">
-<title>Odo</title>
+<title>DrivR</title>
 <style>
-/* Odo — an instrument cluster for work mileage.
-   Graphite panels, amber instrument light, live miles on a rolling odometer.
-   One column; five tabs along the bottom: Today, Trips, Fuel, Month, Settings. */
-@font-face { font-family: "Chakra Petch"; font-weight: 600; font-display: swap; src: url(fonts/chakra-petch-600.woff2) format("woff2"); }
-@font-face { font-family: "Chakra Petch"; font-weight: 700; font-display: swap; src: url(fonts/chakra-petch-700.woff2) format("woff2"); }
-@font-face { font-family: "Archivo"; font-weight: 400; font-display: swap; src: url(fonts/archivo-400.woff2) format("woff2"); }
-@font-face { font-family: "Archivo"; font-weight: 500; font-display: swap; src: url(fonts/archivo-500.woff2) format("woff2"); }
-@font-face { font-family: "Archivo"; font-weight: 600; font-display: swap; src: url(fonts/archivo-600.woff2) format("woff2"); }
-@font-face { font-family: "JetBrains Mono"; font-weight: 500; font-display: swap; src: url(fonts/jetbrains-mono-500.woff2) format("woff2"); }
-@font-face { font-family: "JetBrains Mono"; font-weight: 700; font-display: swap; src: url(fonts/jetbrains-mono-700.woff2) format("woff2"); }
+/* DrivR — fresh, light and colourful. White cards on a cool grey, orange for business, blue for private,
+   green for live logging. Five tabs along the bottom; the most important button always within thumb reach. */
+@font-face { font-family: "Jakarta"; font-weight: 500; font-display: swap; src: url(fonts/plus-jakarta-sans-500.woff2) format("woff2"); }
+@font-face { font-family: "Jakarta"; font-weight: 600; font-display: swap; src: url(fonts/plus-jakarta-sans-600.woff2) format("woff2"); }
+@font-face { font-family: "Jakarta"; font-weight: 700; font-display: swap; src: url(fonts/plus-jakarta-sans-700.woff2) format("woff2"); }
+@font-face { font-family: "Jakarta"; font-weight: 800; font-display: swap; src: url(fonts/plus-jakarta-sans-800.woff2) format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 600; font-display: swap; src: url(fonts/jetbrains-mono-600.woff2) format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 800; font-display: swap; src: url(fonts/jetbrains-mono-800.woff2) format("woff2"); }
 :root {
-  /* dark first: the app lives in a car and on site */
-  --bg: #0e1113; --panel: #161b1e; --raised: #1f262a; --well: #0a0d0f; --line: #2a3237; --line2: #3a444a;
-  --ink: #e9eef0; --sub: #a3aeb4; --faint: #6e7a80;
-  --amber: #ffb21e; --amber-ink: #1a1203; --amber-soft: rgba(255,178,30,.14);
-  --live: #3ddc97; --live-soft: rgba(61,220,151,.14); --biz: #ffb21e; --priv: #8ea3b0; --warn: #ff8a6b; --blue: #5aa9ff;
-  --display: "Chakra Petch", "Bahnschrift", "DIN Alternate", "Arial Narrow", sans-serif;
-  --body: "Archivo", "Segoe UI", Roboto, Arial, sans-serif;
+  --bg: #f4f6fb; --panel: #ffffff; --raised: #eef1f7; --well: #f4f6fb; --line: #e3e7f0; --line2: #d3d9e6;
+  --ink: #131726; --sub: #5d6479; --faint: #9399ad;
+  --biz: #ff6a1a; --biz-deep: #c2410c; --biz-soft: #ffeadd; --on-biz: #ffffff;
+  --priv: #2563eb; --priv-deep: #1d4ed8; --priv-soft: #e3ecff; --on-priv: #ffffff;
+  --live: #16a34a; --live-soft: #dcfce7; --warn: #dc2626; --warn-soft: #fee2e2; --plate: #ffd43b;
+  --amber: var(--biz); --amber-ink: #fff;
+  --display: "Jakarta", "Segoe UI", Roboto, Arial, sans-serif;
+  --body: "Jakarta", "Segoe UI", Roboto, Arial, sans-serif;
   --mono: "JetBrains Mono", "Roboto Mono", ui-monospace, Menlo, monospace;
-  --r: 14px; --tab-h: 68px;
-  color-scheme: dark;
+  --r: 20px; --tab-h: 66px;
+  --shadow: 0 1px 2px rgba(19,23,38,.05), 0 8px 24px rgba(19,23,38,.07);
+  color-scheme: light;
 }
-@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
-  --bg: #eef0ef; --panel: #ffffff; --raised: #f3f5f4; --well: #e3e7e6; --line: #d9dedd; --line2: #c3cac9;
-  --ink: #12171a; --sub: #4f5b61; --faint: #808b90;
-  --amber: #e89400; --amber-ink: #1a1203; --amber-soft: rgba(232,148,0,.13);
-  --live: #108a58; --live-soft: rgba(16,138,88,.12); --biz: #c27a00; --priv: #5d7380; --warn: #c2410c; --blue: #1d6fd6;
-  color-scheme: light } }
-:root[data-theme="light"] {
-  --bg: #eef0ef; --panel: #ffffff; --raised: #f3f5f4; --well: #e3e7e6; --line: #d9dedd; --line2: #c3cac9;
-  --ink: #12171a; --sub: #4f5b61; --faint: #808b90;
-  --amber: #e89400; --amber-ink: #1a1203; --amber-soft: rgba(232,148,0,.13);
-  --live: #108a58; --live-soft: rgba(16,138,88,.12); --biz: #c27a00; --priv: #5d7380; --warn: #c2410c; --blue: #1d6fd6;
-  color-scheme: light }
-
 :root { padding-top: env(safe-area-inset-top, 0px); }
 [hidden] { display: none !important; }
 * { box-sizing: border-box; }
 html, body { min-height: 100%; }
-body { margin: 0; -webkit-tap-highlight-color: transparent; background: var(--bg); color: var(--ink); font: 16px/1.45 var(--body); }
+body { margin: 0; -webkit-tap-highlight-color: transparent; background: var(--bg); color: var(--ink); font: 500 16px/1.45 var(--body); }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 20; }
 
-/* top bar */
-.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg);
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: color-mix(in srgb, var(--bg) 92%, transparent); backdrop-filter: blur(10px);
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding-block: 12px 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
-.brand { display: flex; align-items: center; gap: 10px; }
-.logo { font: 700 22px/1 var(--display); letter-spacing: .14em; color: var(--amber-ink); background: var(--amber); padding: 6px 9px 5px 11px; border-radius: 8px; }
-.view-title { font: 700 22px/1 var(--display); letter-spacing: .04em; text-transform: uppercase; }
-.reg { font: 700 14px var(--mono); letter-spacing: .08em; color: #111; background: #f5d33a; border: 2px solid #111; border-radius: 5px; padding: 2px 8px; }
+.brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.logo { font: 800 20px/1 var(--display); letter-spacing: -.01em; color: #fff; background: var(--biz); padding: 7px 11px; border-radius: 12px; box-shadow: 0 4px 12px rgba(255,106,26,.35); white-space: nowrap; }
+.logo em { font-style: normal; color: #131726; background: #fff; border-radius: 5px; padding: 0 4px; margin-left: 1px; }
+.view-title { font: 800 22px/1 var(--display); letter-spacing: -.02em; }
+.reg { font: 800 13px var(--mono); letter-spacing: .08em; color: #131726; background: var(--plate); border: 2px solid #131726; border-radius: 6px; padding: 2px 8px; white-space: nowrap; }
 
-/* page */
 .wrap { max-width: 600px; margin: 0 auto; padding-block: 4px calc(var(--tab-h) + 28px + env(safe-area-inset-bottom, 0px));
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+body.has-dock .wrap { padding-bottom: calc(var(--tab-h) + 104px + env(safe-area-inset-bottom, 0px)); }
 .view { display: flex; flex-direction: column; gap: 14px; }
-h2 { font: 700 19px/1.15 var(--display); text-transform: uppercase; letter-spacing: .05em; margin: 0; text-wrap: balance; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-.card.live { border-color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber); }
-.card.flat { background: var(--raised); }
-.lbl { font: 600 11.5px var(--body); text-transform: uppercase; letter-spacing: .1em; color: var(--sub); }
-.section-lbl { font: 600 12px var(--body); text-transform: uppercase; letter-spacing: .12em; color: var(--faint); margin: 6px 2px -4px; }
+h2 { font: 800 19px/1.2 var(--display); letter-spacing: -.01em; margin: 0; text-wrap: balance; }
+.card { background: var(--panel); border-radius: var(--r); padding: 16px; display: flex; flex-direction: column; gap: 14px; min-width: 0; box-shadow: var(--shadow); }
+.card.live { box-shadow: var(--shadow), inset 0 0 0 2px var(--biz); }
+.card.flat { background: var(--raised); box-shadow: none; }
+.lbl { font: 700 11.5px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--sub); }
+.section-lbl { font: 800 13px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--sub); margin: 8px 4px -4px; display: flex; justify-content: space-between; align-items: baseline; }
 .field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; }
-input, select { font: 500 17px var(--body); color: var(--ink); background: var(--well); border: 1px solid var(--line); border-radius: 11px; padding: 12px 13px; width: 100%; min-width: 0; min-height: 50px; }
-input::placeholder { color: var(--faint); }
-input.pc { text-transform: uppercase; font: 600 18px var(--mono); letter-spacing: .04em; }
-input.odo { font: 700 22px var(--mono); letter-spacing: .1em; }
-input[type=search] { padding-left: 42px; background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%238a969c' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") no-repeat 13px center; }
-input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
-.hint { font-size: 14px; color: var(--sub); margin: 0; }
-.err { font-size: 14px; color: var(--warn); margin: 0; font-weight: 600; }
+input, select { font: 600 17px var(--body); color: var(--ink); background: var(--well); border: 1.5px solid var(--line); border-radius: 14px; padding: 12px 14px; width: 100%; min-width: 0; min-height: 52px; }
+input:focus, select:focus { border-color: var(--priv); background: #fff; outline: none; box-shadow: 0 0 0 4px var(--priv-soft); }
+input::placeholder { color: var(--faint); font-weight: 500; }
+input.pc { text-transform: uppercase; font: 700 18px var(--mono); letter-spacing: .03em; }
+input.odo { font: 800 22px var(--mono); letter-spacing: .08em; }
+input[type=search] { padding-left: 44px; background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%239399ad' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") no-repeat 14px center; border-color: transparent; box-shadow: var(--shadow); }
+button:focus-visible, summary:focus-visible { outline: 3px solid var(--priv); outline-offset: 2px; }
+.hint { font-size: 14px; color: var(--sub); margin: 0; font-weight: 500; }
+.err { font-size: 14px; color: var(--warn); margin: 0; font-weight: 700; background: var(--warn-soft); padding: 10px 12px; border-radius: 12px; }
 .chips { display: flex; gap: 8px; flex-wrap: wrap; }
-.chip { font: 600 15px var(--body); border: 1px solid var(--line2); background: var(--raised); color: var(--ink); border-radius: 999px; padding: 9px 15px; min-height: 42px; cursor: pointer; }
-.chip[aria-pressed="true"] { background: var(--amber); color: var(--amber-ink); border-color: var(--amber); }
+.chip { font: 700 14.5px var(--body); border: 1.5px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 999px; padding: 9px 15px; min-height: 42px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--priv); color: #fff; border-color: var(--priv); }
 button { font-family: var(--body); }
-button.primary { font: 700 19px var(--display); text-transform: uppercase; letter-spacing: .08em; background: var(--amber); color: var(--amber-ink); border: 0; border-radius: 13px; padding: 15px 16px; min-height: 58px; cursor: pointer; }
-button.primary:active, button.secondary:active, .big:active, .tile-btn:active { transform: scale(.98); }
-button.secondary { font: 600 15.5px var(--body); background: var(--raised); color: var(--ink); border: 1px solid var(--line2); border-radius: 12px; padding: 12px 14px; min-height: 48px; cursor: pointer; }
-button.danger { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 55%, transparent); background: transparent; }
+button.primary { font: 800 17px var(--display); letter-spacing: .01em; background: var(--ink); color: #fff; border: 0; border-radius: 16px; padding: 15px 16px; min-height: 58px; cursor: pointer; }
+button.primary.biz { background: var(--biz); box-shadow: 0 6px 18px rgba(255,106,26,.35); }
+button.primary.priv { background: var(--priv); box-shadow: 0 6px 18px rgba(37,99,235,.3); }
+button.primary:active, button.secondary:active, .big:active, .tile-btn:active, .item-head:active { transform: scale(.98); }
+button.secondary { font: 700 15px var(--body); background: var(--raised); color: var(--ink); border: 0; border-radius: 14px; padding: 12px 14px; min-height: 48px; cursor: pointer; }
+button.danger { color: var(--warn); background: var(--warn-soft); }
 .btns { display: flex; gap: 10px; flex-wrap: wrap; }
 .btns > * { flex: 1 1 0; }
-.route { font: 700 21px/1.2 var(--mono); letter-spacing: .03em; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
-.route i { font-style: normal; color: var(--amber); font-family: var(--body); }
-.meta { display: flex; gap: 4px 14px; flex-wrap: wrap; color: var(--sub); font-size: 14.5px; }
+.route { font: 800 20px/1.2 var(--mono); letter-spacing: .01em; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.route i { font-style: normal; color: var(--biz); font-family: var(--body); }
+.meta { display: flex; gap: 4px 12px; flex-wrap: wrap; color: var(--sub); font-size: 14px; font-weight: 600; }
 
-/* the two giant start buttons */
 .starts { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; }
-.big { display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 18px; min-height: 132px; padding: 16px; border-radius: 18px; cursor: pointer; text-align: left; border: 1px solid var(--line2); background: var(--raised); color: var(--ink); }
+.big { display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 18px; min-height: 140px; padding: 18px; border-radius: 24px; cursor: pointer; text-align: left; border: 0; color: #fff; background: var(--priv); box-shadow: 0 10px 24px rgba(37,99,235,.28); }
 .big svg { width: 30px; height: 30px; }
-.big b { font: 700 22px/1 var(--display); text-transform: uppercase; letter-spacing: .06em; }
-.big small { display: block; font: 500 13px var(--body); color: var(--sub); margin-top: 4px; letter-spacing: 0; text-transform: none; }
-.big.biz { background: var(--amber); color: var(--amber-ink); border-color: var(--amber); }
-.big.biz small { color: color-mix(in srgb, var(--amber-ink) 70%, transparent); }
+.big b { font: 800 22px/1 var(--display); letter-spacing: -.01em; }
+.big small { display: block; font: 600 13px var(--body); opacity: .88; margin-top: 5px; }
+.big.biz { background: var(--biz); box-shadow: 0 10px 24px rgba(255,106,26,.32); }
 
-/* odometer drums */
 .odometer { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
-.drums { display: inline-flex; gap: 4px; padding: 6px; background: var(--well); border-radius: 12px; border: 1px solid var(--line); }
-.drum { width: 34px; height: 50px; border-radius: 7px; background: linear-gradient(#20272b, #12171a 50%, #20272b); color: #f3f5f6; display: grid; place-items: center; font: 700 30px var(--mono); overflow: hidden; position: relative; }
-.drum.tenth { background: linear-gradient(#ffc04a, #ffb21e 50%, #e89a00); color: #1a1203; }
+.drums { display: inline-flex; gap: 4px; }
+.drum { width: 36px; height: 52px; border-radius: 10px; background: var(--panel); border: 1.5px solid var(--line); color: var(--ink); display: grid; place-items: center; font: 800 30px var(--mono); overflow: hidden; box-shadow: 0 2px 0 var(--line); }
+.drum.tenth { background: var(--biz); border-color: var(--biz); color: #fff; box-shadow: 0 2px 0 var(--biz-deep); }
+.priv-trip .drum.tenth { background: var(--priv); border-color: var(--priv); box-shadow: 0 2px 0 var(--priv-deep); }
 .drum span { display: block; transition: transform .45s cubic-bezier(.2,.8,.2,1); }
-.drum::after { content: ""; position: absolute; inset: 0; background: linear-gradient(rgba(0,0,0,.35), transparent 30%, transparent 70%, rgba(0,0,0,.35)); pointer-events: none; }
-.odometer .unit { font: 600 15px var(--body); color: var(--sub); padding-bottom: 8px; }
-.livepill { display: inline-flex; align-items: center; gap: 7px; font: 600 12px var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--live); background: var(--live-soft); border-radius: 999px; padding: 5px 10px; }
+.odometer .unit { font: 700 15px var(--body); color: var(--sub); padding-bottom: 8px; }
+.livepill { display: inline-flex; align-items: center; gap: 7px; font: 800 11.5px var(--body); letter-spacing: .06em; text-transform: uppercase; color: var(--live); background: var(--live-soft); border-radius: 999px; padding: 6px 11px; }
 .livepill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .livepill.parked { color: var(--sub); background: var(--raised); }
-@media (prefers-reduced-motion: no-preference) { .livepill:not(.parked)::before { animation: pulse 1.6s ease-in-out infinite; } }
+@media (prefers-reduced-motion: no-preference) { .livepill:not(.parked)::before { animation: pulse 1.6s ease-in-out infinite; } .view:not([hidden]) { animation: rise .25s ease-out; } }
 @keyframes pulse { 50% { opacity: .25; } }
-.bar { height: 10px; background: var(--well); border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
-.bar > i { display: block; height: 100%; background: var(--amber); border-radius: 6px; transition: width .6s ease; }
-.bar.over > i { background: var(--live); }
+@keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+.bar { height: 12px; background: var(--raised); border-radius: 8px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: linear-gradient(90deg, #ff9a52, var(--biz)); border-radius: 8px; transition: width .6s ease; }
+.bar.over > i { background: linear-gradient(90deg, #4ade80, var(--live)); }
 .tiles2 { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; }
-.tile-btn { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; border-radius: 12px; background: var(--raised); color: var(--ink); border: 1px solid var(--line2); font: 600 15.5px var(--body); cursor: pointer; }
-.tile-btn svg { width: 20px; height: 20px; }
 .tiles3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
-.tiles3 .tile-btn { flex-direction: column; gap: 4px; min-height: 66px; font-size: 13.5px; padding: 8px 4px; }
-.tiles3 .tile-btn svg { width: 22px; height: 22px; }
+.tile-btn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-height: 70px; border-radius: 16px; background: var(--raised); color: var(--ink); border: 0; font: 700 13.5px var(--body); cursor: pointer; padding: 8px 4px; }
+.tile-btn svg { width: 23px; height: 23px; color: var(--priv); }
 
-/* stats */
 .stats { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; }
-.stat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 13px 14px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.stat b { font: 700 26px/1.1 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.stat b small { font: 600 13px var(--body); color: var(--sub); letter-spacing: 0; margin-left: 3px; }
-.stat.biz b { color: var(--biz); }
-.split { display: flex; height: 12px; border-radius: 7px; overflow: hidden; background: var(--well); border: 1px solid var(--line); }
+.stat { background: var(--panel); border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 2px; min-width: 0; box-shadow: var(--shadow); }
+.stat b { font: 800 26px/1.1 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat b small { font: 700 13px var(--body); color: var(--sub); letter-spacing: 0; margin-left: 3px; }
+.stat.biz { background: var(--biz); } .stat.biz .lbl, .stat.biz b, .stat.biz b small { color: #fff; }
+.stat.priv { background: var(--priv); } .stat.priv .lbl, .stat.priv b, .stat.priv b small { color: #fff; }
+.split { display: flex; height: 12px; border-radius: 8px; overflow: hidden; background: var(--raised); }
 .split i { display: block; height: 100%; }
-.glance { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
-.glance div { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
-.glance b { display: block; font: 700 20px var(--mono); font-variant-numeric: tabular-nums; }
+.chart { display: flex; align-items: flex-end; gap: 6px; height: 110px; }
+.chart .col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; height: 100%; min-width: 0; }
+.chart .stack { width: 100%; display: flex; flex-direction: column-reverse; border-radius: 8px; overflow: hidden; background: var(--raised); min-height: 4px; }
+.chart .stack i { display: block; width: 100%; }
+.chart .col span { font: 700 11px var(--body); color: var(--sub); }
+.chart .col b { font: 800 11px var(--mono); color: var(--ink); }
+.legend { display: flex; gap: 14px; font: 700 13px var(--body); color: var(--sub); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: 0; }
+.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--raised); border-radius: 14px; padding: 4px; gap: 4px; }
+.seg button { border: 0; background: transparent; border-radius: 10px; min-height: 42px; font: 800 14px var(--body); color: var(--sub); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: var(--shadow); }
 
-/* lists */
 .monthbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.monthbar button { width: 48px; height: 48px; border-radius: 12px; border: 1px solid var(--line2); background: var(--panel); color: var(--ink); cursor: pointer; display: grid; place-items: center; }
+.monthbar button { width: 46px; height: 46px; border-radius: 14px; border: 0; background: var(--panel); color: var(--ink); cursor: pointer; display: grid; place-items: center; box-shadow: var(--shadow); }
 .monthbar button svg { width: 22px; height: 22px; }
-.monthbar h2 { font-size: 22px; }
-.list { display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
-.item { border-bottom: 1px solid var(--line); padding: 14px 14px; display: flex; flex-direction: column; gap: 12px; }
+.monthbar h2 { font-size: 21px; }
+.list { display: flex; flex-direction: column; background: var(--panel); border-radius: var(--r); overflow: hidden; box-shadow: var(--shadow); }
+.item { border-bottom: 1px solid var(--line); padding: 14px; display: flex; flex-direction: column; gap: 12px; }
 .item:last-child { border-bottom: 0; }
-.item-head { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px 12px; align-items: start; background: none; border: 0; color: inherit; text-align: left; padding: 0; cursor: pointer; font: inherit; width: 100%; }
-.item-head .r { font: 700 15.5px var(--mono); min-width: 0; overflow-wrap: anywhere; }
-.item-head .d { font-size: 13.5px; color: var(--sub); grid-column: 1; }
-.item-head .m { font: 700 20px var(--mono); text-align: right; font-variant-numeric: tabular-nums; grid-row: 1 / span 2; grid-column: 2; }
-.item-head .m small { display: block; font: 500 12px var(--body); color: var(--sub); }
-.tag { display: inline-block; font: 700 10.5px var(--body); letter-spacing: .1em; text-transform: uppercase; padding: 3px 7px; border-radius: 5px; margin-right: 7px; vertical-align: 2px; }
-.tag.bus { background: var(--amber); color: var(--amber-ink); }
-.tag.priv { background: var(--raised); color: var(--priv); border: 1px solid var(--line2); }
+.item-head { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px 12px; align-items: center; background: none; border: 0; color: inherit; text-align: left; padding: 0; cursor: pointer; font: inherit; width: 100%; }
+.item-head .r { font: 800 15px var(--mono); min-width: 0; overflow-wrap: anywhere; }
+.item-head .d { font-size: 13px; color: var(--sub); grid-column: 1; font-weight: 600; }
+.item-head .m { font: 800 21px var(--mono); text-align: right; font-variant-numeric: tabular-nums; grid-row: 1 / span 2; grid-column: 2; }
+.item-head .m small { display: block; font: 700 11.5px var(--body); color: var(--sub); }
+.item-head .m.biz { color: var(--biz-deep); } .item-head .m.priv { color: var(--priv-deep); }
+.tag { display: inline-block; font: 800 10.5px var(--body); letter-spacing: .06em; text-transform: uppercase; padding: 4px 8px; border-radius: 999px; margin-right: 7px; vertical-align: 2px; }
+.tag.bus { background: var(--biz-soft); color: var(--biz-deep); }
+.tag.priv { background: var(--priv-soft); color: var(--priv-deep); }
 .tag.live { background: var(--live-soft); color: var(--live); }
-.jobrow { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 2px 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.jobrow { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 2px 12px; padding: 13px 14px; border-bottom: 1px solid var(--line); }
 .jobrow:last-child { border-bottom: 0; }
-.jobrow b { font: 700 16px var(--mono); }
-.jobrow span { color: var(--sub); font-size: 13.5px; }
-.jobrow .bar { grid-column: 1 / -1; height: 6px; margin-top: 6px; }
-.map { height: 240px; border-radius: 12px; border: 1px solid var(--line); overflow: hidden; background: var(--raised); }
+.jobrow b { font: 800 15.5px var(--mono); }
+.jobrow span { color: var(--sub); font-size: 13px; font-weight: 600; }
+.jobrow .bar { grid-column: 1 / -1; height: 8px; margin-top: 6px; }
+.map { height: 220px; border-radius: 16px; overflow: hidden; background: var(--raised); }
 .map.big { height: 380px; }
 .leaflet-container { font: 12px var(--body); background: var(--raised); }
-.empty { color: var(--sub); font-size: 15px; padding: 18px 14px; margin: 0; text-align: center; }
-.banner { font-size: 14px; background: var(--raised); border: 1px solid var(--line2); border-radius: 12px; padding: 12px 14px; margin: 0; }
-.banner.warn { border-color: var(--warn); }
-.toast { position: fixed; left: 50%; transform: translateX(-50%); z-index: 40; bottom: calc(var(--tab-h) + 16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 12px 18px; border-radius: 12px; font-weight: 600; max-width: calc(100% - 32px); box-shadow: 0 8px 30px rgba(0,0,0,.35); }
+.empty { color: var(--sub); font-size: 15px; padding: 22px 14px; margin: 0; text-align: center; font-weight: 600; }
+.banner { font-size: 14px; background: var(--priv-soft); color: var(--priv-deep); border-radius: 16px; padding: 12px 14px; margin: 0; font-weight: 600; }
+.banner.warn { background: var(--warn-soft); color: var(--warn); }
 
-/* bottom tabs */
-.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(12px);
-  border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(5, minmax(0,1fr));
+.toast { position: fixed; left: 50%; transform: translateX(-50%); z-index: 60; bottom: calc(var(--tab-h) + 16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: #fff; padding: 12px 14px 12px 18px; border-radius: 16px; font-weight: 700; width: max-content; max-width: calc(100% - 32px); box-shadow: 0 10px 30px rgba(19,23,38,.3); display: flex; gap: 14px; align-items: center; }
+body.has-dock .toast { bottom: calc(var(--tab-h) + 92px + env(safe-area-inset-bottom, 0px)); }
+.toast button { background: none; border: 0; color: #7fb0ff; font: 800 15px var(--body); cursor: pointer; padding: 4px 6px; }
+
+.dock { position: fixed; left: 0; right: 0; z-index: 25; bottom: calc(var(--tab-h) + env(safe-area-inset-bottom, 0px));
+  padding: 10px max(16px, env(safe-area-inset-right, 0px)) 10px max(16px, env(safe-area-inset-left, 0px)); background: linear-gradient(transparent, var(--bg) 30%); }
+.dock button { width: 100%; max-width: 568px; display: block; margin: 0 auto; }
+
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: color-mix(in srgb, var(--panel) 95%, transparent); backdrop-filter: blur(12px);
+  box-shadow: 0 -1px 0 var(--line), 0 -8px 24px rgba(19,23,38,.05); display: grid; grid-template-columns: repeat(5, minmax(0,1fr));
   padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
-.tabbar button { height: var(--tab-h); background: none; border: 0; color: var(--faint); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font: 600 11.5px var(--body); letter-spacing: .03em; cursor: pointer; position: relative; }
+.tabbar button { height: var(--tab-h); background: none; border: 0; color: var(--faint); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font: 700 11.5px var(--body); cursor: pointer; position: relative; }
 .tabbar svg { width: 25px; height: 25px; }
-.tabbar button[aria-current="page"] { color: var(--amber); }
-.tabbar button[aria-current="page"]::before { content: ""; position: absolute; top: 0; left: 28%; right: 28%; height: 3px; border-radius: 0 0 3px 3px; background: var(--amber); }
-.tabbar .dot { position: absolute; top: 12px; left: calc(50% + 9px); width: 9px; height: 9px; border-radius: 50%; background: var(--live); border: 2px solid var(--panel); }
+.tabbar button[aria-current="page"] { color: var(--biz); }
+.tabbar button[aria-current="page"] svg { background: var(--biz-soft); border-radius: 10px; padding: 2px 10px; width: 45px; height: 29px; }
+.tabbar .dot { position: absolute; top: 9px; left: calc(50% + 14px); width: 10px; height: 10px; border-radius: 50%; background: var(--live); border: 2px solid var(--panel); }
 
-/* setup */
+.sheet-bg { position: fixed; inset: 0; z-index: 45; background: rgba(19,23,38,.4); }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 46; background: var(--panel); border-radius: 26px 26px 0 0; max-height: 92vh; overflow-y: auto;
+  padding: 10px max(18px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(18px, env(safe-area-inset-left, 0px)); box-shadow: 0 -10px 40px rgba(19,23,38,.2); }
+.sheet .inner { max-width: 568px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.sheet .grab { width: 44px; height: 5px; border-radius: 3px; background: var(--line2); margin: 2px auto 6px; }
+@media (prefers-reduced-motion: no-preference) { .sheet { animation: up .22s ease-out; } }
+@keyframes up { from { transform: translateY(40px); opacity: .4; } }
+.kv { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; }
+.kv div { background: var(--raised); border-radius: 14px; padding: 11px 13px; }
+.kv b { display: block; font: 800 19px var(--mono); }
+
 .wizard { position: fixed; inset: 0; z-index: 50; background: var(--bg); overflow-y: auto;
   padding-block: calc(24px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-bottom, 0px));
   padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
 .wizard .inner { max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; min-height: 100%; }
 .wizard .steps { display: flex; gap: 6px; }
-.wizard .steps i { flex: 1; height: 5px; border-radius: 3px; background: var(--line); }
-.wizard .steps i.on { background: var(--amber); }
-.wizard h1 { font: 700 34px/1.05 var(--display); text-transform: uppercase; letter-spacing: .03em; margin: 8px 0 0; text-wrap: balance; }
+.wizard .steps i { flex: 1; height: 6px; border-radius: 3px; background: var(--line); }
+.wizard .steps i.on { background: var(--biz); }
+.wizard h1 { font: 800 34px/1.08 var(--display); letter-spacing: -.03em; margin: 8px 0 0; text-wrap: balance; }
 .wizard .lead { font-size: 17px; color: var(--sub); margin: 0; }
-.check { display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); }
-.check .ok { width: 26px; height: 26px; border-radius: 50%; flex: none; display: grid; place-items: center; border: 2px solid var(--line2); color: transparent; font: 700 15px var(--body); }
-.check.done .ok { background: var(--live); border-color: var(--live); color: #062; }
-.check b { display: block; font-weight: 600; }
+.check { display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: 18px; background: var(--panel); border: 0; box-shadow: var(--shadow); }
+.check .ok { width: 28px; height: 28px; border-radius: 50%; flex: none; display: grid; place-items: center; border: 2px solid var(--line2); color: transparent; font: 800 15px var(--body); }
+.check.done .ok { background: var(--live); border-color: var(--live); color: #fff; }
+.check b { display: block; font-weight: 800; }
 .check span { color: var(--sub); font-size: 14px; }
-@media (max-width: 370px) { .row, .starts { grid-template-columns: minmax(0,1fr); } .drum { width: 28px; height: 44px; font-size: 25px; } }
+@media (max-width: 370px) { .row, .starts { grid-template-columns: minmax(0,1fr); } .drum { width: 29px; height: 44px; font-size: 25px; } }
 </style>
 </head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -210,7 +220,7 @@ button.danger { color: var(--warn); border-color: color-mix(in srgb, var(--warn)
 </svg>
 
 <header class="top">
-  <div class="brand"><span class="logo">ODO</span><span class="view-title" id="viewTitle">Today</span></div>
+  <div class="brand"><span class="logo">Driv<em>R</em></span><span class="view-title" id="viewTitle">Today</span></div>
   <span class="reg" id="regBadge" hidden></span>
 </header>
 
@@ -220,8 +230,7 @@ button.danger { color: var(--warn); border-color: color-mix(in srgb, var(--warn)
   <section class="view" data-view="today">
     <section id="monthEnd" class="card live" hidden></section>
     <section id="tripCard" class="card"><p class="hint">Loading your log…</p></section>
-    <div class="section-lbl" id="glanceLbl">This month</div>
-    <div class="glance" id="glance"></div>
+    <div id="todayMore" class="view"></div>
   </section>
 
   <section class="view" data-view="trips" hidden>
@@ -260,6 +269,9 @@ button.danger { color: var(--warn); border-color: color-mix(in srgb, var(--warn)
   </section>
 
   <section class="view" data-view="month" hidden>
+    <div class="seg" role="group" aria-label="Period"><button type="button" id="segMonth" aria-pressed="true">Month</button><button type="button" id="segYear" aria-pressed="false">Tax year</button></div>
+    <div id="yearView" class="view" hidden></div>
+    <div id="monthView" class="view">
     <div class="monthbar"><button type="button" class="mprev" aria-label="Previous month"><svg><use href="#i-left"/></svg></button><h2 class="mtitle">—</h2><button type="button" class="mnext" aria-label="Next month"><svg><use href="#i-right"/></svg></button></div>
     <div class="stats">
       <div class="stat biz"><span class="lbl">Business</span><b id="tBus">0</b></div>
@@ -270,6 +282,8 @@ button.danger { color: var(--warn); border-color: color-mix(in srgb, var(--warn)
       <div class="stat"><span class="lbl">Trips</span><b id="tCount">0</b></div>
     </div>
     <div class="split" id="tSplit" title="Business and private share"></div>
+    <div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="lbl">Miles by week</span>
+      <span class="legend"><span><i style="background:var(--biz)"></i>Business</span><span><i style="background:var(--priv)"></i>Private</span></span></div><div id="weekChart"></div></div>
     <div class="section-lbl">Business miles by job</div>
     <div class="list" id="byJob"></div>
     <div class="section-lbl">Mileage sheet</div>
@@ -282,6 +296,7 @@ button.danger { color: var(--warn); border-color: color-mix(in srgb, var(--warn)
       <button class="primary" type="button" id="exportBtn">Build sheet</button>
       <button class="secondary" type="button" id="shareBtn" hidden>Share the sheet</button>
       <p class="hint" id="exportNote">Your paper Mileage Record Sheet, filled in. Miles after your last trip go on it as private.</p>
+    </div>
     </div>
   </section>
 
@@ -302,7 +317,7 @@ button.danger { color: var(--warn); border-color: color-mix(in srgb, var(--warn)
     <div id="carBox" class="card"></div>
     <div class="card">
       <h2>Backup</h2>
-      <p class="hint" id="backupHint">Your whole log is one file on this phone, in Documents/Odo. A dated copy is saved every week in Documents/Odo/Backups. Share one to your laptop to keep a copy off the phone.</p>
+      <p class="hint" id="backupHint">Your whole log is one file on this phone, in Documents/DrivR. A dated copy is saved every week in Documents/DrivR/Backups. Share one to your laptop to keep a copy off the phone.</p>
       <div class="btns">
         <button class="secondary" type="button" id="backupBtn">Share backup</button>
         <button class="secondary" type="button" id="restoreBtn">Restore</button>
@@ -327,6 +342,7 @@ button.danger { color: var(--warn); border-color: color-mix(in srgb, var(--warn)
   <button type="button" data-tab="settings"><svg><use href="#i-settings"/></svg>Settings</button>
 </nav>
 <div class="wizard" id="wizard" hidden></div>
+<div class="dock" id="dock" hidden></div>
 <div class="toast" id="toast" hidden></div>
 
 <script>
@@ -528,9 +544,28 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   const pc = v => String(v || '').toUpperCase().replace(/\s+/g, ' ').trim();
   const uid = () => Math.random().toString(36).slice(2, 10);
   const el = (tag, props = {}, kids = []) => { const e = document.createElement(tag); Object.assign(e, props); kids.forEach(k => e.append(k)); return e; };
-  let toastT; const toast = msg => { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); };
+  let toastT;
+  const toast = (msg, undo) => { // a short message; with undo, an Undo button for 6 seconds
+    const t = $('toast'); t.innerHTML = ''; t.append(el('span', { textContent: msg }));
+    if (undo) { const b = el('button', { type: 'button', textContent: 'Undo' }); b.onclick = async () => { t.hidden = true; clearTimeout(toastT); await undo(); }; t.append(b); }
+    t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, undo ? 6000 : 2600);
+  };
+  const buzz = (ms = 30) => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} };
+  // a sheet that slides up from the bottom; returns its inner box and a close function
+  function openSheet(title) {
+    closeSheet();
+    const bg = el('div', { className: 'sheet-bg', id: 'sheetBg' }), sh = el('div', { className: 'sheet', id: 'sheet', role: 'dialog' });
+    const inner = el('div', { className: 'inner' });
+    const head = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:10px' });
+    const x = el('button', { type: 'button', className: 'secondary', textContent: 'Close', style: 'min-height:40px;padding:6px 14px' });
+    x.onclick = closeSheet; head.append(el('h2', { textContent: title }), x);
+    inner.append(el('div', { className: 'grab' }), head); sh.append(inner);
+    bg.onclick = closeSheet; document.body.append(bg, sh);
+    return inner;
+  }
+  function closeSheet() { const s = $('sheet'), b = $('sheetBg'); if (s) s.remove(); if (b) b.remove(); }
 
-  // ---------- storage: one JSON file in Documents/Odo on the phone ----------
+  // ---------- storage: one JSON file in Documents/DrivR on the phone ----------
   const NATIVE = !!window.androidBridge || !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   const PL = {};
   function plug(name) { const C = window.Capacitor; if (!C) return null; if (PL[name]) return PL[name];
@@ -539,11 +574,11 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (C.nativePromise) { PL[name] = new Proxy({}, { get: (_, m) => m === 'addListener' ? ((ev, cb) => C.nativeCallback(name, 'addListener', { eventName: ev }, cb)) : (o => C.nativePromise(name, m, o || {})) }); return PL[name]; }
     return null; }
   const FS = () => plug('Filesystem');
-  const DIR = 'Odo', OLD_DIR = 'MileageBase Pro', FILE = 'mileage-log.json', LS = 'mbp:log';
+  const DIR = 'DrivR', OLD_DIRS = ['Odo', 'MileageBase Pro'], FILE = 'mileage-log.json', LS = 'mbp:log';
   let DATA = {}, migrated = false;
   async function fsWrite(path, data, base64) { const f = FS(); if (!f) throw new Error('no file access');
     const o = { path: DIR + '/' + path, data, directory: 'DOCUMENTS', recursive: true }; if (!base64) o.encoding = 'utf8'; return f.writeFile(o); }
-  const fileText = () => JSON.stringify({ app: 'Odo', version: 1, saved: new Date().toISOString(), ...DATA });
+  const fileText = () => JSON.stringify({ app: 'DrivR', version: 1, saved: new Date().toISOString(), ...DATA });
   async function saveAll() {
     const txt = fileText();
     if (!NATIVE) { try { localStorage.setItem(LS, txt); } catch (e) {} return; }
@@ -564,8 +599,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       for (const name of [FILE, FILE + '.tmp']) {
         try { const r = await f.readFile({ path: DIR + '/' + name, directory: 'DOCUMENTS', encoding: 'utf8' }); DATA = strip(JSON.parse(r.data)); return; } catch (e) {}
       }
-      // first run as Odo: bring the log and receipt photos across from the MileageBase Pro folder
-      for (const name of [FILE, FILE + '.tmp']) {
+      // first run as DrivR: bring the log and receipt photos across from the Odo or MileageBase Pro folder
+      for (const OLD_DIR of OLD_DIRS) for (const name of [FILE, FILE + '.tmp']) {
         try {
           const r = await f.readFile({ path: OLD_DIR + '/' + name, directory: 'DOCUMENTS', encoding: 'utf8' });
           DATA = strip(JSON.parse(r.data)); await saveAll();
@@ -574,7 +609,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
             for (const x of (rr.files || [])) { const n = typeof x === 'string' ? x : x.name;
               try { const img = await f.readFile({ path: OLD_DIR + '/Receipts/' + n, directory: 'DOCUMENTS' }); await fsWrite('Receipts/' + n, img.data, true); } catch (e) {} }
           } catch (e) {}
-          migrated = true; return;
+          migrated = OLD_DIR; return;
         } catch (e) {}
       }
       return;
@@ -822,7 +857,14 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   function syncNative() { // tells the widget and reminders about the open trip
     const T = TR(); if (!T) return;
     const t = S.openTrip;
-    T.sync({ tripOpen: !!t && t.type !== 'unsorted', label: tripLabel(t) }).catch(() => {});
+    let weekText = '';
+    try { // Friday summary: this week's miles
+      const now = new Date(today() + 'T12:00'), dow = (now.getDay() + 6) % 7, mon = new Date(now - dow * 86400000);
+      const days = milesByDay(`${mon.getFullYear()}-${pad(mon.getMonth() + 1)}-${pad(mon.getDate())}`, 7);
+      const b = Math.round(days.reduce((s, d) => s + d.bus, 0)), p = Math.round(days.reduce((s, d) => s + d.priv, 0));
+      if (b || p) weekText = `${b} business and ${p} private miles this week.` + (t && t.type === 'unsorted' ? ' One trip still needs sorting.' : '');
+    } catch (e) {}
+    T.sync({ tripOpen: !!t && t.type !== 'unsorted', label: tripLabel(t), expectedMi: t && t.expected ? t.expected * 2 : 0, weekText }).catch(() => {});
   }
 
   // Rows exactly as they go on the sheet
@@ -916,11 +958,11 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   const daysOn = d => Math.max(1, Math.floor((new Date(today() + 'T12:00') - new Date(d + 'T12:00')) / 86400000) + 1);
   function discardBtn(c, label) {
     const cancel = el('button', { className: 'secondary danger', type: 'button', textContent: label });
-    let armed = false;
     cancel.onclick = async () => {
-      if (!armed) { armed = true; cancel.textContent = 'Tap again to discard'; setTimeout(() => { armed = false; cancel.textContent = label; }, 4000); return; }
+      const was = S.openTrip;
       if (TR()) { try { await TR().stop(); } catch (e) {} }
-      S.openTrip = null; await saveS(); renderTripCard(); renderGlance(); toast('Discarded');
+      S.openTrip = null; await saveS(); renderTripCard();
+      toast('Trip discarded', async () => { S.openTrip = was; await saveS(); if (TR()) { try { await TR().start({ reset: false }); } catch (e) {} } renderTripCard(); });
     };
     c.append(cancel);
   }
@@ -932,24 +974,21 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (TR()) c.append(odometer('mi'));
     liveMap(c, t);
     batteryBanner(c);
-    const form = el('form', { style: 'display:flex;flex-direction:column;gap:12px' });
-    if (!TR()) form.append(field('Miles driven', 'pDone', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }));
-    const err = el('p', { className: 'err', hidden: true }); form.append(err);
-    form.append(el('button', { className: 'primary', type: 'submit', textContent: 'Finish journey' }));
-    form.onsubmit = async e => {
-      e.preventDefault();
-      let miles;
-      let route = null;
+    if (!TR()) c.append(field('Miles driven', 'pDone', { className: 'odo', inputMode: 'numeric', autocomplete: 'off' }));
+    setDock('Finish journey', 'priv', async () => {
+      let miles, route = null;
       if (TR()) { route = await takeRoute(); try { const st = await TR().stop(); miles = Math.round(MI(st.meters)); } catch (er) { miles = 0; } }
-      else { miles = num($('pDone').value); if (miles == null || miles < 0) { err.textContent = 'Enter the miles.'; err.hidden = false; return; } miles = Math.round(miles); }
+      else { miles = num($('pDone') && $('pDone').value); if (miles == null || miles < 0) { toast('Enter the miles driven'); return; } miles = Math.round(miles); }
       const k = mKey(t.startDate); await loadMonth(k);
       months[k].trips.push({ id: t.id, type: 'priv', startDate: t.startDate, finishDate: today(), startMiles: t.startMiles, finishMiles: t.startMiles + miles, route });
+      const prevLast = S.lastFinish;
       S.lastFinish = Math.max(S.lastFinish ?? 0, t.startMiles + miles); S.openTrip = null;
-      await saveMonth(k); await saveS();
+      await saveMonth(k); await saveS(); buzz(60);
       viewM = k; await renderMonth(); renderTripCard();
-      toast(`Private: ${miles} miles`);
-    };
-    c.append(form);
+      toast(`Private: ${miles} mi`, async () => {
+        months[k].trips = months[k].trips.filter(x => x.id !== t.id); S.lastFinish = prevLast; S.openTrip = t;
+        await saveMonth(k); await saveS(); if (TR()) { try { await TR().start({ reset: false }); } catch (e) {} } renderMonth(); renderTripCard(); });
+    });
     discardBtn(c, 'Discard journey');
     setTimeout(refreshGps, 0);
   }
@@ -966,13 +1005,13 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     }
     S.openTrip = { id: uid(), type: 'priv', startDate: today(), startMiles: miles }; newType = null;
     await saveS(); renderTripCard();
-    toast('Private journey started.' + gpsMsg);
+    buzz(); toast('Private journey started.' + gpsMsg);
   }
   function privStart(form) { // only shown the very first time, when there's no odometer reading yet
     form.append(el('p', { className: 'hint', textContent: 'First trip: read the odometer once. After this, every trip carries on from the last one.' }));
     form.append(field('Odometer now', 'nMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }));
     const err = el('p', { className: 'err', hidden: true }); form.append(err);
-    form.append(el('button', { className: 'primary', type: 'submit', textContent: 'Start private journey' }));
+    form.append(el('button', { className: 'primary priv', type: 'submit', textContent: 'Start private journey' }));
     form.onsubmit = async e => {
       e.preventDefault();
       const miles = num($('nMiles').value);
@@ -995,6 +1034,45 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     batteryBanner(c);
     discardBtn(c, 'Not a trip, discard');
     setTimeout(refreshGps, 0);
+  }
+  function openFinish(t) { // bottom sheet: finish date and the dash reading
+    const box = openSheet('Finish trip');
+    const gps = gpsLive && gpsLive.meters > 0 ? Math.round(MI(gpsLive.meters)) : null;
+    box.append(el('p', { className: 'hint', textContent: `${t.startPc} → ${t.sitePc} · started at ${t.startMiles}` + (gps != null ? ` · GPS ${gps} mi` : '') }));
+    const form = el('form', { style: 'display:flex;flex-direction:column;gap:12px' });
+    const row = el('div', { className: 'row' });
+    row.append(field('Finish date', 'cDate', { type: 'date', value: today(), required: true }),
+               field('Odometer now', 'cMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off', value: gps != null ? t.startMiles + gps : '' }));
+    form.append(row);
+    form.append(el('p', { className: 'hint', textContent: gps != null ? 'Worked out from GPS. Check it against the dash and change it if it\'s out.' : 'Read it off the dash.' }));
+    const err = el('p', { className: 'err', hidden: true }); form.append(err);
+    form.append(el('button', { className: 'primary biz', type: 'submit', textContent: 'Save trip' }));
+    form.onsubmit = async e => {
+      e.preventDefault();
+      const miles = num($('cMiles').value), date = $('cDate').value;
+      if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
+      if (miles < t.startMiles) { err.textContent = `That's lower than the start reading (${t.startMiles}). Check the odometer.`; err.hidden = false; return; }
+      const done = miles - t.startMiles;
+      if (t.expected && done < t.expected * 2 * 0.95 && form.dataset.checked !== String(miles)) {
+        err.textContent = `Logged ${done} mi, but the round trip alone is about ${t.expected * 2} mi. Check the odometer, or tap Save trip again to keep it.`;
+        err.hidden = false; form.dataset.checked = String(miles); return;
+      }
+      if (date < t.startDate) { err.textContent = 'Finish date is before the start date.'; err.hidden = false; return; }
+      let gpsMiles = null, route = null;
+      if (TR()) { route = await takeRoute(); try { const st = await TR().stop(); gpsMiles = Math.round(MI(st.meters) * 10) / 10; } catch (e) {} }
+      const k = mKey(t.startDate); await loadMonth(k);
+      const saved = { ...t, finishMiles: miles, finishDate: date, gpsMiles, route };
+      months[k].trips.push(saved);
+      const prevLast = S.lastFinish;
+      S.lastFinish = Math.max(S.lastFinish ?? 0, miles); S.openTrip = null;
+      await saveMonth(k); await saveS(); closeSheet(); buzz(60);
+      viewM = k; await renderMonth(); renderTripCard();
+      const extra = t.expected ? done - t.expected * 2 : 0;
+      toast(`Saved: ${done} business mi` + (extra > 0 ? ` (+${extra} local)` : ''), async () => { // undo: reopen the trip
+        months[k].trips = months[k].trips.filter(x => x.id !== t.id); S.lastFinish = prevLast; S.openTrip = t;
+        await saveMonth(k); await saveS(); if (TR()) { try { await TR().start({ reset: false }); } catch (e) {} } renderMonth(); renderTripCard(); });
+    };
+    box.append(form);
   }
   function renderBusinessCard(c, t) {
     headRow(c, 'Business · day ' + daysOn(t.startDate), 'bus');
@@ -1031,44 +1109,21 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     c.append(tiles);
     liveMap(c, t);
     batteryBanner(c);
-    const form = el('form', { style: 'display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--line);padding-top:14px' });
-    form.append(el('h2', { textContent: 'Back home or at the office' }));
-    const row = el('div', { className: 'row' });
-    row.append(field('Finish date', 'cDate', { type: 'date', value: today(), required: true }),
-               field('Odometer now', 'cMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }));
-    row.querySelector('#cMiles').addEventListener('input', e => { e.target.dataset.touched = '1'; });
-    form.append(row);
-    form.append(el('p', { className: 'hint', id: 'cHint', textContent: TR() ? 'Fills in from GPS as you drive. Check it against the dash.' : 'Read it off the dash.' }));
-    const err = el('p', { className: 'err', hidden: true }); form.append(err);
-    form.append(el('button', { className: 'primary', type: 'submit', textContent: 'Finish trip' }));
-    form.onsubmit = async e => {
-      e.preventDefault();
-      const miles = num($('cMiles').value), date = $('cDate').value;
-      if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
-      if (miles < t.startMiles) { err.textContent = `That's lower than the start reading (${t.startMiles}). Check the odometer.`; err.hidden = false; return; }
-      const done = miles - t.startMiles;
-      if (t.expected && done < t.expected * 2 * 0.95 && form.dataset.checked !== String(miles)) {
-        err.textContent = `Logged ${done} mi, but the round trip alone is about ${t.expected * 2} mi. Check the odometer, or tap Finish trip again to save it as it is.`;
-        err.hidden = false; form.dataset.checked = String(miles); return;
-      }
-      if (date < t.startDate) { err.textContent = 'Finish date is before the start date.'; err.hidden = false; return; }
-      let gpsMiles = null, route = null;
-      if (TR()) { route = await takeRoute(); try { const st = await TR().stop(); gpsMiles = Math.round(MI(st.meters) * 10) / 10; } catch (e) {} }
-      const k = mKey(t.startDate); await loadMonth(k);
-      months[k].trips.push({ ...t, finishMiles: miles, finishDate: date, gpsMiles, route });
-      S.lastFinish = Math.max(S.lastFinish ?? 0, miles); S.openTrip = null;
-      await saveMonth(k); await saveS();
-      viewM = k; await renderMonth(); renderTripCard();
-      const extra = t.expected ? (miles - t.startMiles) - t.expected * 2 : 0;
-      toast(`Trip saved: ${miles - t.startMiles} business miles` + (extra > 0 ? ` (+${extra} local driving)` : ''));
-    };
-    c.append(form);
+    setDock('Finish trip', '', () => openFinish(t));
     discardBtn(c, 'Discard this trip');
     setTimeout(refreshGps, 0);
   }
 
+  function setDock(label, cls, fn) {
+    const d = $('dock'); d.innerHTML = '';
+    if (!label) { d.hidden = true; document.body.classList.remove('has-dock'); return; }
+    const b = el('button', { type: 'button', className: 'primary ' + (cls || ''), textContent: label }); b.onclick = fn;
+    d.append(b); d.hidden = currentTab !== 'today'; document.body.classList.toggle('has-dock', currentTab === 'today');
+  }
   function renderTripCard() {
-    const c = $('tripCard'); c.innerHTML = ''; c.classList.toggle('live', !!S.openTrip);
+    setDock(null);
+    renderToday();
+    const c = $('tripCard'); c.innerHTML = ''; c.classList.toggle('live', !!S.openTrip); c.classList.toggle('priv-trip', !!S.openTrip && S.openTrip.type === 'priv');
     const dot = $('liveDot'); if (dot) dot.hidden = !S.openTrip;
     if (S.openTrip) {
       const t = S.openTrip;
@@ -1144,7 +1199,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       : 'Read it off the dash. After this, each trip carries on from the last one.' }));
     form.append(odo);
     const err = el('p', { className: 'err', hidden: true }); form.append(err);
-    form.append(el('button', { className: 'primary', type: 'submit', textContent: sorting ? 'Save trip details' : 'Start trip' }));
+    form.append(el('button', { className: 'primary biz', type: 'submit', textContent: sorting ? 'Save trip details' : 'Start trip' }));
     form.onsubmit = async e => {
       e.preventDefault();
       const miles = num($('nMiles').value);
@@ -1168,7 +1223,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       }
       sortMode = null;
       S.openTrip = t; newType = null; expTried = 0; await saveS(); renderTripCard(); if (k === viewM) renderMonth(); fillExpected();
-      toast('Trip started.' + (gpsMsg || ' Finish it when you get back.'));
+      buzz(); toast('Trip started.' + (gpsMsg || ' Finish it when you get back.'));
     };
     c.append(form);
     if (pickSite) { const s = pickSite; pickSite = null; $('nSite').value = s.pc; $('nJob').value = s.job || ''; $('nDesc').value = s.desc || '';
@@ -1199,7 +1254,13 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     let bus = 0, priv = 0;
     rows.forEach(r => { bus += r.bus; priv += r.priv; });
     const statMi = (id, v, unit) => { const b = $(id); b.textContent = String(v); if (unit) b.append(el('small', { textContent: unit })); };
+    { // miles by week of the month
+      const first = viewM + '-01', n = +lastDay(viewM).slice(8), days = milesByDay(first, n), cols = [];
+      for (let s = 0; s < n; s += 7) { const ch = days.slice(s, s + 7); cols.push({ label: `${s + 1}–${Math.min(n, s + 7)}`, bus: ch.reduce((x, d) => x + d.bus, 0), priv: ch.reduce((x, d) => x + d.priv, 0) }); }
+      const wc = $('weekChart'); wc.innerHTML = ''; wc.append(barChart(cols));
+    }
     statMi('tBus', bus.toLocaleString('en-GB'), 'mi'); statMi('tPriv', priv.toLocaleString('en-GB'), 'mi');
+    $('tPriv').parentElement.classList.add('priv');
     $('tCount').textContent = items.filter(r => r.id).length;
     const sp = $('tSplit'); sp.innerHTML = '';
     if (bus + priv > 0) sp.append(el('i', { style: `width:${(bus / (bus + priv) * 100).toFixed(1)}%;background:var(--biz)` }), el('i', { style: `width:${(priv / (bus + priv) * 100).toFixed(1)}%;background:var(--priv)` }));
@@ -1262,15 +1323,90 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (!$('fDate').value) $('fDate').value = today();
   }
 
-  function renderGlance() { // Today tab: this month at a glance
-    const k = mKey(today()); const g = $('glance'); if (!g || !months[k]) return;
-    const { rows, list } = sheetRows(k);
-    let bus = 0, priv = 0; rows.forEach(r => { bus += r.bus; priv += r.priv; });
-    const litres = months[k].fuel.reduce((s, f) => s + (f.litresBus || 0) + (f.litresPriv || 0), 0);
-    g.innerHTML = '';
-    [['Business', bus.toLocaleString('en-GB') + ''], ['Private', priv.toLocaleString('en-GB')], ['Trips', String(list.filter(r => r.id).length)]].forEach(([l, v]) =>
-      g.append(el('div', {}, [el('span', { className: 'lbl', textContent: l }), el('b', { textContent: v })])));
-    $('glanceLbl').textContent = mLabel(k) + (litres ? ` · ${Math.round(litres)} L fuel` : '');
+  function renderGlance() { renderToday(); }
+  function allTrips() { // every saved trip from every month in the log
+    const out = [];
+    Object.keys(DATA).filter(k => /^m-\d{4}-\d{2}$/.test(k)).forEach(k => (DATA[k].trips || []).forEach(t => out.push(t)));
+    return out;
+  }
+  const tripMiles = t => Math.max(0, (t.finishMiles ?? 0) - (t.startMiles ?? 0));
+  // miles per day for a run of dates, split business / private (a multi-day trip is spread across its days)
+  function milesByDay(fromIso, days) {
+    const out = Array.from({ length: days }, () => ({ bus: 0, priv: 0 }));
+    const start = new Date(fromIso + 'T12:00');
+    allTrips().forEach(t => {
+      const a = new Date(t.startDate + 'T12:00'), b = new Date((t.finishDate || t.startDate) + 'T12:00');
+      const n = Math.max(1, Math.round((b - a) / 86400000) + 1), per = tripMiles(t) / n;
+      for (let i = 0; i < n; i++) { const d = Math.round((a - start) / 86400000) + i; if (d >= 0 && d < days) out[d][t.type === 'priv' ? 'priv' : 'bus'] += per; }
+    });
+    return out;
+  }
+  function barChart(cols) { // cols: [{label, bus, priv}]
+    const max = Math.max(1, ...cols.map(c => c.bus + c.priv));
+    const ch = el('div', { className: 'chart' });
+    cols.forEach(c => {
+      const tot = Math.round(c.bus + c.priv);
+      const stack = el('div', { className: 'stack', style: `height:${Math.max(4, (c.bus + c.priv) / max * 100)}%` },
+        [el('i', { style: `height:${tot ? c.bus / (c.bus + c.priv) * 100 : 0}%;background:var(--biz)` }), el('i', { style: `height:${tot ? c.priv / (c.bus + c.priv) * 100 : 0}%;background:var(--priv)` })]);
+      ch.append(el('div', { className: 'col' }, [el('b', { textContent: tot ? String(tot) : '' }), stack, el('span', { textContent: c.label })]));
+    });
+    return ch;
+  }
+  function renderToday() {
+    const box = $('todayMore'); if (!box) return; box.innerHTML = '';
+    if (S.openTrip) return;
+    const now = new Date(today() + 'T12:00'), dow = (now.getDay() + 6) % 7;
+    const mon = new Date(now - dow * 86400000), monIso = `${mon.getFullYear()}-${pad(mon.getMonth() + 1)}-${pad(mon.getDate())}`;
+    const days = milesByDay(monIso, 7);
+    const wb = Math.round(days.reduce((s, d) => s + d.bus, 0)), wp = Math.round(days.reduce((s, d) => s + d.priv, 0));
+    const wk = el('div', { className: 'card' });
+    wk.append(el('div', { style: 'display:flex;justify-content:space-between;align-items:baseline' }, [el('span', { className: 'lbl', textContent: 'This week' }),
+      el('span', { className: 'legend' }, [el('span', {}, [el('i', { style: 'background:var(--biz)' }), wb + ' business']), el('span', {}, [el('i', { style: 'background:var(--priv)' }), wp + ' private'])])]));
+    wk.append(barChart(days.map((d, i) => ({ label: 'MTWTFSS'[i], ...d }))));
+    box.append(wk);
+    const last = allTrips().filter(t => t.finishMiles != null).sort((x, y) => (y.finishMiles ?? 0) - (x.finishMiles ?? 0))[0];
+    if (last) {
+      const P = last.type === 'priv';
+      const card = el('button', { type: 'button', className: 'card', style: 'border:0;text-align:left;cursor:pointer;color:inherit;font:inherit' });
+      card.append(el('div', { className: 'item-head', style: 'pointer-events:none' }, [
+        el('span', { className: 'r' }, [el('span', { className: 'lbl', style: 'display:block;margin-bottom:4px', textContent: 'Last trip' }), P ? 'Private journey' : `${last.startPc} → ${last.sitePc}`]),
+        el('span', { className: 'd', textContent: [fmtD(last.startDate) + (last.finishDate && last.finishDate !== last.startDate ? ' – ' + fmtD(last.finishDate) : ''), !P && last.desc].filter(Boolean).join(' · ') }),
+        el('span', { className: 'm ' + (P ? 'priv' : 'biz'), textContent: String(tripMiles(last)) })]));
+      card.onclick = () => openTrip(last.id, mKey(last.startDate));
+      box.append(card);
+    }
+    const k = mKey(today());
+    if (months[k]) {
+      const { rows } = sheetRows(k); let bus = 0, priv = 0; rows.forEach(r => { bus += r.bus; priv += r.priv; });
+      const g = el('div', { className: 'stats' });
+      g.append(el('div', { className: 'stat' }, [el('span', { className: 'lbl', textContent: mLabel(k).split(' ')[0] + ' business' }), el('b', {}, [bus.toLocaleString('en-GB'), el('small', { textContent: 'mi' })])]),
+               el('div', { className: 'stat' }, [el('span', { className: 'lbl', textContent: mLabel(k).split(' ')[0] + ' private' }), el('b', {}, [priv.toLocaleString('en-GB'), el('small', { textContent: 'mi' })])]));
+      box.append(g);
+    }
+  }
+  // ---- trip detail: a full sheet with the map, the numbers, and edit ----
+  async function openTrip(id, k) {
+    await loadMonth(k); const M = months[k]; const t = M.trips.find(x => x.id === id); if (!t) return;
+    viewM = k;
+    const P = t.type === 'priv';
+    const box = openSheet(P ? 'Private journey' : `${t.startPc} → ${t.sitePc}`);
+    box.append(el('div', { className: 'meta' }, [el('span', { className: 'tag ' + (P ? 'priv' : 'bus'), textContent: P ? 'Private' : 'Business' }),
+      el('span', { textContent: fmtD(t.startDate) + (t.finishDate && t.finishDate !== t.startDate ? ' – ' + fmtD(t.finishDate) : '') }), !P && t.desc ? el('span', { textContent: t.desc }) : '', !P && t.job ? el('span', { textContent: 'Job ' + t.job }) : ''].filter(Boolean)));
+    if (t.route) { const m = el('div', { className: 'map' }); box.append(m); drawMap(m, [t]); }
+    const kv = el('div', { className: 'kv' });
+    const add = (l, v) => kv.append(el('div', {}, [el('span', { className: 'lbl', textContent: l }), el('b', { textContent: v })]));
+    add(P ? 'Private miles' : 'Business miles', String(tripMiles(t)));
+    add('Odometer', `${t.startMiles} → ${t.finishMiles}`);
+    if (t.expected) add('Expected', `${t.expected * 2} mi`);
+    if (t.gpsMiles != null) add('GPS logged', `${t.gpsMiles} mi`);
+    const days = Math.max(1, Math.round((new Date((t.finishDate || t.startDate) + 'T12:00') - new Date(t.startDate + 'T12:00')) / 86400000) + 1);
+    add('Days', String(days));
+    if (!P && t.expected && tripMiles(t) > t.expected * 2) add('Local driving', `${tripMiles(t) - t.expected * 2} mi`);
+    box.append(kv);
+    if (!P && t.sitePc && TR()) { const nav = el('button', { type: 'button', className: 'secondary', textContent: 'Navigate to ' + t.sitePc }); nav.onclick = () => TR().openNav({ q: t.sitePc }).catch(() => toast('No satnav app found')); box.append(nav); }
+    const edit = el('button', { type: 'button', className: 'secondary', textContent: 'Edit trip' });
+    edit.onclick = () => { edit.remove(); box.append(editForm(id)); };
+    box.append(edit);
   }
   function tripItem(r) {
     const it = el('div', { className: 'item' });
@@ -1285,20 +1421,17 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       el('span', { className: 'm' }));
     const m = head.querySelector('.m');
     const extra = r.untracked ? ` · +${r.untracked} not logged` : '';
+    m.classList.add(P || !r.id ? 'priv' : 'biz');
     m.append(String(P ? r.priv : r.id ? r.bus : (r.untracked ?? r.priv)), el('small', { textContent: P ? 'private' : r.id ? 'business' + extra : 'private' }));
     it.append(head);
     if (!r.id) { head.disabled = true; head.style.cursor = 'default'; return it; }
-    if (editing === r.id) {
-      if (r.route) { const box = el('div', { className: 'map' }); it.append(box); drawMap(box, [r]); }
-      it.append(editForm(r.id));
-    }
-    head.onclick = () => { editing = editing === r.id ? null : r.id; renderMonth(); };
+    head.onclick = () => openTrip(r.id, viewM);
     return it;
   }
 
   function editForm(id) {
     const M = months[viewM]; const t = M.trips.find(x => x.id === id);
-    const f = el('form', { className: 'card', style: 'background:var(--bg);padding:14px' });
+    const f = el('form', { style: 'display:flex;flex-direction:column;gap:12px' });
     if (t.type === 'priv') return privEditForm(M, t, f);
     const add = (row) => f.append(row);
     let r = el('div', { className: 'row' });
@@ -1326,13 +1459,9 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
                          startMiles: sm, finishMiles: fm, job: P ? '' : ev('eJob'), desc: P ? '' : ev('eDesc') });
       const nk = mKey(t.startDate);
       if (nk !== viewM) { M.trips = M.trips.filter(x => x.id !== id); await loadMonth(nk); months[nk].trips.push(t); await saveMonth(nk); }
-      await saveMonth(viewM); await recalcLast(); editing = null; renderMonth(); toast('Trip updated');
+      await saveMonth(viewM); await recalcLast(); editing = null; closeSheet(); renderMonth(); renderToday(); toast('Trip updated');
     };
-    let armed = false;
-    del.onclick = async () => {
-      if (!armed) { armed = true; del.textContent = 'Tap again to delete'; return; }
-      M.trips = M.trips.filter(x => x.id !== id); await saveMonth(viewM); await recalcLast(); editing = null; renderMonth(); toast('Trip deleted');
-    };
+    del.onclick = () => deleteTrip(M, t);
     return f;
   }
   function privEditForm(M, t, f) {
@@ -1345,14 +1474,15 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       e.preventDefault();
       const v = num($('pMiles').value); if (v == null || v < 0) { err.textContent = 'Enter the miles.'; err.hidden = false; return; }
       t.finishMiles = (t.startMiles ?? 0) + Math.round(v);
-      await saveMonth(viewM); await recalcLast(); editing = null; renderMonth(); toast('Saved');
+      await saveMonth(viewM); await recalcLast(); editing = null; closeSheet(); renderMonth(); renderToday(); toast('Saved');
     };
-    let armed = false;
-    del.onclick = async () => {
-      if (!armed) { armed = true; del.textContent = 'Tap again to delete'; return; }
-      M.trips = M.trips.filter(x => x.id !== t.id); await saveMonth(viewM); await recalcLast(); editing = null; renderMonth(); toast('Deleted');
-    };
+    del.onclick = () => deleteTrip(M, t);
     return f;
+  }
+  async function deleteTrip(M, t) {
+    const k = viewM;
+    M.trips = M.trips.filter(x => x.id !== t.id); await saveMonth(k); await recalcLast(); closeSheet(); renderMonth(); renderToday();
+    toast('Trip deleted', async () => { M.trips.push(t); await saveMonth(k); await recalcLast(); renderMonth(); renderToday(); });
   }
   async function recalcLast() {
     let best = null;
@@ -1363,6 +1493,48 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   // ---------- wiring ----------
   document.querySelectorAll('.mprev').forEach(b => { b.onclick = async () => { viewM = shiftM(viewM, -1); editing = null; await renderMonth(); }; });
   document.querySelectorAll('.mnext').forEach(b => { b.onclick = async () => { viewM = shiftM(viewM, 1); editing = null; await renderMonth(); }; });
+  // ---------- tax year (6 April to 5 April) ----------
+  let taxStart = (() => { const d = new Date(today() + 'T12:00'), y = d.getFullYear(); return (d.getMonth() > 3 || (d.getMonth() === 3 && d.getDate() >= 6)) ? y : y - 1; })();
+  function taxRange(y) { return [`${y}-04-06`, `${y + 1}-04-05`]; }
+  function renderYear() {
+    const box = $('yearView'); box.innerHTML = '';
+    const [from, to] = taxRange(taxStart);
+    const bar = el('div', { className: 'monthbar' });
+    const pv = el('button', { type: 'button' }, [svg('i-left')]); pv.setAttribute('aria-label', 'Previous tax year'); pv.onclick = () => { taxStart--; renderYear(); };
+    const nx = el('button', { type: 'button' }, [svg('i-right')]); nx.setAttribute('aria-label', 'Next tax year'); nx.onclick = () => { taxStart++; renderYear(); };
+    bar.append(pv, el('h2', { textContent: `Tax year ${taxStart}–${String(taxStart + 1).slice(2)}` }), nx); box.append(bar);
+    const trips = allTrips().filter(t => t.startDate >= from && t.startDate <= to && t.finishMiles != null);
+    // business and private per month, through the same sheet rules as the monthly sheets
+    const cols = []; let bus = 0, priv = 0, litres = 0, cost = 0;
+    for (let i = 0; i < 12; i++) {
+      const m = (3 + i) % 12, y = taxStart + (3 + i >= 12 ? 1 : 0), k = `${y}-${pad(m + 1)}`, M = DATA['m-' + k];
+      let b = 0, pr = 0;
+      if (M) { months[k] = months[k] || M; sheetRows(k).rows.forEach(r => { const d = r.startDate || r.finishDate || lastDay(k); if (d >= from && d <= to) { b += r.bus; pr += r.priv; } });
+        (M.fuel || []).forEach(f => { if (f.date >= from && f.date <= to) { litres += (f.litresBus || 0) + (f.litresPriv || 0); cost += Number(f.cost) || 0; } }); }
+      bus += b; priv += pr; cols.push({ label: MONTHS[m].slice(0, 1), bus: b, priv: pr });
+    }
+    const st = el('div', { className: 'stats' });
+    const stat = (l, v, u, cls) => el('div', { className: 'stat ' + (cls || '') }, [el('span', { className: 'lbl', textContent: l }), el('b', {}, [v, el('small', { textContent: u })])]);
+    st.append(stat('Business', bus.toLocaleString('en-GB'), 'mi', 'biz'), stat('Private', priv.toLocaleString('en-GB'), 'mi', 'priv'),
+      stat('Business share', bus + priv ? Math.round(bus / (bus + priv) * 100) + '' : '–', bus + priv ? '%' : ''), stat('Trips', String(trips.length), ''),
+      stat('Fuel', Math.round(litres).toLocaleString('en-GB'), 'L'), stat('Fuel cost', cost ? '£' + Math.round(cost).toLocaleString('en-GB') : '–', ''));
+    box.append(st);
+    const ch = el('div', { className: 'card' }); ch.append(el('span', { className: 'lbl', textContent: 'Miles by month, April to March' }), barChart(cols)); box.append(ch);
+    box.append(el('p', { className: 'hint', textContent: 'For your records. If you claim mileage allowance yourself, HMRC rates are 45p a mile for the first 10,000 business miles and 25p after. Check with your accountant.' }));
+    const ex = el('button', { type: 'button', className: 'primary', textContent: 'Export tax year (.csv)' });
+    ex.onclick = async () => {
+      const lines = [['Start date', 'Finish date', 'Type', 'Start postcode', 'Site postcode', 'Job', 'Site', 'Start miles', 'Finish miles', 'Miles'].join(',')];
+      trips.sort((x, y) => (x.startMiles ?? 0) - (y.startMiles ?? 0)).forEach(t => { const P = t.type === 'priv';
+        lines.push([t.startDate, t.finishDate || '', P ? 'Private' : 'Business', P ? '' : t.startPc, P ? '' : t.sitePc, P ? '' : (t.job || ''), P ? '' : '"' + String(t.desc || '').replace(/"/g, '""') + '"', t.startMiles, t.finishMiles, tripMiles(t)].join(',')); });
+      lines.push('', `Business miles,${bus}`, `Private miles,${priv}`);
+      const name = `DrivR tax year ${taxStart}-${String(taxStart + 1).slice(2)}.csv`, txt = lines.join('\n');
+      if (!NATIVE) { download(name, new Blob([txt], { type: 'text/csv' })); return; }
+      try { await fsWrite('Sheets/' + name, txt); await shareFile(name, txt, false); } catch (e) { if (!/cancel/i.test(String(e && e.message || e))) toast('Could not share: ' + (e.message || e)); }
+    };
+    box.append(ex);
+  }
+  $('segMonth').onclick = () => { $('segMonth').setAttribute('aria-pressed', 'true'); $('segYear').setAttribute('aria-pressed', 'false'); $('monthView').hidden = false; $('yearView').hidden = true; };
+  $('segYear').onclick = () => { $('segYear').setAttribute('aria-pressed', 'true'); $('segMonth').setAttribute('aria-pressed', 'false'); $('monthView').hidden = true; $('yearView').hidden = false; renderYear(); };
   // ---------- first-run setup ----------
   async function wizState() {
     const st = { loc: false, bat: false, car: false, bg: false };
@@ -1382,9 +1554,9 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     skip.onclick = closeWizard; top.append(steps, skip); inner.append(top);
     const next = (label, fn) => { const b = el('button', { type: 'button', className: 'primary', textContent: label }); b.onclick = fn; return b; };
     if (step === 0) {
-      inner.append(el('div', { style: 'margin-top:8vh' }, [el('span', { className: 'logo', style: 'font-size:44px;padding:12px 16px 10px 20px', textContent: 'ODO' })]));
+      inner.append(el('div', { style: 'margin-top:8vh' }, [el('span', { className: 'logo', style: 'font-size:46px;padding:12px 18px;border-radius:20px' }, ['Driv', el('em', { textContent: 'R' })])]));
       inner.append(el('h1', { textContent: 'Your work mileage, logged by itself' }));
-      inner.append(el('p', { className: 'lead', textContent: 'Odo logs every drive with GPS, starts on its own when your phone connects to the car, and fills in your mileage sheet at the end of the month.' }));
+      inner.append(el('p', { className: 'lead', textContent: 'DrivR logs every drive with GPS, starts on its own when your phone connects to the car, and fills in your mileage sheet at the end of the month.' }));
       inner.append(el('div', { style: 'flex:1' }), next('Get started', () => openWizard(1)));
     } else if (step === 1) {
       inner.append(el('h1', { textContent: 'Your details' }), el('p', { className: 'lead', textContent: 'These go on the top of your mileage sheet.' }));
@@ -1408,8 +1580,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       inner.append(el('div', { style: 'flex:1' }), next('Next', () => openWizard(3)));
     } else {
       inner.append(el('h1', { textContent: 'All set' }));
-      inner.append(el('p', { className: 'lead', textContent: 'Tap Business or Private on Today to start a trip, or just drive: once your car is linked, Odo starts logging and asks what it was later. At month end, Month builds your sheet.' }));
-      inner.append(el('div', { style: 'flex:1' }), next('Start using Odo', closeWizard));
+      inner.append(el('p', { className: 'lead', textContent: 'Tap Business or Private on Today to start a trip, or just drive: once your car is linked, DrivR starts logging and asks what it was later. At month end, Month builds your sheet.' }));
+      inner.append(el('div', { style: 'flex:1' }), next('Start using DrivR', closeWizard));
     }
   }
   async function closeWizard() { $('wizard').hidden = true; wizStep = -1; S.setupDone = true; await saveS(); renderCar(); }
@@ -1417,7 +1589,10 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && wizStep === 2 && !$('wizard').hidden) openWizard(2); });
   // ---------- tabs ----------
   const TITLES = { today: 'Today', trips: 'Trips', fuel: 'Fuel', month: 'Month', settings: 'Settings' };
+  let currentTab = 'today';
   function showTab(name) {
+    currentTab = name; closeSheet();
+    const d = $('dock'); if (d && d.firstChild) { d.hidden = name !== 'today'; document.body.classList.toggle('has-dock', name === 'today'); }
     document.querySelectorAll('.view[data-view]').forEach(v => { v.hidden = v.dataset.view !== name; });
     document.querySelectorAll('.tabbar button').forEach(b => { if (b.dataset.tab === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     $('viewTitle').textContent = TITLES[name] || '';
@@ -1580,8 +1755,10 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       const act = await T.takeAction();
       if (st.active && !S.openTrip) {
         const d = act.since ? new Date(act.since) : new Date();
-        S.openTrip = { id: uid(), type: 'unsorted', startDate: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, startMiles: suggestedStart() };
+        const iso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, weekend = d.getDay() === 0 || d.getDay() === 6;
+        S.openTrip = { id: uid(), type: weekend ? 'priv' : 'unsorted', startDate: iso, startMiles: suggestedStart() };
         await saveS(); renderTripCard();
+        if (weekend) toast('Weekend drive, logging as private');
       } else if (S.openTrip && !st.active) { // logging stopped (phone restarted): carry on
         try { await T.start({ reset: false }); } catch (e) {}
       }
@@ -1633,7 +1810,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     try { await shareFile(lastSheet.name, lastSheet.data, true); } catch (e) { if (!/cancel/i.test(String(e && e.message || e))) toast('Could not share: ' + (e.message || e)); }
   };
   $('backupBtn').onclick = async () => {
-    const txt = fileText(), name = `Odo backup ${today()}.json`;
+    const txt = fileText(), name = `DrivR backup ${today()}.json`;
     if (!NATIVE) { download(name, new Blob([txt], { type: 'application/json' })); return; }
     try { await shareFile(name, txt, false); } catch (e) { if (!/cancel/i.test(String(e && e.message || e))) toast('Could not share: ' + (e.message || e)); }
   };
@@ -1645,12 +1822,12 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     try {
       const d = strip(JSON.parse(await f.text()));
       const ms = Object.keys(d).filter(k => /^m-\d{4}-\d{2}$/.test(k));
-      if (!d.settings && !ms.length) throw new Error('not an Odo backup');
+      if (!d.settings && !ms.length) throw new Error('not a DrivR backup');
       const trips = ms.reduce((n, k) => n + ((d[k].trips || []).length), 0);
       pending = d;
       msg.textContent = `${f.name}: ${trips} trips over ${ms.length} month${ms.length === 1 ? '' : 's'}. Restoring replaces everything in the app now.`;
       $('restoreGo').hidden = false;
-    } catch (err) { msg.textContent = 'That file could not be read as an Odo or MileageBase backup.'; }
+    } catch (err) { msg.textContent = 'That file could not be read as a DrivR backup.'; }
   };
   $('restoreGo').onclick = async () => {
     if (!pending) return;
@@ -1667,7 +1844,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     await loadMonth(shiftM(viewM, -1));
     fillSettings(); renderTripCard(); await renderMonth();
     await checkNative(); syncNative(); renderMonthEnd(); renderCar(); autoBackup(); renderGlance();
-    if (migrated) toast('Your MileageBase log is now in Odo');
+    if (migrated) toast('Your trips are now in DrivR');
     if (!S.setupDone) openWizard(0);
   })();
 })();

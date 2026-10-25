@@ -112,12 +112,12 @@ public class TrackingService extends Service {
             if (!p.getBoolean("tripOpen", false) && now - since > 3_600_000L && now - p.getLong("nagSort", 0) > 6 * 3_600_000L) {
                 p.edit().putLong("nagSort", now).apply();
                 ReminderReceiver.notify(TrackingService.this, ReminderReceiver.ID_OPEN, "Trip logging, not sorted yet",
-                        "Open Odo and mark it Business or Private.", "open", false);
+                        "Open DrivR and mark it Business or Private.", "open", false);
             }
             if (now - since > 7 * 86_400_000L && now - p.getLong("nagOpen", 0) > 86_400_000L) {
                 p.edit().putLong("nagOpen", now).apply();
                 ReminderReceiver.notify(TrackingService.this, ReminderReceiver.ID_OPEN, "Trip open for " + ((now - since) / 86_400_000L) + " days",
-                        "If you're back, open Odo and finish it.", "finish", false);
+                        "If you're back, open DrivR and finish it.", "finish", false);
             }
             handler.postDelayed(this, 3_600_000L);
         }
@@ -241,7 +241,7 @@ public class TrackingService extends Service {
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             NotificationChannel ch = new NotificationChannel(CHANNEL, "Trip logging", NotificationManager.IMPORTANCE_LOW);
-            ch.setDescription("Shown while Odo is logging a trip");
+            ch.setDescription("Shown while DrivR is logging a trip");
             ch.setShowBadge(false);
             if (nm != null) nm.createNotificationChannel(ch);
         }
@@ -255,13 +255,21 @@ public class TrackingService extends Service {
         Intent open = getPackageManager().getLaunchIntentForPackage(getPackageName());
         int flags = PendingIntent.FLAG_UPDATE_CURRENT | (Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0);
         PendingIntent pi = open == null ? null : PendingIntent.getActivity(this, 0, open, flags);
+        SharedPreferences p = prefs(this);
+        String label = p.getString("label", "");
+        int expected = p.getInt("expectedMi", 0); // round trip, when the app knows it
+        if (expected > 0) text = String.format(Locale.UK, "%.0f of %d mi expected", miles, expected) + ("parked".equals(m) ? " · parked" : "");
         NotificationCompat.Builder b = new NotificationCompat.Builder(this, CHANNEL)
                 .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-                .setContentTitle("Trip open")
+                .setContentTitle(label.isEmpty() ? "Trip open" : label)
                 .setContentText(text)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
+                .setColor(0xFFFF6A1A)
                 .setPriority(NotificationCompat.PRIORITY_LOW);
+        if (expected > 0) b.setProgress(expected, (int) Math.min(expected, Math.round(miles)), false);
+        if (p.getBoolean("tripOpen", false)) b.addAction(0, "Finish", ReminderReceiver.openApp(this, "finish", 8104));
+        else b.addAction(0, "Sort trip", ReminderReceiver.openApp(this, "open", 8105));
         if (pi != null) b.setContentIntent(pi);
         return b.build();
     }

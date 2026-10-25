@@ -16,8 +16,9 @@ import java.util.Calendar;
 /** Car Bluetooth prompt, month-end reminder, and setting things up again after a restart. */
 public class ReminderReceiver extends BroadcastReceiver {
     static final String MONTH_END = "uk.mileagebase.app.MONTH_END";
+    static final String WEEK_END = "uk.mileagebase.app.WEEK_END";
     static final String CHANNEL = "reminders";
-    static final int ID_MONTH = 7001, ID_CAR = 7002, ID_OPEN = 7003, ID_RESUME = 7004;
+    static final int ID_WEEK = 7005, ID_MONTH = 7001, ID_CAR = 7002, ID_OPEN = 7003, ID_RESUME = 7004;
 
     @Override
     public void onReceive(Context c, Intent intent) {
@@ -28,8 +29,14 @@ public class ReminderReceiver extends BroadcastReceiver {
             schedule(c);
             WidgetProvider.refresh(c);
             if (p.getBoolean("active", false)) {
-                notify(c, ID_RESUME, "Trip still open", "The phone restarted. Open Odo to carry on logging.", "open", false);
+                notify(c, ID_RESUME, "Trip still open", "The phone restarted. Open DrivR to carry on logging.", "open", false);
             }
+            return;
+        }
+        if (WEEK_END.equals(a)) {
+            String w = p.getString("weekText", "");
+            if (!w.isEmpty()) notify(c, ID_WEEK, "Your week", w, "open", false);
+            schedule(c);
             return;
         }
         if (MONTH_END.equals(a)) {
@@ -81,6 +88,12 @@ public class ReminderReceiver extends BroadcastReceiver {
         Intent i = new Intent(c, ReminderReceiver.class).setAction(MONTH_END);
         PendingIntent pi = PendingIntent.getBroadcast(c, 9001, i, PendingIntent.FLAG_UPDATE_CURRENT | immutable());
         try { am.set(AlarmManager.RTC_WAKEUP, cal.getTimeInMillis(), pi); } catch (Exception e) { /* ignore */ }
+        // Friday 5pm: the week's miles
+        Calendar f = Calendar.getInstance();
+        f.set(Calendar.HOUR_OF_DAY, 17); f.set(Calendar.MINUTE, 0); f.set(Calendar.SECOND, 0); f.set(Calendar.MILLISECOND, 0);
+        while (f.get(Calendar.DAY_OF_WEEK) != Calendar.FRIDAY || f.getTimeInMillis() <= System.currentTimeMillis()) f.add(Calendar.DAY_OF_MONTH, 1);
+        PendingIntent wp = PendingIntent.getBroadcast(c, 9002, new Intent(c, ReminderReceiver.class).setAction(WEEK_END), PendingIntent.FLAG_UPDATE_CURRENT | immutable());
+        try { am.set(AlarmManager.RTC_WAKEUP, f.getTimeInMillis(), wp); } catch (Exception e) { /* ignore */ }
     }
 
     static int immutable() { return Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0; }

@@ -34,7 +34,7 @@ jobs:
           cp manifest.webmanifest www/ || true
           cp node_modules/leaflet/dist/leaflet.js node_modules/leaflet/dist/leaflet.css www/
           mkdir -p www/fonts
-          for f in chakra-petch:600 chakra-petch:700 archivo:400 archivo:500 archivo:600 jetbrains-mono:500 jetbrains-mono:700; do
+          for f in plus-jakarta-sans:500 plus-jakarta-sans:600 plus-jakarta-sans:700 plus-jakarta-sans:800 jetbrains-mono:600 jetbrains-mono:800; do
             n=${f%%:*}; w=${f##*:}
             cp node_modules/@fontsource/$n/files/$n-latin-$w-normal.woff2 www/fonts/$n-$w.woff2 || echo "missing $n $w"
           done
@@ -59,8 +59,8 @@ jobs:
           sed -i 's#</manifest>#    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />\n    <uses-feature android:name="android.hardware.location.gps" android:required="false" />\n</manifest>#' $M
           sed -i 's#</application>#    <service android:name=".TrackingService" android:exported="false" android:foregroundServiceType="location" />\n    </application>#' $M
           # car Bluetooth, month-end reminders, restart handling and the home-screen widget
-          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />\n    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />\n    <uses-permission android:name="android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND" />\n    <uses-permission android:name="android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND" />\n    <uses-feature android:name="android.software.companion_device_setup" android:required="false" />\n</manifest>#' $M
-          sed -i 's#</application>#    <receiver android:name=".ReminderReceiver" android:exported="true"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /><action android:name="android.bluetooth.device.action.ACL_CONNECTED" /></intent-filter></receiver>\n    <receiver android:name=".WidgetProvider" android:exported="true" android:label="Odo"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/mbp_widget_info" /></receiver>\n    </application>#' $M
+          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />\n    <uses-permission android:name="android.permission.VIBRATE" />\n    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />\n    <uses-permission android:name="android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND" />\n    <uses-permission android:name="android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND" />\n    <uses-feature android:name="android.software.companion_device_setup" android:required="false" />\n</manifest>#' $M
+          sed -i 's#</application>#    <receiver android:name=".ReminderReceiver" android:exported="true"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /><action android:name="android.bluetooth.device.action.ACL_CONNECTED" /></intent-filter></receiver>\n    <receiver android:name=".WidgetProvider" android:exported="true" android:label="DrivR"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/mbp_widget_info" /></receiver>\n    </application>#' $M
           cp -r native/res/* android/app/src/main/res/
           RES=android/app/src/main/res
           rm -rf $RES/mipmap-anydpi-v26
@@ -100,18 +100,18 @@ jobs:
             echo "::error title=Build errors::$msg"
             exit $code
           fi
-          cp app/build/outputs/apk/release/app-release.apk $GITHUB_WORKSPACE/Odo.apk
+          cp app/build/outputs/apk/release/app-release.apk $GITHUB_WORKSPACE/DrivR.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Odo-apk
-          path: Odo.apk
+          name: DrivR-apk
+          path: DrivR.apk
 
       - name: Publish as a release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
-          name: Odo (build ${{ github.run_number }})
-          files: Odo.apk
+          name: DrivR (build ${{ github.run_number }})
+          files: DrivR.apk
           make_latest: true

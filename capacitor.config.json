@@ -1,6 +1,6 @@
 {
   "appId": "uk.mileagebase.app",
-  "appName": "Odo",
+  "appName": "DrivR",
   "webDir": "www",
   "android": {
     "allowMixedContent": false
