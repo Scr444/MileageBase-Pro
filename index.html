@@ -590,6 +590,32 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     }, 0);
     return b;
   }
+  // ---------- expected road miles, start postcode to site, from OpenStreetMap routing ----------
+  let expTried = 0;
+  async function roadMiles(from, to) {
+    const key = pc(from) + '|' + pc(to);
+    S.routeCache = S.routeCache || {};
+    if (S.routeCache[key]) return S.routeCache[key];
+    const a = await postcodeLL(from), b = await postcodeLL(to);
+    if (!a || !b) return null;
+    const r = await fetch(`https://router.project-osrm.org/route/v1/driving/${a[1]},${a[0]};${b[1]},${b[0]}?overview=false`);
+    const j = await r.json();
+    const m = j && j.routes && j.routes[0] ? Math.round(j.routes[0].distance / 1609.344) : null;
+    if (m != null) S.routeCache[key] = m;
+    return m;
+  }
+  async function fillExpected() { // looks up the open business trip's expected miles; tries again later if no signal
+    const t = S.openTrip;
+    if (!t || t.type || !t.startPc || !t.sitePc || t.expected != null) return;
+    if (Date.now() - expTried < 120000) return;
+    expTried = Date.now();
+    try {
+      const m = await roadMiles(t.startPc, t.sitePc);
+      if (m != null && S.openTrip && S.openTrip.id === t.id) { S.openTrip.expected = m; await saveS(); const l = $('expLine'); if (l) l.textContent = expText(m); else renderTripCard(); }
+    } catch (e) {}
+  }
+  const expText = m => `Expected: ${m} mi each way, ${m * 2} mi round trip`;
+  setInterval(fillExpected, 30000);
   async function refreshGps() { // live miles on the open trip
     const T = TR(); if (!T || !S.openTrip) return;
     try { gpsLive = await T.status(); } catch (e) { return; }
@@ -652,7 +678,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       }
       const gap = prev != null && t.startMiles != null ? Math.max(0, t.startMiles - prev) : 0;
       const row = { id: t.id, desc: t.desc, startPc: t.startPc, sitePc: t.sitePc, job: t.job, driver: S.driver,
-                    startDate: t.startDate, finishMiles: t.finishMiles, finishDate: t.finishDate, priv: gap, bus: run, untracked: Math.max(0, gap - privRun), route: t.route };
+                    startDate: t.startDate, finishMiles: t.finishMiles, finishDate: t.finishDate, priv: gap, bus: run, untracked: Math.max(0, gap - privRun), route: t.route, expected: t.expected };
       rows.push(row); list.push(row);
       prev = t.finishMiles ?? prev; privRun = 0;
     });
@@ -789,6 +815,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       meta.append(el('span', { textContent: 'Started at ' + t.startMiles }));
       if (t.desc) meta.append(el('span', { textContent: t.desc }));
       c.append(meta);
+      c.append(el('p', { className: 'hint', id: 'expLine', textContent: t.expected != null ? expText(t.expected) : 'Expected miles: looking up the road distance…' }));
+      if (t.expected == null) setTimeout(fillExpected, 0);
       if (TR()) {
         const box = el('div', { className: 'map' }); c.append(box); initLiveMap(box, t);
         c.append(el('p', { className: 'hint', id: 'gpsLine', textContent: 'GPS: checking…' }));
@@ -819,6 +847,11 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         const miles = num($('cMiles').value), date = $('cDate').value;
         if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
         if (miles < t.startMiles) { err.textContent = `That's lower than the start reading (${t.startMiles}). Check the odometer.`; err.hidden = false; return; }
+        const done = miles - t.startMiles;
+        if (t.expected && done < t.expected * 2 * 0.95 && form.dataset.checked !== String(miles)) {
+          err.textContent = `Logged ${done} mi, but the round trip alone is about ${t.expected * 2} mi. Check the odometer, or tap Finish trip again to save it as it is.`;
+          err.hidden = false; form.dataset.checked = String(miles); return;
+        }
         if (date < t.startDate) { err.textContent = 'Finish date is before the start date.'; err.hidden = false; return; }
         let gpsMiles = null, route = null;
         if (TR()) { route = await takeRoute(); try { const st = await TR().stop(); gpsMiles = Math.round(MI(st.meters) * 10) / 10; } catch (e) {} }
@@ -827,7 +860,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         S.lastFinish = Math.max(S.lastFinish ?? 0, miles); S.openTrip = null;
         await saveMonth(k); await saveS();
         viewM = k; await renderMonth(); renderTripCard();
-        toast(`Trip saved: ${miles - t.startMiles} ${t.type === 'priv' ? 'private' : 'business'} miles`);
+        const extra = t.expected ? (miles - t.startMiles) - t.expected * 2 : 0;
+        toast(`Trip saved: ${miles - t.startMiles} ${t.type === 'priv' ? 'private' : 'business'} miles` + (extra > 0 ? ` (+${extra} local driving)` : ''));
       };
       c.append(form);
       const cancel = el('button', { className: 'secondary danger', type: 'button', textContent: 'Discard this trip' });
@@ -916,7 +950,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         S.sites = [{ pc: t.sitePc, job: t.job, desc: t.desc }, ...(S.sites || []).filter(s => s.pc !== t.sitePc)].slice(0, 12);
       }
       sortMode = null;
-      S.openTrip = t; newType = 'bus'; await saveS(); renderTripCard(); if (k === viewM) renderMonth();
+      S.openTrip = t; newType = 'bus'; expTried = 0; await saveS(); renderTripCard(); if (k === viewM) renderMonth(); fillExpected();
       toast('Trip started.' + (gpsMsg || ' Finish it when you get back.'));
     };
     c.append(form);
@@ -991,7 +1025,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (r.id) title.append(el('span', { className: 'tag ' + (P ? 'priv' : 'bus'), textContent: P ? 'Private' : 'Business' }));
     title.append(P ? 'Journey' : r.id ? `${r.startPc || '?'} → ${r.sitePc || '?'}` : r.desc);
     head.append(title,
-      el('span', { className: 'd', textContent: [when, !P && r.job ? 'Job ' + r.job : '', !P && r.id ? r.desc : '', r.route ? 'route' : ''].filter(Boolean).join(' · ') || fmtD(r.finishDate) }),
+      el('span', { className: 'd', textContent: [when, !P && r.job ? 'Job ' + r.job : '', !P && r.id ? r.desc : '', r.expected ? `expected ${r.expected * 2}` : '', r.route ? 'route' : ''].filter(Boolean).join(' · ') || fmtD(r.finishDate) }),
       el('span', { className: 'm' }));
     const m = head.querySelector('.m');
     const extra = r.untracked ? ` · +${r.untracked} not logged` : '';
