@@ -462,15 +462,22 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       if (j && j.result) return (llCache[code] = [j.result.latitude, j.result.longitude]); } catch (e) {}
     return null;
   }
-  const TILE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-  const TILE_OPT = { maxZoom: 19, subdomains: 'abcd', attribution: '© OpenStreetMap contributors © CARTO' };
+  // OpenStreetMap's own tiles, with the OSM Germany server as a backup if tiles fail to load
+  const TILES = ['https://tile.openstreetmap.org/{z}/{x}/{y}.png', 'https://tile.openstreetmap.de/{z}/{x}/{y}.png'];
+  const TILE_OPT = { maxZoom: 19, attribution: '© OpenStreetMap contributors', referrerPolicy: 'strict-origin-when-cross-origin' };
+  function addTiles(L, map) {
+    let i = 0, fails = 0;
+    const layer = L.tileLayer(TILES[0], TILE_OPT).addTo(map);
+    layer.on('tileerror', () => { if (++fails >= 3 && i < TILES.length - 1) { fails = 0; layer.setUrl(TILES[++i]); } });
+    return layer;
+  }
   const dot = (L, ll, fill, r = 6) => L.circleMarker(ll, { radius: r, color: '#fff', weight: 2, fillColor: fill, fillOpacity: 1 });
   let live = null; // the open trip's live map
   async function initLiveMap(box, t) {
     live = null;
     try {
       const L = await loadLeaflet(); if (!box.isConnected) return;
-      const map = L.map(box, { zoomControl: true }); L.tileLayer(TILE_URL, TILE_OPT).addTo(map);
+      const map = L.map(box, { zoomControl: true }); addTiles(L, map);
       const priv = t.type === 'priv';
       const st = { map, L, box, priv, fitted: false, here: null, ahead: null, start: null, site: null,
         line: L.polyline([], { color: priv ? '#7b8790' : '#1f6feb', weight: 5, opacity: .9 }).addTo(map) };
@@ -526,7 +533,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     try {
       const L = await loadLeaflet();
       const map = L.map(box, { zoomControl: true, attributionControl: true });
-      L.tileLayer(TILE_URL, TILE_OPT).addTo(map);
+      addTiles(L, map);
       const cs = getComputedStyle(document.documentElement);
       const col = { bus: '#1f6feb', priv: '#7b8790' };
       let bounds = null;
