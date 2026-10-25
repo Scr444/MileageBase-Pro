@@ -22,6 +22,9 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
 import androidx.core.app.NotificationCompat;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
 /**
@@ -51,6 +54,20 @@ public class TrackingService extends Service {
     private boolean parked, running;
     private double meters;
     private double notedMiles = -1;
+    private Location routeLast;
+    static final float ROUTE_STEP_M = 40f;
+
+    static File routeFile(Context c) { return new File(c.getFilesDir(), "route.txt"); }
+
+    /** Keeps a point every 40 m or so, for the route map. */
+    private void routePoint(Location l) {
+        if (routeLast != null && l.distanceTo(routeLast) < ROUTE_STEP_M) return;
+        routeLast = l;
+        String line = String.format(Locale.UK, "%.5f,%.5f\n", l.getLatitude(), l.getLongitude());
+        try (FileOutputStream out = new FileOutputStream(routeFile(this), true)) {
+            out.write(line.getBytes(StandardCharsets.UTF_8));
+        } catch (Exception e) { /* the miles still count */ }
+    }
 
     static SharedPreferences prefs(Context c) { return c.getSharedPreferences(PREFS, Context.MODE_PRIVATE); }
     static double readMeters(Context c) { return Double.longBitsToDouble(prefs(c).getLong("meters", 0L)); }
@@ -155,6 +172,8 @@ public class TrackingService extends Service {
                 if (v >= DRIVING_MS) lastDriving = now;
                 boolean inDrive = now - lastDriving < DRIVE_SPELL_MS;
                 if (v >= DRIVING_MS || (inDrive && v >= CREEP_MS)) {
+                    if (routeLast == null) routePoint(last);
+                    routePoint(l);
                     meters += d;
                     lastMoving = now;
                     prefs(TrackingService.this).edit().putLong("meters", Double.doubleToLongBits(meters)).apply();

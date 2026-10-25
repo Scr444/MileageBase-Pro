@@ -69,6 +69,12 @@ button.danger { color: var(--red); border-color: var(--red); }
 .item-head .d { font-size: 14px; color: var(--muted); grid-column: 1; }
 .item-head .m { font: 600 17px var(--mono); text-align: right; font-variant-numeric: tabular-nums; grid-row: 1 / span 2; grid-column: 2; }
 .item-head .m small { display: block; font: 500 12px var(--body); color: var(--muted); }
+.tag { display: inline-block; font: 700 11px var(--body); letter-spacing: .08em; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; margin-right: 6px; vertical-align: 2px; }
+.tag.bus { background: var(--yellow); color: var(--on-yellow); }
+.tag.priv { background: var(--band); color: var(--muted); border: 1px solid var(--line); }
+.map { height: 260px; border-radius: 8px; border: 1px solid var(--line); overflow: hidden; background: var(--band); }
+.map.big { height: 380px; }
+.leaflet-container { font: 12px var(--body); }
 .empty { color: var(--muted); font-size: 15px; padding: 12px 0; margin: 0; }
 .banner { font-size: 14px; background: var(--band); border-radius: 8px; padding: 10px 12px; margin: 0; }
 details.card > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
@@ -106,6 +112,8 @@ details.card[open] > summary::after { content: "–"; }
     <div>
       <span class="lbl">Trips</span>
       <div class="list" id="tripList"></div>
+      <button class="secondary" type="button" id="monthMapBtn" style="margin-top:10px;width:100%" hidden>Show this month on a map</button>
+      <div id="monthMapWrap"></div>
     </div>
     <div>
       <span class="lbl">Fuel</span>
@@ -418,6 +426,73 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   const TR = () => NATIVE ? plug('Tracker') : null;
   const MI = m => (Number(m) || 0) / 1609.344;
   let gpsLive = null, needBattery = false;
+
+  // ---------- routes: simplified and packed as an encoded polyline ----------
+  function simplify(pts, tol) { // Douglas-Peucker in metres
+    if (pts.length < 3) return pts;
+    const R = 6371000, toXY = p => [p[1] * Math.PI / 180 * R * Math.cos(p[0] * Math.PI / 180), p[0] * Math.PI / 180 * R];
+    const xy = pts.map(toXY), keep = new Uint8Array(pts.length); keep[0] = keep[pts.length - 1] = 1;
+    const stack = [[0, pts.length - 1]];
+    while (stack.length) {
+      const [s, e] = stack.pop(); let best = 0, idx = -1;
+      const [x1, y1] = xy[s], [x2, y2] = xy[e], dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy) || 1;
+      for (let i = s + 1; i < e; i++) { const d = Math.abs(dy * xy[i][0] - dx * xy[i][1] + x2 * y1 - y2 * x1) / L; if (d > best) { best = d; idx = i; } }
+      if (best > tol && idx > 0) { keep[idx] = 1; stack.push([s, idx], [idx, e]); }
+    }
+    return pts.filter((_, i) => keep[i]);
+  }
+  function encodeRoute(pts) {
+    let out = '', pl = 0, pn = 0;
+    const enc = v => { v = v < 0 ? ~(v << 1) : v << 1; let s = ''; while (v >= 0x20) { s += String.fromCharCode((0x20 | (v & 0x1f)) + 63); v >>= 5; } return s + String.fromCharCode(v + 63); };
+    for (const [la, lo] of pts) { const a = Math.round(la * 1e5), b = Math.round(lo * 1e5); out += enc(a - pl) + enc(b - pn); pl = a; pn = b; }
+    return out;
+  }
+  function decodeRoute(str) {
+    const pts = []; let i = 0, la = 0, lo = 0;
+    const dec = () => { let r = 0, sh = 0, b; do { b = str.charCodeAt(i++) - 63; r |= (b & 0x1f) << sh; sh += 5; } while (b >= 0x20); return r & 1 ? ~(r >> 1) : r >> 1; };
+    while (i < str.length) { la += dec(); lo += dec(); pts.push([la / 1e5, lo / 1e5]); }
+    return pts;
+  }
+  async function takeRoute() { // read the recorded route from the phone, packed small
+    const T = TR(); if (!T) return null;
+    try {
+      const r = await T.route();
+      const pts = String(r.points || '').split('\n').map(l => l.split(',').map(Number)).filter(p => p.length === 2 && isFinite(p[0]) && isFinite(p[1]));
+      return pts.length > 1 ? encodeRoute(simplify(pts, 12)) : null;
+    } catch (e) { return null; }
+  }
+  let leafletP = null;
+  function loadLeaflet() {
+    if (window.L) return Promise.resolve(window.L);
+    if (leafletP) return leafletP;
+    leafletP = new Promise((ok, bad) => {
+      const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'leaflet.css'; document.head.append(css);
+      const s = document.createElement('script'); s.src = 'leaflet.js'; s.onload = () => ok(window.L); s.onerror = () => { leafletP = null; bad(new Error('map unavailable')); };
+      document.head.append(s);
+    });
+    return leafletP;
+  }
+  async function drawMap(box, trips) { // trips: [{route, type}]
+    try {
+      const L = await loadLeaflet();
+      const map = L.map(box, { zoomControl: true, attributionControl: true });
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19, subdomains: 'abcd', attribution: '© OpenStreetMap contributors © CARTO' }).addTo(map);
+      const cs = getComputedStyle(document.documentElement);
+      const col = { bus: '#1f6feb', priv: '#7b8790' };
+      let bounds = null;
+      trips.forEach(t => {
+        const pts = decodeRoute(t.route); if (pts.length < 2) return;
+        const priv = t.type === 'priv';
+        const line = L.polyline(pts, { color: priv ? col.priv : col.bus, weight: 5, opacity: .9, dashArray: priv ? '8 8' : null }).addTo(map);
+        L.circleMarker(pts[0], { radius: 6, color: '#fff', weight: 2, fillColor: '#2f9e44', fillOpacity: 1 }).addTo(map);
+        L.circleMarker(pts[pts.length - 1], { radius: 6, color: '#fff', weight: 2, fillColor: '#d9480f', fillOpacity: 1 }).addTo(map);
+        bounds = bounds ? bounds.extend(line.getBounds()) : line.getBounds();
+      });
+      if (bounds) map.fitBounds(bounds, { padding: [24, 24] }); else map.setView([53.6, -1.7], 7);
+      setTimeout(() => map.invalidateSize(), 200);
+    } catch (e) { box.textContent = 'The map shows in the installed app.'; box.style.display = 'grid'; box.style.placeItems = 'center'; box.style.color = 'var(--muted)'; }
+  }
   async function gpsPostcode() { // where the phone is now, as a postcode
     const T = TR(); if (!T) throw new Error('GPS works in the installed app');
     const p = await T.permissions(); if (!p.location) throw new Error('location permission is off');
@@ -495,12 +570,12 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       const run = Math.max(0, (t.finishMiles ?? 0) - (t.startMiles ?? 0));
       if (t.type === 'priv') {
         privRun += run;
-        list.push({ id: t.id, type: 'priv', priv: run, bus: 0 });
+        list.push({ id: t.id, type: 'priv', priv: run, bus: 0, startDate: t.startDate, finishDate: t.finishDate, route: t.route });
         return;
       }
       const gap = prev != null && t.startMiles != null ? Math.max(0, t.startMiles - prev) : 0;
       const row = { id: t.id, desc: t.desc, startPc: t.startPc, sitePc: t.sitePc, job: t.job, driver: S.driver,
-                    startDate: t.startDate, finishMiles: t.finishMiles, finishDate: t.finishDate, priv: gap, bus: run, untracked: Math.max(0, gap - privRun) };
+                    startDate: t.startDate, finishMiles: t.finishMiles, finishDate: t.finishDate, priv: gap, bus: run, untracked: Math.max(0, gap - privRun), route: t.route };
       rows.push(row); list.push(row);
       prev = t.finishMiles ?? prev; privRun = 0;
     });
@@ -551,16 +626,17 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (TR()) { c.append(el('p', { className: 'hint', id: 'gpsLine', textContent: 'GPS: checking…' })); batteryBanner(c); setTimeout(refreshGps, 0); }
     const form = el('form', { style: 'display:flex;flex-direction:column;gap:12px' });
     if (!TR()) form.append(field('Miles driven', 'pDone', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }));
-    form.append(el('p', { className: 'hint', textContent: 'Only the miles are kept. They go in the Private column.' }));
+    form.append(el('p', { className: 'hint', textContent: 'The sheet only gets the miles, in the Private column.' }));
     const err = el('p', { className: 'err', hidden: true }); form.append(err);
     form.append(el('button', { className: 'primary', type: 'submit', textContent: 'Finish journey' }));
     form.onsubmit = async e => {
       e.preventDefault();
       let miles;
-      if (TR()) { try { const st = await TR().stop(); miles = Math.round(MI(st.meters)); } catch (er) { miles = 0; } }
+      let route = null;
+      if (TR()) { route = await takeRoute(); try { const st = await TR().stop(); miles = Math.round(MI(st.meters)); } catch (er) { miles = 0; } }
       else { miles = num($('pDone').value); if (miles == null || miles < 0) { err.textContent = 'Enter the miles.'; err.hidden = false; return; } miles = Math.round(miles); }
-      const k = t.startDate; await loadMonth(k);
-      months[k].trips.push({ id: t.id, type: 'priv', startDate: k, startMiles: t.startMiles, finishMiles: t.startMiles + miles });
+      const k = mKey(t.startDate); await loadMonth(k);
+      months[k].trips.push({ id: t.id, type: 'priv', startDate: t.startDate, finishDate: today(), startMiles: t.startMiles, finishMiles: t.startMiles + miles, route });
       S.lastFinish = Math.max(S.lastFinish ?? 0, t.startMiles + miles); S.openTrip = null;
       await saveMonth(k); await saveS();
       viewM = k; await renderMonth(); renderTripCard();
@@ -579,7 +655,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   function privStart(form) {
     const sug = suggestedStart();
     if (sug == null) form.append(field('Odometer now (first time only)', 'nMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }));
-    form.append(el('p', { className: 'hint', textContent: 'Nothing is recorded except the miles. No places, no times. They go in the Private column.' }));
+    form.append(el('p', { className: 'hint', textContent: 'Just tap Start. You can see the journey and its route in the app, but the sheet only gets the miles, in the Private column.' }));
     const err = el('p', { className: 'err', hidden: true }); form.append(err);
     form.append(el('button', { className: 'primary', type: 'submit', textContent: 'Start private journey' }));
     form.onsubmit = async e => {
@@ -596,7 +672,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
           else { await TR().start({ reset: true }); await checkBattery(); }
         } catch (er) { gpsMsg = ' GPS logging did not start: ' + (er.message || er); }
       }
-      S.openTrip = { id: uid(), type: 'priv', startDate: k, startMiles: miles }; newType = 'bus';
+      S.openTrip = { id: uid(), type: 'priv', startDate: today(), startMiles: miles }; newType = 'bus';
       await saveS(); renderTripCard();
       toast('Private journey started.' + gpsMsg);
     };
@@ -642,10 +718,10 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
         if (miles < t.startMiles) { err.textContent = `That's lower than the start reading (${t.startMiles}). Check the odometer.`; err.hidden = false; return; }
         if (date < t.startDate) { err.textContent = 'Finish date is before the start date.'; err.hidden = false; return; }
-        let gpsMiles = null;
-        if (TR()) { try { const st = await TR().stop(); gpsMiles = Math.round(MI(st.meters) * 10) / 10; } catch (e) {} }
+        let gpsMiles = null, route = null;
+        if (TR()) { route = await takeRoute(); try { const st = await TR().stop(); gpsMiles = Math.round(MI(st.meters) * 10) / 10; } catch (e) {} }
         const k = mKey(t.startDate); await loadMonth(k);
-        months[k].trips.push({ ...t, finishMiles: miles, finishDate: date, gpsMiles });
+        months[k].trips.push({ ...t, finishMiles: miles, finishDate: date, gpsMiles, route });
         S.lastFinish = Math.max(S.lastFinish ?? 0, miles); S.openTrip = null;
         await saveMonth(k); await saveS();
         viewM = k; await renderMonth(); renderTripCard();
@@ -737,6 +813,15 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     $('tBus').textContent = bus; $('tPriv').textContent = priv;
     if (!items.length) list.append(el('p', { className: 'empty', textContent: 'No trips this month yet. Start one above.' }));
     items.forEach(r => list.append(tripItem(r)));
+    const routed = items.filter(r => r.route);
+    $('monthMapBtn').hidden = !routed.length; $('monthMapWrap').innerHTML = ''; $('monthMapBtn').textContent = 'Show this month on a map';
+    $('monthMapBtn').onclick = () => {
+      const w = $('monthMapWrap');
+      if (w.firstChild) { w.innerHTML = ''; $('monthMapBtn').textContent = 'Show this month on a map'; return; }
+      const box = el('div', { className: 'map big', style: 'margin-top:10px' }); w.append(box);
+      w.append(el('p', { className: 'hint', textContent: 'Blue: business. Grey dashed: private. Green start, orange finish.' }));
+      $('monthMapBtn').textContent = 'Hide map'; drawMap(box, routed);
+    };
     const fl = $('fuelList'); fl.innerHTML = '';
     let litres = 0;
     if (!M.fuel.length) fl.append(el('p', { className: 'empty', textContent: 'No fuel logged this month.' }));
@@ -764,16 +849,22 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const it = el('div', { className: 'item' });
     const head = el('button', { type: 'button', className: 'item-head' });
     const P = r.type === 'priv';
-    head.append(
-      el('span', { className: 'r', textContent: P ? 'Private journey' : r.id ? `${r.startPc || '?'} → ${r.sitePc || '?'}` : r.desc }),
-      el('span', { className: 'd', textContent: P ? 'Miles only' : [fmtD(r.startDate) + (r.finishDate && r.finishDate !== r.startDate ? ' – ' + fmtD(r.finishDate) : ''), r.job ? 'Job ' + r.job : '', r.id ? r.desc : ''].filter(Boolean).join(' · ') || fmtD(r.finishDate) }),
+    const when = r.startDate && r.startDate.length > 7 ? fmtD(r.startDate) + (r.finishDate && r.finishDate !== r.startDate ? ' – ' + fmtD(r.finishDate) : '') : '';
+    const title = el('span', { className: 'r' });
+    if (r.id) title.append(el('span', { className: 'tag ' + (P ? 'priv' : 'bus'), textContent: P ? 'Private' : 'Business' }));
+    title.append(P ? 'Journey' : r.id ? `${r.startPc || '?'} → ${r.sitePc || '?'}` : r.desc);
+    head.append(title,
+      el('span', { className: 'd', textContent: [when, !P && r.job ? 'Job ' + r.job : '', !P && r.id ? r.desc : '', r.route ? 'route' : ''].filter(Boolean).join(' · ') || fmtD(r.finishDate) }),
       el('span', { className: 'm' }));
     const m = head.querySelector('.m');
     const extra = r.untracked ? ` · +${r.untracked} not logged` : '';
     m.append(String(P ? r.priv : r.id ? r.bus : (r.untracked ?? r.priv)), el('small', { textContent: P ? 'private' : r.id ? 'business' + extra : 'private' }));
     it.append(head);
     if (!r.id) { head.disabled = true; head.style.cursor = 'default'; return it; }
-    if (editing === r.id) it.append(editForm(r.id));
+    if (editing === r.id) {
+      if (r.route) { const box = el('div', { className: 'map' }); it.append(box); drawMap(box, [r]); }
+      it.append(editForm(r.id));
+    }
     head.onclick = () => { editing = editing === r.id ? null : r.id; renderMonth(); };
     return it;
   }

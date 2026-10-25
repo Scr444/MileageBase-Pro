@@ -61,7 +61,7 @@ public class TrackerPlugin extends Plugin {
         Context c = getContext();
         boolean reset = Boolean.TRUE.equals(call.getBoolean("reset", true));
         SharedPreferences.Editor e = TrackingService.prefs(c).edit().putBoolean("active", true).putString("mode", "starting");
-        if (reset) e.putLong("meters", Double.doubleToLongBits(0));
+        if (reset) { e.putLong("meters", Double.doubleToLongBits(0)); TrackingService.routeFile(c).delete(); }
         e.apply();
         try {
             ContextCompat.startForegroundService(c, new Intent(c, TrackingService.class));
@@ -78,6 +78,26 @@ public class TrackerPlugin extends Plugin {
         JSObject r = status(c);
         TrackingService.prefs(c).edit().putBoolean("active", false).putString("mode", "stopped").apply();
         c.stopService(new Intent(c, TrackingService.class));
+        call.resolve(r);
+    }
+
+    /** The route so far, as "lat,lon" lines. */
+    @PluginMethod
+    public void route(PluginCall call) {
+        JSObject r = new JSObject();
+        String pts = "";
+        try {
+            java.io.File f = TrackingService.routeFile(getContext());
+            if (f.exists()) {
+                byte[] b = new byte[(int) f.length()];
+                try (java.io.FileInputStream in = new java.io.FileInputStream(f)) {
+                    int off = 0, n;
+                    while (off < b.length && (n = in.read(b, off, b.length - off)) > 0) off += n;
+                }
+                pts = new String(b, java.nio.charset.StandardCharsets.UTF_8);
+            }
+        } catch (Exception e) { /* empty route */ }
+        r.put("points", pts);
         call.resolve(r);
     }
 

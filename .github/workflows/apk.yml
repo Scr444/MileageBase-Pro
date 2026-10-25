@@ -32,6 +32,7 @@ jobs:
           cp index.html www/
           cp icon-192.png icon-512.png www/ || true
           cp manifest.webmanifest www/ || true
+          cp node_modules/leaflet/dist/leaflet.js node_modules/leaflet/dist/leaflet.css www/
           cp node_modules/@capacitor/core/dist/capacitor.js www/ || echo 'no capacitor.js - app uses the native bridge directly'
 
       - name: Create the Android project
