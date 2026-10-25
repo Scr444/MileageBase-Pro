@@ -89,10 +89,19 @@ public class TrackingService extends Service {
         if (handler != null) handler.removeCallbacks(parkCheck);
         stopAll();
         try {
-            lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 0f, gps, Looper.getMainLooper());
+            lm.requestLocationUpdates(driveProvider(), 2000L, 0f, gps, Looper.getMainLooper());
         } catch (SecurityException | IllegalArgumentException e) { /* no GPS */ }
         handler.postDelayed(parkCheck, 30_000L);
         mode("driving");
+    }
+
+    /** GPS when the device has it and precise location is allowed; otherwise Android's combined source. */
+    private String driveProvider() {
+        boolean fine = androidx.core.content.ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED;
+        java.util.List<String> all = lm.getAllProviders();
+        if (fine && all.contains(LocationManager.GPS_PROVIDER)) return LocationManager.GPS_PROVIDER;
+        if (Build.VERSION.SDK_INT >= 31 && all.contains(LocationManager.FUSED_PROVIDER)) return LocationManager.FUSED_PROVIDER;
+        return LocationManager.NETWORK_PROVIDER;
     }
 
     private void park() {
