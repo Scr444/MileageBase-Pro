@@ -2,159 +2,295 @@
 <html lang="en-GB"><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1c2326">
+<meta name="theme-color" content="#0e1113">
 <link rel="manifest" href="manifest.webmanifest">
-<title>MileageBase Pro</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<title>Odo</title>
 <style>
-/* Layout: one narrow column, built like a van logbook — current trip on top, the month's sheet below, settings last. */
+/* Odo — an instrument cluster for work mileage.
+   Graphite panels, amber instrument light, live miles on a rolling odometer.
+   One column; five tabs along the bottom: Today, Trips, Fuel, Month, Settings. */
+@font-face { font-family: "Chakra Petch"; font-weight: 600; font-display: swap; src: url(fonts/chakra-petch-600.woff2) format("woff2"); }
+@font-face { font-family: "Chakra Petch"; font-weight: 700; font-display: swap; src: url(fonts/chakra-petch-700.woff2) format("woff2"); }
+@font-face { font-family: "Archivo"; font-weight: 400; font-display: swap; src: url(fonts/archivo-400.woff2) format("woff2"); }
+@font-face { font-family: "Archivo"; font-weight: 500; font-display: swap; src: url(fonts/archivo-500.woff2) format("woff2"); }
+@font-face { font-family: "Archivo"; font-weight: 600; font-display: swap; src: url(fonts/archivo-600.woff2) format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 500; font-display: swap; src: url(fonts/jetbrains-mono-500.woff2) format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-weight: 700; font-display: swap; src: url(fonts/jetbrains-mono-700.woff2) format("woff2"); }
 :root {
-  --bg: #f3f4f2; --surface: #ffffff; --band: #e3e6e6; --ink: #1c2326; --muted: #5d676c;
-  --line: #d3d8da; --yellow: #f4c814; --on-yellow: #1c2326; --red: #b42318; --ok: #2f6b3a;
-  --display: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
-  --body: "Barlow", "Segoe UI", Arial, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  /* dark first: the app lives in a car and on site */
+  --bg: #0e1113; --panel: #161b1e; --raised: #1f262a; --well: #0a0d0f; --line: #2a3237; --line2: #3a444a;
+  --ink: #e9eef0; --sub: #a3aeb4; --faint: #6e7a80;
+  --amber: #ffb21e; --amber-ink: #1a1203; --amber-soft: rgba(255,178,30,.14);
+  --live: #3ddc97; --live-soft: rgba(61,220,151,.14); --biz: #ffb21e; --priv: #8ea3b0; --warn: #ff8a6b; --blue: #5aa9ff;
+  --display: "Chakra Petch", "Bahnschrift", "DIN Alternate", "Arial Narrow", sans-serif;
+  --body: "Archivo", "Segoe UI", Roboto, Arial, sans-serif;
+  --mono: "JetBrains Mono", "Roboto Mono", ui-monospace, Menlo, monospace;
+  --r: 14px; --tab-h: 68px;
+  color-scheme: dark;
 }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
-  --bg: #14181a; --surface: #1d2326; --band: #262d31; --ink: #e8ecec; --muted: #9aa5aa;
-  --line: #343d42; --yellow: #f5cc2e; --on-yellow: #14181a; --red: #f08a7e; --ok: #8fd19c; color-scheme: dark } }
-:root[data-theme="dark"] {
-  --bg: #14181a; --surface: #1d2326; --band: #262d31; --ink: #e8ecec; --muted: #9aa5aa;
-  --line: #343d42; --yellow: #f5cc2e; --on-yellow: #14181a; --red: #f08a7e; --ok: #8fd19c; color-scheme: dark }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) {
+  --bg: #eef0ef; --panel: #ffffff; --raised: #f3f5f4; --well: #e3e7e6; --line: #d9dedd; --line2: #c3cac9;
+  --ink: #12171a; --sub: #4f5b61; --faint: #808b90;
+  --amber: #e89400; --amber-ink: #1a1203; --amber-soft: rgba(232,148,0,.13);
+  --live: #108a58; --live-soft: rgba(16,138,88,.12); --biz: #c27a00; --priv: #5d7380; --warn: #c2410c; --blue: #1d6fd6;
+  color-scheme: light } }
+:root[data-theme="light"] {
+  --bg: #eef0ef; --panel: #ffffff; --raised: #f3f5f4; --well: #e3e7e6; --line: #d9dedd; --line2: #c3cac9;
+  --ink: #12171a; --sub: #4f5b61; --faint: #808b90;
+  --amber: #e89400; --amber-ink: #1a1203; --amber-soft: rgba(232,148,0,.13);
+  --live: #108a58; --live-soft: rgba(16,138,88,.12); --biz: #c27a00; --priv: #5d7380; --warn: #c2410c; --blue: #1d6fd6;
+  color-scheme: light }
 
-:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+:root { padding-top: env(safe-area-inset-top, 0px); }
 [hidden] { display: none !important; }
+* { box-sizing: border-box; }
+html, body { min-height: 100%; }
 body { margin: 0; -webkit-tap-highlight-color: transparent; background: var(--bg); color: var(--ink); font: 16px/1.45 var(--body); }
-.wrap { max-width: 560px; margin: 0 auto; padding-block: 16px 48px;
-  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-  display: flex; flex-direction: column; gap: 18px; }
-header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-h1 { font: 700 30px/1 var(--display); letter-spacing: .01em; margin: 0; text-transform: uppercase; }
-h1 span { background: var(--yellow); color: var(--on-yellow); padding: 0 6px; }
-.reg { font: 600 15px var(--mono); border: 2px solid var(--ink); padding: 1px 8px; border-radius: 4px; letter-spacing: .06em; }
-h2 { font: 700 20px/1.1 var(--display); text-transform: uppercase; letter-spacing: .03em; margin: 0; text-wrap: balance; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
-.card.live { border: 2px solid var(--yellow); }
-.lbl { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); }
-.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-input, select { font: 500 17px var(--body); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; width: 100%; box-sizing: border-box; min-width: 0; }
-input.pc { text-transform: uppercase; font-family: var(--mono); letter-spacing: .03em; }
-input.odo { font-family: var(--mono); font-size: 20px; letter-spacing: .08em; }
-input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
-.hint { font-size: 14px; color: var(--muted); margin: 0; }
-.err { font-size: 14px; color: var(--red); margin: 0; font-weight: 600; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 20; }
+
+/* top bar */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding-block: 12px 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.brand { display: flex; align-items: center; gap: 10px; }
+.logo { font: 700 22px/1 var(--display); letter-spacing: .14em; color: var(--amber-ink); background: var(--amber); padding: 6px 9px 5px 11px; border-radius: 8px; }
+.view-title { font: 700 22px/1 var(--display); letter-spacing: .04em; text-transform: uppercase; }
+.reg { font: 700 14px var(--mono); letter-spacing: .08em; color: #111; background: #f5d33a; border: 2px solid #111; border-radius: 5px; padding: 2px 8px; }
+
+/* page */
+.wrap { max-width: 600px; margin: 0 auto; padding-block: 4px calc(var(--tab-h) + 28px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.view { display: flex; flex-direction: column; gap: 14px; }
+h2 { font: 700 19px/1.15 var(--display); text-transform: uppercase; letter-spacing: .05em; margin: 0; text-wrap: balance; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.card.live { border-color: var(--amber); box-shadow: inset 0 0 0 1px var(--amber); }
+.card.flat { background: var(--raised); }
+.lbl { font: 600 11.5px var(--body); text-transform: uppercase; letter-spacing: .1em; color: var(--sub); }
+.section-lbl { font: 600 12px var(--body); text-transform: uppercase; letter-spacing: .12em; color: var(--faint); margin: 6px 2px -4px; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; }
+input, select { font: 500 17px var(--body); color: var(--ink); background: var(--well); border: 1px solid var(--line); border-radius: 11px; padding: 12px 13px; width: 100%; min-width: 0; min-height: 50px; }
+input::placeholder { color: var(--faint); }
+input.pc { text-transform: uppercase; font: 600 18px var(--mono); letter-spacing: .04em; }
+input.odo { font: 700 22px var(--mono); letter-spacing: .1em; }
+input[type=search] { padding-left: 42px; background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%238a969c' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") no-repeat 13px center; }
+input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid var(--amber); outline-offset: 2px; }
+.hint { font-size: 14px; color: var(--sub); margin: 0; }
+.err { font-size: 14px; color: var(--warn); margin: 0; font-weight: 600; }
 .chips { display: flex; gap: 8px; flex-wrap: wrap; }
-.chip { font: 600 15px var(--body); border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 999px; padding: 7px 14px; cursor: pointer; }
-.chip[aria-pressed="true"] { background: var(--yellow); color: var(--on-yellow); border-color: var(--yellow); }
-button.primary { font: 700 19px var(--display); text-transform: uppercase; letter-spacing: .05em; background: var(--ink); color: var(--bg); border: 0; border-radius: 8px; padding: 13px 16px; cursor: pointer; }
-button.secondary { font: 600 15px var(--body); background: transparent; color: var(--ink); border: 1px solid var(--line); border-radius: 8px; padding: 9px 14px; cursor: pointer; }
-button.danger { color: var(--red); border-color: var(--red); }
+.chip { font: 600 15px var(--body); border: 1px solid var(--line2); background: var(--raised); color: var(--ink); border-radius: 999px; padding: 9px 15px; min-height: 42px; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--amber); color: var(--amber-ink); border-color: var(--amber); }
+button { font-family: var(--body); }
+button.primary { font: 700 19px var(--display); text-transform: uppercase; letter-spacing: .08em; background: var(--amber); color: var(--amber-ink); border: 0; border-radius: 13px; padding: 15px 16px; min-height: 58px; cursor: pointer; }
+button.primary:active, button.secondary:active, .big:active, .tile-btn:active { transform: scale(.98); }
+button.secondary { font: 600 15.5px var(--body); background: var(--raised); color: var(--ink); border: 1px solid var(--line2); border-radius: 12px; padding: 12px 14px; min-height: 48px; cursor: pointer; }
+button.danger { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 55%, transparent); background: transparent; }
 .btns { display: flex; gap: 10px; flex-wrap: wrap; }
-.btns > * { flex: 1 1 auto; }
-.route { font: 600 22px/1.2 var(--mono); letter-spacing: .03em; display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
-.route i { font-style: normal; color: var(--muted); font-family: var(--body); }
-.meta { display: flex; gap: 6px 16px; flex-wrap: wrap; color: var(--muted); font-size: 15px; }
+.btns > * { flex: 1 1 0; }
+.route { font: 700 21px/1.2 var(--mono); letter-spacing: .03em; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+.route i { font-style: normal; color: var(--amber); font-family: var(--body); }
+.meta { display: flex; gap: 4px 14px; flex-wrap: wrap; color: var(--sub); font-size: 14.5px; }
+
+/* the two giant start buttons */
+.starts { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; }
+.big { display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 18px; min-height: 132px; padding: 16px; border-radius: 18px; cursor: pointer; text-align: left; border: 1px solid var(--line2); background: var(--raised); color: var(--ink); }
+.big svg { width: 30px; height: 30px; }
+.big b { font: 700 22px/1 var(--display); text-transform: uppercase; letter-spacing: .06em; }
+.big small { display: block; font: 500 13px var(--body); color: var(--sub); margin-top: 4px; letter-spacing: 0; text-transform: none; }
+.big.biz { background: var(--amber); color: var(--amber-ink); border-color: var(--amber); }
+.big.biz small { color: color-mix(in srgb, var(--amber-ink) 70%, transparent); }
+
+/* odometer drums */
+.odometer { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+.drums { display: inline-flex; gap: 4px; padding: 6px; background: var(--well); border-radius: 12px; border: 1px solid var(--line); }
+.drum { width: 34px; height: 50px; border-radius: 7px; background: linear-gradient(#20272b, #12171a 50%, #20272b); color: #f3f5f6; display: grid; place-items: center; font: 700 30px var(--mono); overflow: hidden; position: relative; }
+.drum.tenth { background: linear-gradient(#ffc04a, #ffb21e 50%, #e89a00); color: #1a1203; }
+.drum span { display: block; transition: transform .45s cubic-bezier(.2,.8,.2,1); }
+.drum::after { content: ""; position: absolute; inset: 0; background: linear-gradient(rgba(0,0,0,.35), transparent 30%, transparent 70%, rgba(0,0,0,.35)); pointer-events: none; }
+.odometer .unit { font: 600 15px var(--body); color: var(--sub); padding-bottom: 8px; }
+.livepill { display: inline-flex; align-items: center; gap: 7px; font: 600 12px var(--body); letter-spacing: .1em; text-transform: uppercase; color: var(--live); background: var(--live-soft); border-radius: 999px; padding: 5px 10px; }
+.livepill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.livepill.parked { color: var(--sub); background: var(--raised); }
+@media (prefers-reduced-motion: no-preference) { .livepill:not(.parked)::before { animation: pulse 1.6s ease-in-out infinite; } }
+@keyframes pulse { 50% { opacity: .25; } }
+.bar { height: 10px; background: var(--well); border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }
+.bar > i { display: block; height: 100%; background: var(--amber); border-radius: 6px; transition: width .6s ease; }
+.bar.over > i { background: var(--live); }
+.tiles2 { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; }
+.tile-btn { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; border-radius: 12px; background: var(--raised); color: var(--ink); border: 1px solid var(--line2); font: 600 15.5px var(--body); cursor: pointer; }
+.tile-btn svg { width: 20px; height: 20px; }
+.tiles3 { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+.tiles3 .tile-btn { flex-direction: column; gap: 4px; min-height: 66px; font-size: 13.5px; padding: 8px 4px; }
+.tiles3 .tile-btn svg { width: 22px; height: 22px; }
+
+/* stats */
+.stats { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 13px 14px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stat b { font: 700 26px/1.1 var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat b small { font: 600 13px var(--body); color: var(--sub); letter-spacing: 0; margin-left: 3px; }
+.stat.biz b { color: var(--biz); }
+.split { display: flex; height: 12px; border-radius: 7px; overflow: hidden; background: var(--well); border: 1px solid var(--line); }
+.split i { display: block; height: 100%; }
+.glance { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; }
+.glance div { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.glance b { display: block; font: 700 20px var(--mono); font-variant-numeric: tabular-nums; }
+
+/* lists */
 .monthbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.monthbar button { font: 700 22px var(--display); width: 44px; height: 44px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
-.monthbar h2 { font-size: 26px; }
-.totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
-.totals div { background: var(--band); padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
-.totals b { font: 600 22px var(--mono); font-variant-numeric: tabular-nums; }
-.list { display: flex; flex-direction: column; border-top: 1px solid var(--line); }
-.item { border-bottom: 1px solid var(--line); padding: 12px 0; display: flex; flex-direction: column; gap: 10px; }
-.item-head { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: start; background: none; border: 0; color: inherit; text-align: left; padding: 0; cursor: pointer; font: inherit; width: 100%; }
-.item-head .r { font: 600 16px var(--mono); }
-.item-head .d { font-size: 14px; color: var(--muted); grid-column: 1; }
-.item-head .m { font: 600 17px var(--mono); text-align: right; font-variant-numeric: tabular-nums; grid-row: 1 / span 2; grid-column: 2; }
-.item-head .m small { display: block; font: 500 12px var(--body); color: var(--muted); }
-.tag { display: inline-block; font: 700 11px var(--body); letter-spacing: .08em; text-transform: uppercase; padding: 2px 7px; border-radius: 4px; margin-right: 6px; vertical-align: 2px; }
-.tag.bus { background: var(--yellow); color: var(--on-yellow); }
-.tag.priv { background: var(--band); color: var(--muted); border: 1px solid var(--line); }
-.map { height: 260px; border-radius: 8px; border: 1px solid var(--line); overflow: hidden; background: var(--band); }
+.monthbar button { width: 48px; height: 48px; border-radius: 12px; border: 1px solid var(--line2); background: var(--panel); color: var(--ink); cursor: pointer; display: grid; place-items: center; }
+.monthbar button svg { width: 22px; height: 22px; }
+.monthbar h2 { font-size: 22px; }
+.list { display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); overflow: hidden; }
+.item { border-bottom: 1px solid var(--line); padding: 14px 14px; display: flex; flex-direction: column; gap: 12px; }
+.item:last-child { border-bottom: 0; }
+.item-head { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px 12px; align-items: start; background: none; border: 0; color: inherit; text-align: left; padding: 0; cursor: pointer; font: inherit; width: 100%; }
+.item-head .r { font: 700 15.5px var(--mono); min-width: 0; overflow-wrap: anywhere; }
+.item-head .d { font-size: 13.5px; color: var(--sub); grid-column: 1; }
+.item-head .m { font: 700 20px var(--mono); text-align: right; font-variant-numeric: tabular-nums; grid-row: 1 / span 2; grid-column: 2; }
+.item-head .m small { display: block; font: 500 12px var(--body); color: var(--sub); }
+.tag { display: inline-block; font: 700 10.5px var(--body); letter-spacing: .1em; text-transform: uppercase; padding: 3px 7px; border-radius: 5px; margin-right: 7px; vertical-align: 2px; }
+.tag.bus { background: var(--amber); color: var(--amber-ink); }
+.tag.priv { background: var(--raised); color: var(--priv); border: 1px solid var(--line2); }
+.tag.live { background: var(--live-soft); color: var(--live); }
+.jobrow { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 2px 12px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.jobrow:last-child { border-bottom: 0; }
+.jobrow b { font: 700 16px var(--mono); }
+.jobrow span { color: var(--sub); font-size: 13.5px; }
+.jobrow .bar { grid-column: 1 / -1; height: 6px; margin-top: 6px; }
+.map { height: 240px; border-radius: 12px; border: 1px solid var(--line); overflow: hidden; background: var(--raised); }
 .map.big { height: 380px; }
-.leaflet-container { font: 12px var(--body); }
-.empty { color: var(--muted); font-size: 15px; padding: 12px 0; margin: 0; }
-.banner { font-size: 14px; background: var(--band); border-radius: 8px; padding: 10px 12px; margin: 0; }
-details.card > summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; }
-details.card > summary::after { content: "+"; font: 700 22px var(--display); }
-details.card[open] > summary::after { content: "–"; }
-.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-weight: 600; max-width: calc(100% - 32px); box-sizing: border-box; }
-@media (max-width: 380px) { .row { grid-template-columns: 1fr; } }
-@media (prefers-reduced-motion: no-preference) { .card { transition: border-color .2s; } }
+.leaflet-container { font: 12px var(--body); background: var(--raised); }
+.empty { color: var(--sub); font-size: 15px; padding: 18px 14px; margin: 0; text-align: center; }
+.banner { font-size: 14px; background: var(--raised); border: 1px solid var(--line2); border-radius: 12px; padding: 12px 14px; margin: 0; }
+.banner.warn { border-color: var(--warn); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); z-index: 40; bottom: calc(var(--tab-h) + 16px + env(safe-area-inset-bottom, 0px)); background: var(--ink); color: var(--bg); padding: 12px 18px; border-radius: 12px; font-weight: 600; max-width: calc(100% - 32px); box-shadow: 0 8px 30px rgba(0,0,0,.35); }
+
+/* bottom tabs */
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: color-mix(in srgb, var(--panel) 94%, transparent); backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(5, minmax(0,1fr));
+  padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
+.tabbar button { height: var(--tab-h); background: none; border: 0; color: var(--faint); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font: 600 11.5px var(--body); letter-spacing: .03em; cursor: pointer; position: relative; }
+.tabbar svg { width: 25px; height: 25px; }
+.tabbar button[aria-current="page"] { color: var(--amber); }
+.tabbar button[aria-current="page"]::before { content: ""; position: absolute; top: 0; left: 28%; right: 28%; height: 3px; border-radius: 0 0 3px 3px; background: var(--amber); }
+.tabbar .dot { position: absolute; top: 12px; left: calc(50% + 9px); width: 9px; height: 9px; border-radius: 50%; background: var(--live); border: 2px solid var(--panel); }
+
+/* setup */
+.wizard { position: fixed; inset: 0; z-index: 50; background: var(--bg); overflow-y: auto;
+  padding-block: calc(24px + env(safe-area-inset-top, 0px)) calc(24px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); }
+.wizard .inner { max-width: 520px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; min-height: 100%; }
+.wizard .steps { display: flex; gap: 6px; }
+.wizard .steps i { flex: 1; height: 5px; border-radius: 3px; background: var(--line); }
+.wizard .steps i.on { background: var(--amber); }
+.wizard h1 { font: 700 34px/1.05 var(--display); text-transform: uppercase; letter-spacing: .03em; margin: 8px 0 0; text-wrap: balance; }
+.wizard .lead { font-size: 17px; color: var(--sub); margin: 0; }
+.check { display: flex; gap: 12px; align-items: flex-start; padding: 14px; border-radius: 12px; background: var(--panel); border: 1px solid var(--line); }
+.check .ok { width: 26px; height: 26px; border-radius: 50%; flex: none; display: grid; place-items: center; border: 2px solid var(--line2); color: transparent; font: 700 15px var(--body); }
+.check.done .ok { background: var(--live); border-color: var(--live); color: #062; }
+.check b { display: block; font-weight: 600; }
+.check span { color: var(--sub); font-size: 14px; }
+@media (max-width: 370px) { .row, .starts { grid-template-columns: minmax(0,1fr); } .drum { width: 28px; height: 44px; font-size: 25px; } }
 </style>
 </head><body>
-<div class="wrap">
-  <header>
-    <h1><span>MileageBase</span> Pro</h1>
-    <span class="reg" id="regBadge" hidden></span>
-  </header>
-  <p class="banner" id="storeNote" hidden></p>
-  <section id="monthEnd" class="card live" hidden></section>
-  <section id="tripCard" class="card"><p class="hint">Loading your log…</p></section>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-today" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15a8 8 0 1 1 16 0"/><path d="M12 15l4-5"/><circle cx="12" cy="15" r="1.4" fill="currentColor"/><path d="M5 19h14"/></symbol>
+  <symbol id="i-trips" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="6" r="2.2"/><path d="M8 18h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/></symbol>
+  <symbol id="i-fuel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15"/><path d="M3 20h12"/><path d="M6 8h6"/><path d="M14 11h2a2 2 0 0 1 2 2v3a1.5 1.5 0 0 0 3 0V8l-3-3"/></symbol>
+  <symbol id="i-month" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M8 14h2M14 14h2M8 17h2"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.6 1.6 0 0 0-1-1.5 1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.6 1.6 0 0 0 1.5-1 1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-brief" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8.5 7V5.5A1.5 1.5 0 0 1 10 4h4a1.5 1.5 0 0 1 1.5 1.5V7"/><path d="M3 13h18"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11l8-7 8 7"/><path d="M6 9.5V20h12V9.5"/><path d="M10 20v-5h4v5"/></symbol>
+  <symbol id="i-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5l7.5 18-7.5-4-7.5 4z"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+  <symbol id="i-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+  <symbol id="i-sheet" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 9h16M4 15h16M10 3v18"/></symbol>
+</svg>
 
-  <section class="card" aria-labelledby="monthTitle">
-    <div class="monthbar">
-      <button type="button" id="prevM" aria-label="Previous month">‹</button>
-      <h2 id="monthTitle">—</h2>
-      <button type="button" id="nextM" aria-label="Next month">›</button>
-    </div>
-    <div class="field">
-      <label class="lbl" for="startMiles">Start miles (odometer on the 1st)</label>
-      <input id="startMiles" class="odo" inputmode="numeric" autocomplete="off">
-      <p class="hint" id="startHint"></p>
-    </div>
-    <div class="totals">
-      <div><span class="lbl">Business</span><b id="tBus">0</b></div>
-      <div><span class="lbl">Private</span><b id="tPriv">0</b></div>
-      <div><span class="lbl">Fuel L</span><b id="tFuel">0</b></div>
-    </div>
-    <div>
-      <span class="lbl">Trips</span>
+<header class="top">
+  <div class="brand"><span class="logo">ODO</span><span class="view-title" id="viewTitle">Today</span></div>
+  <span class="reg" id="regBadge" hidden></span>
+</header>
+
+<main class="wrap">
+  <p class="banner" id="storeNote" hidden></p>
+
+  <section class="view" data-view="today">
+    <section id="monthEnd" class="card live" hidden></section>
+    <section id="tripCard" class="card"><p class="hint">Loading your log…</p></section>
+    <div class="section-lbl" id="glanceLbl">This month</div>
+    <div class="glance" id="glance"></div>
+  </section>
+
+  <section class="view" data-view="trips" hidden>
+    <input type="search" id="tripSearch" placeholder="Search every trip: job, postcode, site" autocomplete="off">
+    <div id="searchBox" hidden><div class="list" id="searchResults"></div></div>
+    <div id="monthTrips" class="view">
+      <div class="monthbar"><button type="button" class="mprev" aria-label="Previous month"><svg><use href="#i-left"/></svg></button><h2 class="mtitle" id="monthTitle">—</h2><button type="button" class="mnext" aria-label="Next month"><svg><use href="#i-right"/></svg></button></div>
       <div class="list" id="tripList"></div>
-      <button class="secondary" type="button" id="monthMapBtn" style="margin-top:10px;width:100%" hidden>Show this month on a map</button>
+      <button class="secondary" type="button" id="monthMapBtn" hidden>Show this month on a map</button>
       <div id="monthMapWrap"></div>
     </div>
-    <div>
-      <span class="lbl">Fuel</span>
-      <div class="list" id="fuelList"></div>
-    </div>
-    <form id="fuelForm" class="card" style="background:var(--bg)">
+  </section>
+
+  <section class="view" data-view="fuel" hidden>
+    <form id="fuelForm" class="card">
       <h2>Add fuel</h2>
-      <button class="secondary" type="button" id="fPhoto">Photo of receipt</button>
+      <button class="tile-btn" type="button" id="fPhoto"><svg><use href="#i-camera"/></svg> Photo of receipt</button>
       <input type="file" id="fFile" accept="image/*" capture="environment" hidden>
       <div id="fPreview" style="display:flex;gap:12px;align-items:center" hidden>
-        <img id="fThumb" alt="Receipt" style="width:64px;height:84px;object-fit:cover;border-radius:6px;border:1px solid var(--line)">
+        <img id="fThumb" alt="Receipt" style="width:64px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">
         <p class="hint" id="fRead" style="margin:0"></p>
       </div>
       <div class="row">
         <div class="field"><label class="lbl" for="fDate">Date</label><input id="fDate" type="date" required></div>
-        <div class="field"><label class="lbl" for="fLitres">Litres</label><input id="fLitres" inputmode="decimal" required></div>
+        <div class="field"><label class="lbl" for="fLitres">Litres</label><input id="fLitres" class="odo" inputmode="decimal" required></div>
       </div>
-      <div class="field"><label class="lbl" for="fCost">Cost £ (for you, not on the sheet)</label><input id="fCost" inputmode="decimal" autocomplete="off"></div>
       <div class="row">
+        <div class="field"><label class="lbl" for="fCost">Cost £</label><input id="fCost" inputmode="decimal" autocomplete="off" placeholder="Only for you"></div>
         <div class="field"><label class="lbl" for="fType">For</label><select id="fType"><option value="bus">Business</option><option value="priv">Private</option></select></div>
-        <div class="field"><label class="lbl" for="fPaid">Paid by</label><input id="fPaid" placeholder="Fuel card"></div>
       </div>
+      <div class="field"><label class="lbl" for="fPaid">Paid by</label><input id="fPaid" placeholder="Fuel card"></div>
       <button class="primary" type="submit">Add fuel</button>
     </form>
-    <div class="field">
-      <label class="lbl" for="endMiles">Odometer at month end (optional)</label>
-      <input id="endMiles" class="odo" inputmode="numeric" autocomplete="off">
-      <p class="hint">Any miles after your last trip go on the sheet as private.</p>
-    </div>
-    <button class="primary" type="button" id="exportBtn">Download sheet (.xlsx)</button>
-    <p class="hint" id="exportNote">Same layout as the paper Mileage Record Sheet, filled in.</p>
-    <button class="secondary" type="button" id="shareBtn" hidden>Share the sheet</button>
+    <div class="monthbar"><button type="button" class="mprev" aria-label="Previous month"><svg><use href="#i-left"/></svg></button><h2 class="mtitle">—</h2><button type="button" class="mnext" aria-label="Next month"><svg><use href="#i-right"/></svg></button></div>
+    <div class="list" id="fuelList"></div>
   </section>
 
-  <details class="card" id="settingsBox">
-    <summary><h2>Your details</h2></summary>
-    <form id="settingsForm" style="display:flex;flex-direction:column;gap:14px">
+  <section class="view" data-view="month" hidden>
+    <div class="monthbar"><button type="button" class="mprev" aria-label="Previous month"><svg><use href="#i-left"/></svg></button><h2 class="mtitle">—</h2><button type="button" class="mnext" aria-label="Next month"><svg><use href="#i-right"/></svg></button></div>
+    <div class="stats">
+      <div class="stat biz"><span class="lbl">Business</span><b id="tBus">0</b></div>
+      <div class="stat"><span class="lbl">Private</span><b id="tPriv">0</b></div>
+      <div class="stat"><span class="lbl">Fuel</span><b id="tFuel">0</b></div>
+      <div class="stat"><span class="lbl">Economy</span><b id="tMpg">–</b></div>
+      <div class="stat"><span class="lbl">Fuel cost</span><b id="tCost">–</b></div>
+      <div class="stat"><span class="lbl">Trips</span><b id="tCount">0</b></div>
+    </div>
+    <div class="split" id="tSplit" title="Business and private share"></div>
+    <div class="section-lbl">Business miles by job</div>
+    <div class="list" id="byJob"></div>
+    <div class="section-lbl">Mileage sheet</div>
+    <div class="card">
+      <div class="row">
+        <div class="field"><label class="lbl" for="startMiles">Odometer on the 1st</label><input id="startMiles" class="odo" inputmode="numeric" autocomplete="off"></div>
+        <div class="field"><label class="lbl" for="endMiles">At month end</label><input id="endMiles" class="odo" inputmode="numeric" autocomplete="off"></div>
+      </div>
+      <p class="hint" id="startHint"></p>
+      <button class="primary" type="button" id="exportBtn">Build sheet</button>
+      <button class="secondary" type="button" id="shareBtn" hidden>Share the sheet</button>
+      <p class="hint" id="exportNote">Your paper Mileage Record Sheet, filled in. Miles after your last trip go on it as private.</p>
+    </div>
+  </section>
+
+  <section class="view" data-view="settings" hidden id="settingsBox">
+    <form id="settingsForm" class="card">
+      <h2>Your details</h2>
       <div class="row">
         <div class="field"><label class="lbl" for="sName">Name</label><input id="sName" autocomplete="name"></div>
-        <div class="field"><label class="lbl" for="sDriver">Driver initials</label><input id="sDriver" maxlength="4" class="pc"></div>
+        <div class="field"><label class="lbl" for="sDriver">Initials</label><input id="sDriver" maxlength="4" class="pc"></div>
       </div>
       <div class="field"><label class="lbl" for="sReg">Vehicle registration</label><input id="sReg" class="pc"></div>
       <div class="row">
@@ -163,20 +299,34 @@ details.card[open] > summary::after { content: "–"; }
       </div>
       <button class="primary" type="submit">Save details</button>
     </form>
-    <div id="carBox" style="display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:14px"></div>
-    <div style="display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:14px">
+    <div id="carBox" class="card"></div>
+    <div class="card">
       <h2>Backup</h2>
-      <p class="hint" id="backupHint">Your whole log is one file on this phone. A dated copy is also saved every week in Documents/MileageBase Pro/Backups. Share it to your laptop to keep a copy off the phone.</p>
+      <p class="hint" id="backupHint">Your whole log is one file on this phone, in Documents/Odo. A dated copy is saved every week in Documents/Odo/Backups. Share one to your laptop to keep a copy off the phone.</p>
       <div class="btns">
-        <button class="secondary" type="button" id="backupBtn">Share backup file</button>
-        <button class="secondary" type="button" id="restoreBtn">Restore from backup</button>
+        <button class="secondary" type="button" id="backupBtn">Share backup</button>
+        <button class="secondary" type="button" id="restoreBtn">Restore</button>
       </div>
       <input type="file" id="restoreFile" accept=".json,application/json" hidden>
       <p class="hint" id="restoreMsg" hidden></p>
       <button class="secondary danger" type="button" id="restoreGo" hidden>Replace my log with this backup</button>
     </div>
-  </details>
-</div>
+    <div class="card flat">
+      <h2>Setup</h2>
+      <p class="hint">Run through the car link, location and battery checks again.</p>
+      <button class="secondary" type="button" id="rerunSetup">Run setup again</button>
+    </div>
+  </section>
+</main>
+
+<nav class="tabbar" aria-label="Sections">
+  <button type="button" data-tab="today" aria-current="page"><svg><use href="#i-today"/></svg>Today<i class="dot" id="liveDot" hidden></i></button>
+  <button type="button" data-tab="trips"><svg><use href="#i-trips"/></svg>Trips</button>
+  <button type="button" data-tab="fuel"><svg><use href="#i-fuel"/></svg>Fuel</button>
+  <button type="button" data-tab="month"><svg><use href="#i-month"/></svg>Month</button>
+  <button type="button" data-tab="settings"><svg><use href="#i-settings"/></svg>Settings</button>
+</nav>
+<div class="wizard" id="wizard" hidden></div>
 <div class="toast" id="toast" hidden></div>
 
 <script>
@@ -380,7 +530,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   const el = (tag, props = {}, kids = []) => { const e = document.createElement(tag); Object.assign(e, props); kids.forEach(k => e.append(k)); return e; };
   let toastT; const toast = msg => { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, 2600); };
 
-  // ---------- storage: one JSON file in Documents/MileageBase Pro on the phone ----------
+  // ---------- storage: one JSON file in Documents/Odo on the phone ----------
   const NATIVE = !!window.androidBridge || !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
   const PL = {};
   function plug(name) { const C = window.Capacitor; if (!C) return null; if (PL[name]) return PL[name];
@@ -389,11 +539,11 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (C.nativePromise) { PL[name] = new Proxy({}, { get: (_, m) => m === 'addListener' ? ((ev, cb) => C.nativeCallback(name, 'addListener', { eventName: ev }, cb)) : (o => C.nativePromise(name, m, o || {})) }); return PL[name]; }
     return null; }
   const FS = () => plug('Filesystem');
-  const DIR = 'MileageBase Pro', FILE = 'mileage-log.json', LS = 'mbp:log';
-  let DATA = {};
+  const DIR = 'Odo', OLD_DIR = 'MileageBase Pro', FILE = 'mileage-log.json', LS = 'mbp:log';
+  let DATA = {}, migrated = false;
   async function fsWrite(path, data, base64) { const f = FS(); if (!f) throw new Error('no file access');
     const o = { path: DIR + '/' + path, data, directory: 'DOCUMENTS', recursive: true }; if (!base64) o.encoding = 'utf8'; return f.writeFile(o); }
-  const fileText = () => JSON.stringify({ app: 'MileageBase Pro', version: 1, saved: new Date().toISOString(), ...DATA });
+  const fileText = () => JSON.stringify({ app: 'Odo', version: 1, saved: new Date().toISOString(), ...DATA });
   async function saveAll() {
     const txt = fileText();
     if (!NATIVE) { try { localStorage.setItem(LS, txt); } catch (e) {} return; }
@@ -413,6 +563,19 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       try { await f.mkdir({ path: DIR, directory: 'DOCUMENTS', recursive: true }); } catch (e) {}
       for (const name of [FILE, FILE + '.tmp']) {
         try { const r = await f.readFile({ path: DIR + '/' + name, directory: 'DOCUMENTS', encoding: 'utf8' }); DATA = strip(JSON.parse(r.data)); return; } catch (e) {}
+      }
+      // first run as Odo: bring the log and receipt photos across from the MileageBase Pro folder
+      for (const name of [FILE, FILE + '.tmp']) {
+        try {
+          const r = await f.readFile({ path: OLD_DIR + '/' + name, directory: 'DOCUMENTS', encoding: 'utf8' });
+          DATA = strip(JSON.parse(r.data)); await saveAll();
+          try {
+            const rr = await f.readdir({ path: OLD_DIR + '/Receipts', directory: 'DOCUMENTS' });
+            for (const x of (rr.files || [])) { const n = typeof x === 'string' ? x : x.name;
+              try { const img = await f.readFile({ path: OLD_DIR + '/Receipts/' + n, directory: 'DOCUMENTS' }); await fsWrite('Receipts/' + n, img.data, true); } catch (e) {} }
+          } catch (e) {}
+          migrated = true; return;
+        } catch (e) {}
       }
       return;
     }
@@ -611,7 +774,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     expTried = Date.now();
     try {
       const m = await roadMiles(t.startPc, t.sitePc);
-      if (m != null && S.openTrip && S.openTrip.id === t.id) { S.openTrip.expected = m; await saveS(); const l = $('expLine'); if (l) l.textContent = expText(m); else renderTripCard(); }
+      if (m != null && S.openTrip && S.openTrip.id === t.id) { S.openTrip.expected = m; await saveS(); renderTripCard(); }
     } catch (e) {}
   }
   const expText = m => `Expected: ${m} mi each way, ${m * 2} mi round trip`;
@@ -619,10 +782,13 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   async function refreshGps() { // live miles on the open trip
     const T = TR(); if (!T || !S.openTrip) return;
     try { gpsLive = await T.status(); } catch (e) { return; }
-    const box = $('gpsLine'); if (!box) return;
-    const words = { driving: 'logging your drive', parked: 'parked, GPS off', starting: 'waiting for GPS', stopped: 'not logging' };
-    box.textContent = `GPS: ${MI(gpsLive.meters).toFixed(1)} mi so far · ${words[gpsLive.mode] || gpsLive.mode}`;
-    const pm = $('privMiles'); if (pm) pm.textContent = MI(gpsLive.meters).toFixed(1) + ' mi';
+    const mi = MI(gpsLive.meters);
+    setDrums(mi);
+    const pill = $('livePill');
+    if (pill) { const words = { driving: 'Logging', parked: 'Parked · GPS off', starting: 'Finding GPS', stopped: 'Not logging' };
+      pill.textContent = words[gpsLive.mode] || gpsLive.mode; pill.classList.toggle('parked', gpsLive.mode !== 'driving'); }
+    const bar = $('expBar'); const t = S.openTrip;
+    if (bar && t && t.expected) { const f = mi / (t.expected * 2); bar.firstChild.style.width = Math.min(100, f * 100).toFixed(1) + '%'; bar.classList.toggle('over', f >= 1); }
     updateLive();
     const odo = $('cMiles');
     if (odo && !odo.dataset.touched && gpsLive.meters > 0) {
@@ -642,7 +808,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   const months = {};
   let viewM = mKey(today());
   let editing = null; // trip id being edited
-  let newType = 'bus'; // trip type chosen on the start form
+  let newType = null; // 'bus' while filling in a new business trip
   const blankMonth = () => ({ startMiles: null, endMiles: null, trips: [], fuel: [] });
   async function loadMonth(k) { if (!months[k]) months[k] = (await store.get('m-' + k)) || blankMonth(); return months[k]; }
   const saveMonth = k => store.set('m-' + k, months[k]);
@@ -716,20 +882,58 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   }
   function batteryBanner(c) {
     if (!needBattery) return;
-    const bat = el('div', { className: 'banner', style: 'display:flex;flex-direction:column;gap:8px' });
+    const bat = el('div', { className: 'banner warn', style: 'display:flex;flex-direction:column;gap:10px' });
     bat.append(el('span', { textContent: 'Set the battery setting to Unrestricted, or your phone may stop the GPS logging mid-trip.' }));
     const go = el('button', { className: 'secondary', type: 'button', textContent: 'Open battery setting' });
     go.onclick = async () => { try { await TR().openBattery(); } catch (e) {} setTimeout(checkBattery, 4000); };
     bat.append(go); c.append(bat);
   }
+  const svg = (id, cls) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); if (cls) s.setAttribute('class', cls);
+    const u = document.createElementNS('http://www.w3.org/2000/svg', 'use'); u.setAttribute('href', '#' + id); s.append(u); return s; };
+  // ---- the rolling odometer: five whole miles and the tenth in amber ----
+  function odometer(unit) {
+    const wrap = el('div', { className: 'odometer' });
+    const d = el('div', { className: 'drums', id: 'drums', role: 'img' });
+    for (let i = 0; i < 6; i++) d.append(el('div', { className: 'drum' + (i === 5 ? ' tenth' : '') }, [el('span', { textContent: '0' })]));
+    wrap.append(d, el('span', { className: 'unit', textContent: unit }));
+    return wrap;
+  }
+  function setDrums(mi) {
+    const d = $('drums'); if (!d) return;
+    const digits = String(Math.round(Math.max(0, mi) * 10)).padStart(6, '0').slice(-6);
+    d.setAttribute('aria-label', (Math.round(mi * 10) / 10).toFixed(1) + ' miles');
+    [...d.children].forEach((drum, i) => {
+      const s = drum.firstChild, v = digits[i];
+      if (s.textContent !== v) { s.style.transform = 'translateY(-60%)'; s.textContent = v; requestAnimationFrame(() => requestAnimationFrame(() => { s.style.transform = ''; })); }
+    });
+  }
+  function headRow(c, tag, cls) {
+    const r = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:10px' });
+    r.append(el('span', { className: 'tag ' + cls, textContent: tag }));
+    if (TR()) r.append(el('span', { className: 'livepill parked', id: 'livePill', textContent: 'Checking GPS' }));
+    c.append(r);
+  }
+  const daysOn = d => Math.max(1, Math.floor((new Date(today() + 'T12:00') - new Date(d + 'T12:00')) / 86400000) + 1);
+  function discardBtn(c, label) {
+    const cancel = el('button', { className: 'secondary danger', type: 'button', textContent: label });
+    let armed = false;
+    cancel.onclick = async () => {
+      if (!armed) { armed = true; cancel.textContent = 'Tap again to discard'; setTimeout(() => { armed = false; cancel.textContent = label; }, 4000); return; }
+      if (TR()) { try { await TR().stop(); } catch (e) {} }
+      S.openTrip = null; await saveS(); renderTripCard(); renderGlance(); toast('Discarded');
+    };
+    c.append(cancel);
+  }
+  function liveMap(c, t) { if (TR()) { const box = el('div', { className: 'map' }); c.append(box); initLiveMap(box, t); } }
+
   function renderPrivCard(c, t) { // a private journey: miles only
-    c.append(el('span', { className: 'lbl', textContent: 'Private journey' }));
-    const big = el('div', { className: 'route', id: 'privMiles', textContent: TR() ? '0.0 mi' : '' });
-    c.append(big);
-    if (TR()) { const box = el('div', { className: 'map' }); c.append(box); initLiveMap(box, t); c.append(el('p', { className: 'hint', id: 'gpsLine', textContent: 'GPS: checking…' })); batteryBanner(c); setTimeout(refreshGps, 0); }
+    headRow(c, 'Private journey', 'priv');
+    c.append(el('div', { className: 'meta' }, [el('span', { textContent: 'Since ' + fmtD(t.startDate) }), el('span', { textContent: 'Only the miles go on the sheet' })]));
+    if (TR()) c.append(odometer('mi'));
+    liveMap(c, t);
+    batteryBanner(c);
     const form = el('form', { style: 'display:flex;flex-direction:column;gap:12px' });
     if (!TR()) form.append(field('Miles driven', 'pDone', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }));
-    form.append(el('p', { className: 'hint', textContent: 'The sheet only gets the miles, in the Private column.' }));
     const err = el('p', { className: 'err', hidden: true }); form.append(err);
     form.append(el('button', { className: 'primary', type: 'submit', textContent: 'Finish journey' }));
     form.onsubmit = async e => {
@@ -746,149 +950,165 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       toast(`Private: ${miles} miles`);
     };
     c.append(form);
-    const cancel = el('button', { className: 'secondary danger', type: 'button', textContent: 'Discard' });
-    let armed = false;
-    cancel.onclick = async () => {
-      if (!armed) { armed = true; cancel.textContent = 'Tap again to discard'; setTimeout(() => { armed = false; cancel.textContent = 'Discard'; }, 4000); return; }
-      if (TR()) { try { await TR().stop(); } catch (e) {} }
-      S.openTrip = null; await saveS(); renderTripCard(); toast('Discarded');
-    };
-    c.append(cancel);
+    discardBtn(c, 'Discard journey');
+    setTimeout(refreshGps, 0);
   }
-  function privStart(form) {
-    const sug = suggestedStart();
-    if (sug == null) form.append(field('Odometer now (first time only)', 'nMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }));
-    form.append(el('p', { className: 'hint', textContent: 'Just tap Start. You can see the journey and its route in the app, but the sheet only gets the miles, in the Private column.' }));
+  async function startPrivate(miles) {
+    const k = mKey(today()); await loadMonth(k);
+    if (months[k].startMiles == null) { months[k].startMiles = S.lastFinish ?? miles; await saveMonth(k); }
+    let gpsMsg = '';
+    if (TR()) {
+      try {
+        const pm = await TR().permissions();
+        if (!pm.location) gpsMsg = ' GPS is off: allow location to log miles.';
+        else { await TR().start({ reset: true }); await checkBattery(); }
+      } catch (er) { gpsMsg = ' GPS logging did not start: ' + (er.message || er); }
+    }
+    S.openTrip = { id: uid(), type: 'priv', startDate: today(), startMiles: miles }; newType = null;
+    await saveS(); renderTripCard();
+    toast('Private journey started.' + gpsMsg);
+  }
+  function privStart(form) { // only shown the very first time, when there's no odometer reading yet
+    form.append(el('p', { className: 'hint', textContent: 'First trip: read the odometer once. After this, every trip carries on from the last one.' }));
+    form.append(field('Odometer now', 'nMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }));
     const err = el('p', { className: 'err', hidden: true }); form.append(err);
     form.append(el('button', { className: 'primary', type: 'submit', textContent: 'Start private journey' }));
     form.onsubmit = async e => {
       e.preventDefault();
-      const miles = sug ?? num($('nMiles').value);
+      const miles = num($('nMiles').value);
       if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
-      const k = mKey(today()); await loadMonth(k);
-      if (months[k].startMiles == null) { months[k].startMiles = S.lastFinish ?? miles; await saveMonth(k); }
-      let gpsMsg = '';
-      if (TR()) {
-        try {
-          const pm = await TR().permissions();
-          if (!pm.location) gpsMsg = ' GPS is off: allow location to log miles.';
-          else { await TR().start({ reset: true }); await checkBattery(); }
-        } catch (er) { gpsMsg = ' GPS logging did not start: ' + (er.message || er); }
-      }
-      S.openTrip = { id: uid(), type: 'priv', startDate: today(), startMiles: miles }; newType = 'bus';
-      await saveS(); renderTripCard();
-      toast('Private journey started.' + gpsMsg);
+      await startPrivate(miles);
     };
   }
   let sortMode = null;
   function renderUnsortedCard(c, t) { // logging started by itself when the car connected
-    c.append(el('span', { className: 'lbl', textContent: 'Trip logging, not sorted' }));
-    c.append(el('div', { className: 'route', id: 'privMiles', textContent: '0.0 mi' }));
-    c.append(el('p', { className: 'hint', textContent: `Started by itself when your phone connected to the car${t.startDate ? ', ' + fmtD(t.startDate) : ''}. What is this trip?` }));
-    if (TR()) { const box = el('div', { className: 'map' }); c.append(box); initLiveMap(box, t); c.append(el('p', { className: 'hint', id: 'gpsLine', textContent: 'GPS: checking…' })); batteryBanner(c); setTimeout(refreshGps, 0); }
-    const b1 = el('button', { className: 'primary', type: 'button', textContent: 'Business' });
-    const b2 = el('button', { className: 'secondary', type: 'button', textContent: 'Private' });
+    headRow(c, 'Not sorted yet', 'live');
+    c.append(el('p', { className: 'hint', textContent: `Logging started by itself when your phone connected to the car${t.startDate ? ', ' + fmtD(t.startDate) : ''}. What is this trip?` }));
+    if (TR()) c.append(odometer('mi so far'));
+    const starts = el('div', { className: 'starts' });
+    const b1 = el('button', { className: 'big biz', type: 'button' }, [svg('i-brief'), el('b', {}, ['Business', el('small', { textContent: 'Pick the site' })])]);
+    const b2 = el('button', { className: 'big', type: 'button' }, [svg('i-home'), el('b', {}, ['Private', el('small', { textContent: 'Miles only' })])]);
     b1.onclick = () => { sortMode = 'bus'; renderTripCard(); };
     b2.onclick = async () => { S.openTrip = { id: t.id, type: 'priv', startDate: t.startDate, startMiles: t.startMiles ?? suggestedStart() ?? 0 }; await saveS(); renderTripCard(); toast('Marked private'); };
-    c.append(el('div', { className: 'btns' }, [b1, b2]));
-    const cancel = el('button', { className: 'secondary danger', type: 'button', textContent: 'Not a trip, discard' });
-    let armed = false;
-    cancel.onclick = async () => {
-      if (!armed) { armed = true; cancel.textContent = 'Tap again to discard'; setTimeout(() => { armed = false; cancel.textContent = 'Not a trip, discard'; }, 4000); return; }
-      if (TR()) { try { await TR().stop(); } catch (e) {} }
-      S.openTrip = null; await saveS(); renderTripCard(); toast('Discarded');
-    };
-    c.append(cancel);
+    starts.append(b1, b2); c.append(starts);
+    liveMap(c, t);
+    batteryBanner(c);
+    discardBtn(c, 'Not a trip, discard');
+    setTimeout(refreshGps, 0);
   }
+  function renderBusinessCard(c, t) {
+    headRow(c, 'Business · day ' + daysOn(t.startDate), 'bus');
+    c.append(el('div', { className: 'route' }, [t.startPc, el('i', { textContent: '→' }), t.sitePc]));
+    const meta = el('div', { className: 'meta' });
+    if (t.desc) meta.append(el('span', { textContent: t.desc }));
+    if (t.job) meta.append(el('span', { textContent: 'Job ' + t.job }));
+    meta.append(el('span', { textContent: 'Since ' + fmtD(t.startDate) }));
+    c.append(meta);
+    if (TR()) c.append(odometer('mi logged'));
+    const bar = el('div', { className: 'bar', id: 'expBar' }, [el('i', { style: 'width:0%' })]);
+    if (t.expected != null) c.append(bar);
+    c.append(el('p', { className: 'hint', id: 'expLine', textContent: t.expected != null ? expText(t.expected) : 'Expected miles: looking up the road distance…' }));
+    if (t.expected == null) setTimeout(fillExpected, 0);
+    const tiles = el('div', { className: 'tiles2' });
+    if (TR() && t.sitePc) {
+      const nav = el('button', { className: 'tile-btn', type: 'button' }, [svg('i-nav'), 'Navigate']);
+      nav.onclick = () => TR().openNav({ q: t.sitePc }).catch(e => toast(e.message || 'No satnav app found'));
+      tiles.append(nav);
+    }
+    const fuel = el('button', { className: 'tile-btn', type: 'button' }, [svg('i-fuel'), 'Add fuel']);
+    fuel.onclick = () => showTab('fuel');
+    tiles.append(fuel);
+    if (TR()) {
+      const fix = el('button', { className: 'tile-btn', type: 'button' }, [svg('i-pin'), 'Site is here']);
+      fix.onclick = async () => {
+        fix.lastChild.textContent = 'Finding…';
+        try { const code = await gpsPostcode(); S.openTrip.sitePc = code; S.openTrip.expected = undefined; expTried = 0; await saveS(); renderTripCard(); toast('Site postcode set to ' + code); }
+        catch (e) { fix.lastChild.textContent = 'Site is here'; toast('GPS: ' + (e.message || e)); }
+      };
+      tiles.append(fix);
+    }
+    if (tiles.children.length === 3) tiles.className = 'tiles3';
+    c.append(tiles);
+    liveMap(c, t);
+    batteryBanner(c);
+    const form = el('form', { style: 'display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--line);padding-top:14px' });
+    form.append(el('h2', { textContent: 'Back home or at the office' }));
+    const row = el('div', { className: 'row' });
+    row.append(field('Finish date', 'cDate', { type: 'date', value: today(), required: true }),
+               field('Odometer now', 'cMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }));
+    row.querySelector('#cMiles').addEventListener('input', e => { e.target.dataset.touched = '1'; });
+    form.append(row);
+    form.append(el('p', { className: 'hint', id: 'cHint', textContent: TR() ? 'Fills in from GPS as you drive. Check it against the dash.' : 'Read it off the dash.' }));
+    const err = el('p', { className: 'err', hidden: true }); form.append(err);
+    form.append(el('button', { className: 'primary', type: 'submit', textContent: 'Finish trip' }));
+    form.onsubmit = async e => {
+      e.preventDefault();
+      const miles = num($('cMiles').value), date = $('cDate').value;
+      if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
+      if (miles < t.startMiles) { err.textContent = `That's lower than the start reading (${t.startMiles}). Check the odometer.`; err.hidden = false; return; }
+      const done = miles - t.startMiles;
+      if (t.expected && done < t.expected * 2 * 0.95 && form.dataset.checked !== String(miles)) {
+        err.textContent = `Logged ${done} mi, but the round trip alone is about ${t.expected * 2} mi. Check the odometer, or tap Finish trip again to save it as it is.`;
+        err.hidden = false; form.dataset.checked = String(miles); return;
+      }
+      if (date < t.startDate) { err.textContent = 'Finish date is before the start date.'; err.hidden = false; return; }
+      let gpsMiles = null, route = null;
+      if (TR()) { route = await takeRoute(); try { const st = await TR().stop(); gpsMiles = Math.round(MI(st.meters) * 10) / 10; } catch (e) {} }
+      const k = mKey(t.startDate); await loadMonth(k);
+      months[k].trips.push({ ...t, finishMiles: miles, finishDate: date, gpsMiles, route });
+      S.lastFinish = Math.max(S.lastFinish ?? 0, miles); S.openTrip = null;
+      await saveMonth(k); await saveS();
+      viewM = k; await renderMonth(); renderTripCard();
+      const extra = t.expected ? (miles - t.startMiles) - t.expected * 2 : 0;
+      toast(`Trip saved: ${miles - t.startMiles} business miles` + (extra > 0 ? ` (+${extra} local driving)` : ''));
+    };
+    c.append(form);
+    discardBtn(c, 'Discard this trip');
+    setTimeout(refreshGps, 0);
+  }
+
   function renderTripCard() {
     const c = $('tripCard'); c.innerHTML = ''; c.classList.toggle('live', !!S.openTrip);
+    const dot = $('liveDot'); if (dot) dot.hidden = !S.openTrip;
     if (S.openTrip) {
       const t = S.openTrip;
       if (t.type === 'priv') { renderPrivCard(c, t); return; }
-      if (t.type === 'unsorted') { if (sortMode !== 'bus') { renderUnsortedCard(c, t); return; } }
-      else {
-      c.append(el('span', { className: 'lbl', textContent: 'On a business trip' }));
-      c.append(el('div', { className: 'route' }, [t.startPc, el('i', { textContent: '→' }), t.sitePc]));
-      const meta = el('div', { className: 'meta' });
-      meta.append(el('span', { textContent: 'Since ' + fmtD(t.startDate) }));
-      if (t.job) meta.append(el('span', { textContent: 'Job ' + t.job }));
-      meta.append(el('span', { textContent: 'Started at ' + t.startMiles }));
-      if (t.desc) meta.append(el('span', { textContent: t.desc }));
-      c.append(meta);
-      c.append(el('p', { className: 'hint', id: 'expLine', textContent: t.expected != null ? expText(t.expected) : 'Expected miles: looking up the road distance…' }));
-      if (t.expected == null) setTimeout(fillExpected, 0);
-      if (TR()) {
-        const box = el('div', { className: 'map' }); c.append(box); initLiveMap(box, t);
-        c.append(el('p', { className: 'hint', id: 'gpsLine', textContent: 'GPS: checking…' }));
-        const fix = t.type === 'priv' ? null : el('button', { className: 'secondary', type: 'button', textContent: 'Set site postcode to where I am' });
-        if (fix) fix.onclick = async () => {
-          fix.textContent = 'Finding…';
-          try { const code = await gpsPostcode(); S.openTrip.sitePc = code; await saveS(); renderTripCard(); toast('Site postcode set to ' + code); }
-          catch (e) { fix.textContent = 'Set site postcode to where I am'; toast('GPS: ' + (e.message || e)); }
-        };
-        if (fix) c.append(fix);
-        if (t.sitePc) { const nav = el('button', { className: 'secondary', type: 'button', textContent: 'Navigate to ' + t.sitePc });
-          nav.onclick = () => TR().openNav({ q: t.sitePc }).catch(e => toast(e.message || 'No satnav app found')); c.append(nav); }
-        batteryBanner(c);
-        setTimeout(refreshGps, 0);
-      }
-      const form = el('form', { className: 'card', style: 'background:var(--bg);padding:14px' });
-      form.append(el('h2', { textContent: 'Back home or at the office' }));
-      const row = el('div', { className: 'row' });
-      row.append(field('Finish date', 'cDate', { type: 'date', value: today(), required: true }),
-                 field('Odometer now', 'cMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }));
-      row.querySelector('#cMiles').addEventListener('input', e => { e.target.dataset.touched = '1'; });
-      form.append(row);
-      form.append(el('p', { className: 'hint', id: 'cHint', textContent: TR() ? 'Fills in from GPS as you drive.' : 'Read it off the dash.' }));
-      const err = el('p', { className: 'err', hidden: true }); form.append(err);
-      form.append(el('button', { className: 'primary', type: 'submit', textContent: 'Finish trip' }));
-      form.onsubmit = async e => {
-        e.preventDefault();
-        const miles = num($('cMiles').value), date = $('cDate').value;
-        if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
-        if (miles < t.startMiles) { err.textContent = `That's lower than the start reading (${t.startMiles}). Check the odometer.`; err.hidden = false; return; }
-        const done = miles - t.startMiles;
-        if (t.expected && done < t.expected * 2 * 0.95 && form.dataset.checked !== String(miles)) {
-          err.textContent = `Logged ${done} mi, but the round trip alone is about ${t.expected * 2} mi. Check the odometer, or tap Finish trip again to save it as it is.`;
-          err.hidden = false; form.dataset.checked = String(miles); return;
-        }
-        if (date < t.startDate) { err.textContent = 'Finish date is before the start date.'; err.hidden = false; return; }
-        let gpsMiles = null, route = null;
-        if (TR()) { route = await takeRoute(); try { const st = await TR().stop(); gpsMiles = Math.round(MI(st.meters) * 10) / 10; } catch (e) {} }
-        const k = mKey(t.startDate); await loadMonth(k);
-        months[k].trips.push({ ...t, finishMiles: miles, finishDate: date, gpsMiles, route });
-        S.lastFinish = Math.max(S.lastFinish ?? 0, miles); S.openTrip = null;
-        await saveMonth(k); await saveS();
-        viewM = k; await renderMonth(); renderTripCard();
-        const extra = t.expected ? (miles - t.startMiles) - t.expected * 2 : 0;
-        toast(`Trip saved: ${miles - t.startMiles} ${t.type === 'priv' ? 'private' : 'business'} miles` + (extra > 0 ? ` (+${extra} local driving)` : ''));
-      };
-      c.append(form);
-      const cancel = el('button', { className: 'secondary danger', type: 'button', textContent: 'Discard this trip' });
-      let armed = false;
-      cancel.onclick = async () => {
-        if (!armed) { armed = true; cancel.textContent = 'Tap again to discard'; setTimeout(() => { armed = false; cancel.textContent = 'Discard this trip'; }, 4000); return; }
-        if (TR()) { try { await TR().stop(); } catch (e) {} }
-        S.openTrip = null; await saveS(); renderTripCard(); toast('Trip discarded');
-      };
-      c.append(cancel);
-      return;
-      }
+      if (t.type === 'unsorted' && sortMode !== 'bus') { renderUnsortedCard(c, t); return; }
+      if (t.type !== 'unsorted') { renderBusinessCard(c, t); return; }
     }
     const sorting = S.openTrip && S.openTrip.type === 'unsorted' ? S.openTrip : null;
-    c.append(el('h2', { textContent: sorting ? 'Business trip details' : 'Start a trip' }));
+    // ---- nothing open: two giant buttons, and your saved sites one tap away ----
+    if (!sorting && newType !== 'bus' && newType !== 'priv') {
+      c.append(el('h2', { textContent: 'Start a trip' }));
+      const starts = el('div', { className: 'starts' });
+      const b1 = el('button', { className: 'big biz', type: 'button' }, [svg('i-brief'), el('b', {}, ['Business', el('small', { textContent: 'To a site or job' })])]);
+      const b2 = el('button', { className: 'big', type: 'button' }, [svg('i-home'), el('b', {}, ['Private', el('small', { textContent: 'One tap, miles only' })])]);
+      b1.onclick = () => { newType = 'bus'; renderTripCard(); };
+      b2.onclick = async () => { const sug = suggestedStart(); if (sug != null) await startPrivate(sug); else { newType = 'priv'; renderTripCard(); } };
+      starts.append(b1, b2); c.append(starts);
+      if ((S.sites || []).length) {
+        c.append(el('span', { className: 'lbl', textContent: 'Saved sites' }));
+        const list = el('div', { className: 'list', style: 'background:var(--raised)' });
+        S.sites.slice(0, 5).forEach(s => {
+          const b = el('button', { type: 'button', className: 'item-head', style: 'padding:13px 14px;border-bottom:1px solid var(--line)' });
+          b.append(el('span', { className: 'r', textContent: s.pc }), el('span', { className: 'd', textContent: [s.desc, s.job ? 'Job ' + s.job : ''].filter(Boolean).join(' · ') || 'Saved site' }),
+            el('span', { className: 'm', style: 'color:var(--amber)' }, [svg('i-right', 'chev')]));
+          b.querySelector('.chev').setAttribute('style', 'width:22px;height:22px');
+          b.onclick = () => { newType = 'bus'; pickSite = s; renderTripCard(); };
+          list.append(b);
+        });
+        c.append(list);
+      }
+      return;
+    }
+    if (!sorting && newType === 'priv') { // first ever trip, no odometer yet
+      c.append(backRow('Private journey'));
+      const form = el('form', { style: 'display:flex;flex-direction:column;gap:14px' });
+      privStart(form); c.append(form); return;
+    }
+    c.append(backRow(sorting ? 'Business trip details' : 'New business trip'));
     const form = el('form', { style: 'display:flex;flex-direction:column;gap:14px' });
-    const kind = el('div', { className: 'chips', role: 'group' });
-    kind.setAttribute('aria-label', 'Trip type');
-    const kb = [['bus', 'Business'], ['priv', 'Private']].map(([v, label]) => {
-      const b = el('button', { type: 'button', className: 'chip', textContent: label });
-      b.setAttribute('aria-pressed', String(v === newType)); b.onclick = () => { newType = v; renderTripCard(); };
-      return b; });
-    kind.append(...kb); if (!sorting) form.append(kind);
-    const priv = newType === 'priv';
-    if (priv && !sorting) { privStart(form); c.append(form); return; }
     const startAt = S.office;
-    if (!priv) {
     const from = field('Start postcode', 'nFrom', { className: 'pc', value: pc(startAt), required: true, autocapitalize: 'characters', autocomplete: 'off' });
     const chipsFrom = placeChips('nFrom', startAt); if (TR() && !sorting) chipsFrom.append(gpsChip('nFrom', true));
     from.append(chipsFrom);
@@ -896,7 +1116,6 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     form.append(from);
     const site = field('Site postcode', 'nSite', { className: 'pc', required: true, autocapitalize: 'characters', autocomplete: 'off', placeholder: 'BS11 8AX' });
     if ((S.sites || []).length) {
-      site.append(el('span', { className: 'lbl', textContent: 'Saved sites' }));
       const sc = el('div', { className: 'chips' });
       S.sites.slice(0, 8).forEach(s => {
         const b = el('button', { type: 'button', className: 'chip', textContent: s.pc + (s.desc ? ' · ' + s.desc : s.job ? ' · Job ' + s.job : '') });
@@ -907,13 +1126,11 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       site.append(sc);
     }
     form.append(site);
-    }
     const r1 = el('div', { className: 'row' });
-    if (!priv) r1.append(field('Job number', 'nJob', { inputMode: 'numeric', autocomplete: 'off' }));
+    r1.append(field('Job number', 'nJob', { inputMode: 'numeric', autocomplete: 'off' }));
     r1.append(field('Start date', 'nDate', { type: 'date', value: sorting ? sorting.startDate : today(), required: true }));
     form.append(r1);
-    if (!priv) form.append(field('Site name (optional)', 'nDesc', { placeholder: 'e.g. Avonmouth DC', autocomplete: 'off' }));
-    else form.append(el('p', { className: 'hint', textContent: 'No places are recorded for a private trip. The sheet just shows "Private" with the dates and miles, all in the Private column.' }));
+    form.append(field('Site name (optional)', 'nDesc', { placeholder: 'Avonmouth DC', autocomplete: 'off' }));
     const odo = field('Odometer now', 'nMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' });
     const sug = sorting && sorting.startMiles != null ? sorting.startMiles : suggestedStart();
     odo.querySelector('input').value = sug ?? '';
@@ -923,19 +1140,19 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         const code = j && j.result && j.result[0] && j.result[0].postcode; if (code && $('nFrom') && !$('nFrom').dataset.touched) $('nFrom').value = code; } catch (e) {}
     }, 0);
     odo.append(el('p', { className: 'hint', textContent: sug != null
-      ? `Filled in from your last trip. If you've driven since, change it and the difference goes on the sheet as private miles.`
+      ? `Carried on from your last trip. If you've driven since, change it and the difference goes on the sheet as private miles.`
       : 'Read it off the dash. After this, each trip carries on from the last one.' }));
     form.append(odo);
     const err = el('p', { className: 'err', hidden: true }); form.append(err);
-    form.append(el('button', { className: 'primary', type: 'submit', textContent: 'Start trip' }));
+    form.append(el('button', { className: 'primary', type: 'submit', textContent: sorting ? 'Save trip details' : 'Start trip' }));
     form.onsubmit = async e => {
       e.preventDefault();
       const miles = num($('nMiles').value);
       if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
       if (S.lastFinish != null && miles < S.lastFinish) { err.textContent = `That's lower than your last finish reading (${S.lastFinish}). Check the odometer.`; err.hidden = false; return; }
-      const P = !sorting && newType === 'priv', val = id => $(id) ? $(id).value.trim() : '';
-      const t = { id: sorting ? sorting.id : uid(), type: P ? 'priv' : undefined, startPc: P ? '' : pc(val('nFrom')), sitePc: P ? '' : pc(val('nSite')), job: P ? '' : val('nJob'),
-                  startDate: $('nDate').value, desc: P ? '' : val('nDesc'), startMiles: miles };
+      const val = id => $(id) ? $(id).value.trim() : '';
+      const t = { id: sorting ? sorting.id : uid(), startPc: pc(val('nFrom')), sitePc: pc(val('nSite')), job: val('nJob'),
+                  startDate: $('nDate').value, desc: val('nDesc'), startMiles: miles };
       const k = mKey(t.startDate); await loadMonth(k);
       if (months[k].startMiles == null) { months[k].startMiles = S.lastFinish ?? miles; await saveMonth(k); }
       let gpsMsg = '';
@@ -950,16 +1167,27 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         S.sites = [{ pc: t.sitePc, job: t.job, desc: t.desc }, ...(S.sites || []).filter(s => s.pc !== t.sitePc)].slice(0, 12);
       }
       sortMode = null;
-      S.openTrip = t; newType = 'bus'; expTried = 0; await saveS(); renderTripCard(); if (k === viewM) renderMonth(); fillExpected();
+      S.openTrip = t; newType = null; expTried = 0; await saveS(); renderTripCard(); if (k === viewM) renderMonth(); fillExpected();
       toast('Trip started.' + (gpsMsg || ' Finish it when you get back.'));
     };
     c.append(form);
+    if (pickSite) { const s = pickSite; pickSite = null; $('nSite').value = s.pc; $('nJob').value = s.job || ''; $('nDesc').value = s.desc || '';
+      form.querySelectorAll('.chip').forEach(x => { if (x.textContent.startsWith(s.pc + ' ') || x.textContent === s.pc) x.setAttribute('aria-pressed', 'true'); }); }
+  }
+  let pickSite = null;
+  function backRow(title) {
+    const r = el('div', { style: 'display:flex;align-items:center;gap:10px' });
+    const b = el('button', { type: 'button', className: 'secondary', style: 'min-height:42px;padding:8px 12px' }, [svg('i-left')]); b.setAttribute('aria-label', 'Back');
+    b.firstChild.setAttribute('style', 'width:20px;height:20px');
+    b.onclick = () => { newType = null; sortMode = null; renderTripCard(); };
+    r.append(b, el('h2', { textContent: title }));
+    return r;
   }
 
   // ---------- month ----------
   async function renderMonth() {
     const M = await loadMonth(viewM);
-    $('monthTitle').textContent = mLabel(viewM);
+    document.querySelectorAll('.mtitle').forEach(h => { h.textContent = mLabel(viewM); });
     $('startMiles').value = M.startMiles ?? '';
     $('endMiles').value = M.endMiles ?? '';
     const prevM = months[shiftM(viewM, -1)];
@@ -970,8 +1198,22 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const list = $('tripList'); list.innerHTML = '';
     let bus = 0, priv = 0;
     rows.forEach(r => { bus += r.bus; priv += r.priv; });
-    $('tBus').textContent = bus; $('tPriv').textContent = priv;
-    if (!items.length) list.append(el('p', { className: 'empty', textContent: 'No trips this month yet. Start one above.' }));
+    const statMi = (id, v, unit) => { const b = $(id); b.textContent = String(v); if (unit) b.append(el('small', { textContent: unit })); };
+    statMi('tBus', bus.toLocaleString('en-GB'), 'mi'); statMi('tPriv', priv.toLocaleString('en-GB'), 'mi');
+    $('tCount').textContent = items.filter(r => r.id).length;
+    const sp = $('tSplit'); sp.innerHTML = '';
+    if (bus + priv > 0) sp.append(el('i', { style: `width:${(bus / (bus + priv) * 100).toFixed(1)}%;background:var(--biz)` }), el('i', { style: `width:${(priv / (bus + priv) * 100).toFixed(1)}%;background:var(--priv)` }));
+    // business miles by job
+    const jobs = {};
+    items.filter(r => r.id && r.type !== 'priv').forEach(r => { const key = r.job ? 'Job ' + r.job : (r.desc || r.sitePc || 'No job number');
+      const j = jobs[key] || (jobs[key] = { key, desc: r.job ? (r.desc || r.sitePc) : (r.desc ? r.sitePc : ''), miles: 0, trips: 0 }); j.miles += r.bus; j.trips++; });
+    const jl = Object.values(jobs).sort((x, y) => y.miles - x.miles), top = jl.length ? jl[0].miles || 1 : 1;
+    const bj = $('byJob'); bj.innerHTML = '';
+    if (!jl.length) bj.append(el('p', { className: 'empty', textContent: 'No business trips this month.' }));
+    jl.forEach(j => bj.append(el('div', { className: 'jobrow' }, [el('b', { textContent: j.key }), el('b', { textContent: j.miles.toLocaleString('en-GB') + ' mi' }),
+      el('span', { textContent: [j.desc, j.trips + (j.trips === 1 ? ' trip' : ' trips')].filter(Boolean).join(' · ') }), el('span'),
+      el('div', { className: 'bar' }, [el('i', { style: `width:${(j.miles / top * 100).toFixed(1)}%` })])])));
+    if (!items.length) list.append(el('p', { className: 'empty', textContent: 'No trips this month. Start one on Today.' }));
     items.forEach(r => list.append(tripItem(r)));
     const routed = items.filter(r => r.route);
     $('monthMapBtn').hidden = !routed.length; $('monthMapWrap').innerHTML = ''; $('monthMapBtn').textContent = 'Show this month on a map';
@@ -1012,10 +1254,24 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       it.append(head, el('div', { className: 'btns' }, row));
       fl.append(it);
     });
-    $('tFuel').textContent = Math.round(litres * 10) / 10;
+    statMi('tFuel', (Math.round(litres * 10) / 10).toLocaleString('en-GB'), 'L');
+    const gallons = litres / 4.54609, cost = M.fuel.reduce((s, f) => s + (Number(f.cost) || 0), 0);
+    if (gallons > 0 && bus + priv > 0) statMi('tMpg', ((bus + priv) / gallons).toFixed(1), 'mpg'); else $('tMpg').textContent = '–';
+    if (cost > 0) statMi('tCost', '£' + cost.toFixed(0), bus + priv > 0 ? (cost / (bus + priv) * 100).toFixed(1) + 'p/mi' : ''); else $('tCost').textContent = '–';
+    renderGlance();
     if (!$('fDate').value) $('fDate').value = today();
   }
 
+  function renderGlance() { // Today tab: this month at a glance
+    const k = mKey(today()); const g = $('glance'); if (!g || !months[k]) return;
+    const { rows, list } = sheetRows(k);
+    let bus = 0, priv = 0; rows.forEach(r => { bus += r.bus; priv += r.priv; });
+    const litres = months[k].fuel.reduce((s, f) => s + (f.litresBus || 0) + (f.litresPriv || 0), 0);
+    g.innerHTML = '';
+    [['Business', bus.toLocaleString('en-GB') + ''], ['Private', priv.toLocaleString('en-GB')], ['Trips', String(list.filter(r => r.id).length)]].forEach(([l, v]) =>
+      g.append(el('div', {}, [el('span', { className: 'lbl', textContent: l }), el('b', { textContent: v })])));
+    $('glanceLbl').textContent = mLabel(k) + (litres ? ` · ${Math.round(litres)} L fuel` : '');
+  }
   function tripItem(r) {
     const it = el('div', { className: 'item' });
     const head = el('button', { type: 'button', className: 'item-head' });
@@ -1105,8 +1361,92 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   }
 
   // ---------- wiring ----------
-  $('prevM').onclick = async () => { viewM = shiftM(viewM, -1); editing = null; await renderMonth(); };
-  $('nextM').onclick = async () => { viewM = shiftM(viewM, 1); editing = null; await renderMonth(); };
+  document.querySelectorAll('.mprev').forEach(b => { b.onclick = async () => { viewM = shiftM(viewM, -1); editing = null; await renderMonth(); }; });
+  document.querySelectorAll('.mnext').forEach(b => { b.onclick = async () => { viewM = shiftM(viewM, 1); editing = null; await renderMonth(); }; });
+  // ---------- first-run setup ----------
+  async function wizState() {
+    const st = { loc: false, bat: false, car: false, bg: false };
+    const T = TR(); if (!T) return st;
+    try { st.loc = !!(await T.status()).location; } catch (e) {}
+    try { st.bat = !!(await T.batteryOk()).ok; } catch (e) {}
+    try { const c = await T.cars(); st.car = !!c.cars; st.bg = !!c.background; } catch (e) {}
+    return st;
+  }
+  let wizStep = 0;
+  async function openWizard(step) {
+    wizStep = step; const w = $('wizard'); w.hidden = false; w.innerHTML = '';
+    const inner = el('div', { className: 'inner' }); w.append(inner);
+    const top = el('div', { style: 'display:flex;align-items:center;gap:14px' });
+    const steps = el('div', { className: 'steps', style: 'flex:1' }); for (let i = 0; i < 4; i++) steps.append(el('i', { className: i <= step ? 'on' : '' }));
+    const skip = el('button', { type: 'button', className: 'secondary', textContent: 'Skip', style: 'min-height:40px;padding:6px 14px' });
+    skip.onclick = closeWizard; top.append(steps, skip); inner.append(top);
+    const next = (label, fn) => { const b = el('button', { type: 'button', className: 'primary', textContent: label }); b.onclick = fn; return b; };
+    if (step === 0) {
+      inner.append(el('div', { style: 'margin-top:8vh' }, [el('span', { className: 'logo', style: 'font-size:44px;padding:12px 16px 10px 20px', textContent: 'ODO' })]));
+      inner.append(el('h1', { textContent: 'Your work mileage, logged by itself' }));
+      inner.append(el('p', { className: 'lead', textContent: 'Odo logs every drive with GPS, starts on its own when your phone connects to the car, and fills in your mileage sheet at the end of the month.' }));
+      inner.append(el('div', { style: 'flex:1' }), next('Get started', () => openWizard(1)));
+    } else if (step === 1) {
+      inner.append(el('h1', { textContent: 'Your details' }), el('p', { className: 'lead', textContent: 'These go on the top of your mileage sheet.' }));
+      const f = el('div', { style: 'display:flex;flex-direction:column;gap:14px' });
+      f.append(field('Name', 'wName', { value: S.name, autocomplete: 'name' }));
+      const r = el('div', { className: 'row' }); r.append(field('Initials', 'wDriver', { value: S.driver, className: 'pc', maxLength: 4 }), field('Vehicle reg', 'wReg', { value: S.reg, className: 'pc' })); f.append(r);
+      const r2 = el('div', { className: 'row' }); r2.append(field('Office postcode', 'wOffice', { value: S.office, className: 'pc' }), field('Home postcode', 'wHome', { value: S.home, className: 'pc' })); f.append(r2);
+      inner.append(f, el('div', { style: 'flex:1' }), next('Next', async () => {
+        Object.assign(S, { name: $('wName').value.trim(), driver: pc($('wDriver').value), reg: pc($('wReg').value), office: pc($('wOffice').value) || 'HD8 0RW', home: pc($('wHome').value) });
+        await saveS(); fillSettings(); openWizard(2); }));
+    } else if (step === 2) {
+      inner.append(el('h1', { textContent: 'Make it bulletproof' }), el('p', { className: 'lead', textContent: 'Four quick settings so no mile gets missed. Tap each one.' }));
+      const st = await wizState();
+      const item = (done, title, text, fn) => { const c = el('button', { type: 'button', className: 'check' + (done ? ' done' : ''), style: 'text-align:left;color:inherit;font:inherit;cursor:pointer;width:100%' },
+        [el('span', { className: 'ok', textContent: '✓' }), el('div', {}, [el('b', { textContent: title }), el('span', { textContent: text })])]); c.onclick = async () => { try { await fn(); } catch (e) { toast(e.message || 'Not available'); } setTimeout(() => wizStep === 2 && openWizard(2), 1500); }; return c; };
+      if (!TR()) inner.append(el('p', { className: 'banner', textContent: 'These settings work in the installed app on your phone.' }));
+      inner.append(item(st.loc, 'Location and notifications', 'So GPS can log your drives.', () => TR().permissions()));
+      inner.append(item(st.car, 'Link your car', 'Logging starts by itself when your phone connects, Android Auto included.', () => TR().linkCar()));
+      inner.append(item(st.bg, 'Location: allow all the time', 'Lets automatic starts work with the app closed. Open Permissions, Location, Allow all the time.', () => TR().openAppSettings()));
+      inner.append(item(st.bat, 'Battery: unrestricted', 'Stops the phone pausing logging mid-trip.', () => TR().openBattery()));
+      inner.append(el('div', { style: 'flex:1' }), next('Next', () => openWizard(3)));
+    } else {
+      inner.append(el('h1', { textContent: 'All set' }));
+      inner.append(el('p', { className: 'lead', textContent: 'Tap Business or Private on Today to start a trip, or just drive: once your car is linked, Odo starts logging and asks what it was later. At month end, Month builds your sheet.' }));
+      inner.append(el('div', { style: 'flex:1' }), next('Start using Odo', closeWizard));
+    }
+  }
+  async function closeWizard() { $('wizard').hidden = true; wizStep = -1; S.setupDone = true; await saveS(); renderCar(); }
+  $('rerunSetup').onclick = () => openWizard(2);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && wizStep === 2 && !$('wizard').hidden) openWizard(2); });
+  // ---------- tabs ----------
+  const TITLES = { today: 'Today', trips: 'Trips', fuel: 'Fuel', month: 'Month', settings: 'Settings' };
+  function showTab(name) {
+    document.querySelectorAll('.view[data-view]').forEach(v => { v.hidden = v.dataset.view !== name; });
+    document.querySelectorAll('.tabbar button').forEach(b => { if (b.dataset.tab === name) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+    $('viewTitle').textContent = TITLES[name] || '';
+    window.scrollTo(0, 0);
+    if (name === 'settings') renderCar();
+    if (name === 'fuel' && !$('fDate').value) $('fDate').value = today();
+  }
+  document.querySelectorAll('.tabbar button').forEach(b => { b.onclick = () => showTab(b.dataset.tab); });
+  // ---------- search every month ----------
+  $('tripSearch').addEventListener('input', () => {
+    const q = $('tripSearch').value.trim().toLowerCase();
+    $('searchBox').hidden = !q; $('monthTrips').hidden = !!q;
+    if (!q) return;
+    const out = $('searchResults'); out.innerHTML = '';
+    const keys = Object.keys(DATA).filter(k => /^m-\d{4}-\d{2}$/.test(k)).sort().reverse();
+    let n = 0;
+    keys.forEach(mk => { const M = DATA[mk]; (M.trips || []).forEach(t => {
+      if (t.type === 'priv') return;
+      const hay = [t.startPc, t.sitePc, t.job, t.desc, t.startDate].join(' ').toLowerCase();
+      if (!hay.includes(q)) return;
+      n++;
+      const h = el('div', { className: 'item' });
+      h.append(el('div', { className: 'item-head' }, [el('span', { className: 'r' }, [el('span', { className: 'tag bus', textContent: 'Business' }), `${t.startPc || '?'} → ${t.sitePc || '?'}`]),
+        el('span', { className: 'd', textContent: [fmtD(t.startDate), t.job ? 'Job ' + t.job : '', t.desc].filter(Boolean).join(' · ') }),
+        el('span', { className: 'm', textContent: String(Math.max(0, (t.finishMiles ?? 0) - (t.startMiles ?? 0))) })]));
+      out.append(h);
+    }); });
+    if (!n) out.append(el('p', { className: 'empty', textContent: 'No trips match.' }));
+  });
   $('startMiles').onchange = async () => { months[viewM].startMiles = num($('startMiles').value); await saveMonth(viewM); renderMonth(); toast('Start miles saved'); };
   $('endMiles').onchange = async () => { months[viewM].endMiles = num($('endMiles').value); await saveMonth(viewM); renderMonth(); toast('Month-end reading saved'); };
   // ---------- fuel receipts: photo kept with the entry, litres and cost read off it on the phone ----------
@@ -1171,7 +1511,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   $('settingsForm').onsubmit = async e => {
     e.preventDefault();
     Object.assign(S, { name: $('sName').value.trim(), driver: pc($('sDriver').value), reg: pc($('sReg').value), office: pc($('sOffice').value) || 'HD8 0RW', home: pc($('sHome').value) });
-    await saveS(); fillSettings(); renderTripCard(); renderMonth(); $('settingsBox').open = false; toast('Details saved');
+    await saveS(); fillSettings(); renderTripCard(); renderMonth(); toast('Details saved');
   };
   function fillSettings() {
     $('sName').value = S.name; $('sDriver').value = S.driver; $('sReg').value = S.reg; $('sOffice').value = S.office; $('sHome').value = S.home;
@@ -1246,6 +1586,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         try { await T.start({ reset: false }); } catch (e) {}
       }
       const a = act.action, t = S.openTrip;
+      if (a && a !== 'open') showTab(a === 'monthend' ? 'today' : 'today');
       if (a === 'autostart' && !t) {
         try { await T.start({ reset: true }); } catch (e) {}
         S.openTrip = { id: uid(), type: 'unsorted', startDate: today(), startMiles: suggestedStart() }; await saveS(); renderTripCard();
@@ -1254,7 +1595,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         renderTripCard(); setTimeout(() => $('nSite') && $('nSite').focus(), 100);
       } else if (a === 'private') {
         if (t && t.type === 'unsorted') { S.openTrip = { id: t.id, type: 'priv', startDate: t.startDate, startMiles: t.startMiles ?? suggestedStart() ?? 0 }; await saveS(); renderTripCard(); }
-        else if (!t) { newType = 'priv'; renderTripCard(); const f = $('tripCard').querySelector('form'); if (f && suggestedStart() != null) f.requestSubmit(); }
+        else if (!t) { const sg = suggestedStart(); if (sg != null) await startPrivate(sg); else { newType = 'priv'; renderTripCard(); } }
       } else if (a === 'finish') {
         renderTripCard(); const b = $('tripCard').querySelector('form button[type=submit]'); if (b) b.scrollIntoView({ block: 'center' });
       } else if (a === 'monthend') {
@@ -1292,7 +1633,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     try { await shareFile(lastSheet.name, lastSheet.data, true); } catch (e) { if (!/cancel/i.test(String(e && e.message || e))) toast('Could not share: ' + (e.message || e)); }
   };
   $('backupBtn').onclick = async () => {
-    const txt = fileText(), name = `MileageBase backup ${today()}.json`;
+    const txt = fileText(), name = `Odo backup ${today()}.json`;
     if (!NATIVE) { download(name, new Blob([txt], { type: 'application/json' })); return; }
     try { await shareFile(name, txt, false); } catch (e) { if (!/cancel/i.test(String(e && e.message || e))) toast('Could not share: ' + (e.message || e)); }
   };
@@ -1304,12 +1645,12 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     try {
       const d = strip(JSON.parse(await f.text()));
       const ms = Object.keys(d).filter(k => /^m-\d{4}-\d{2}$/.test(k));
-      if (!d.settings && !ms.length) throw new Error('not a MileageBase backup');
+      if (!d.settings && !ms.length) throw new Error('not an Odo backup');
       const trips = ms.reduce((n, k) => n + ((d[k].trips || []).length), 0);
       pending = d;
       msg.textContent = `${f.name}: ${trips} trips over ${ms.length} month${ms.length === 1 ? '' : 's'}. Restoring replaces everything in the app now.`;
       $('restoreGo').hidden = false;
-    } catch (err) { msg.textContent = 'That file could not be read as a MileageBase backup.'; }
+    } catch (err) { msg.textContent = 'That file could not be read as an Odo or MileageBase backup.'; }
   };
   $('restoreGo').onclick = async () => {
     if (!pending) return;
@@ -1325,8 +1666,9 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const saved = await store.get('settings'); if (saved) S = { ...S, ...saved };
     await loadMonth(shiftM(viewM, -1));
     fillSettings(); renderTripCard(); await renderMonth();
-    await checkNative(); syncNative(); renderMonthEnd(); renderCar(); autoBackup();
-    if (!S.name && !S.reg) $('settingsBox').open = true;
+    await checkNative(); syncNative(); renderMonthEnd(); renderCar(); autoBackup(); renderGlance();
+    if (migrated) toast('Your MileageBase log is now in Odo');
+    if (!S.setupDone) openWizard(0);
   })();
 })();
 </script>

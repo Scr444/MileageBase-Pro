@@ -1,6 +1,8 @@
 {
   "appId": "uk.mileagebase.app",
-  "appName": "MileageBase Pro",
+  "appName": "Odo",
   "webDir": "www",
-  "android": { "allowMixedContent": false }
+  "android": {
+    "allowMixedContent": false
+  }
 }

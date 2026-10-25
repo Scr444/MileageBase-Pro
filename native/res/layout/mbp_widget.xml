@@ -7,20 +7,20 @@
     android:padding="12dp"
     android:background="@drawable/mbp_widget_bg">
     <TextView android:id="@+id/w_head" android:layout_width="wrap_content" android:layout_height="wrap_content"
-        android:text="MILEAGEBASE" android:textColor="#F4C814" android:textSize="11sp" android:textStyle="bold" android:letterSpacing="0.08" />
+        android:text="ODO" android:textColor="#FFB21E" android:textSize="11sp" android:textStyle="bold" android:letterSpacing="0.08" />
     <TextView android:id="@+id/w_title" android:layout_width="match_parent" android:layout_height="wrap_content"
         android:textColor="#E8ECEC" android:textSize="15sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end" />
     <TextView android:id="@+id/w_miles" android:layout_width="match_parent" android:layout_height="wrap_content"
-        android:textColor="#F4C814" android:textSize="22sp" android:fontFamily="monospace" android:layout_marginBottom="6dp" />
+        android:textColor="#FFB21E" android:textSize="22sp" android:fontFamily="monospace" android:layout_marginBottom="6dp" />
     <LinearLayout android:id="@+id/w_start_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
         <TextView android:id="@+id/w_bus" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1"
-            android:layout_marginEnd="6dp" android:gravity="center" android:text="Business" android:textColor="#14181A"
+            android:layout_marginEnd="6dp" android:gravity="center" android:text="Business" android:textColor="#1A1203"
             android:textStyle="bold" android:textSize="14sp" android:background="@drawable/mbp_btn_yellow" />
         <TextView android:id="@+id/w_priv" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1"
             android:gravity="center" android:text="Private" android:textColor="#E8ECEC"
             android:textStyle="bold" android:textSize="14sp" android:background="@drawable/mbp_btn_grey" />
     </LinearLayout>
     <TextView android:id="@+id/w_finish" android:layout_width="match_parent" android:layout_height="40dp"
-        android:gravity="center" android:text="Finish" android:textColor="#14181A" android:textStyle="bold" android:textSize="14sp"
+        android:gravity="center" android:text="Finish" android:textColor="#1A1203" android:textStyle="bold" android:textSize="14sp"
         android:background="@drawable/mbp_btn_yellow" android:visibility="gone" />
 </LinearLayout>

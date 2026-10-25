@@ -33,6 +33,12 @@ jobs:
           cp icon-192.png icon-512.png www/ || true
           cp manifest.webmanifest www/ || true
           cp node_modules/leaflet/dist/leaflet.js node_modules/leaflet/dist/leaflet.css www/
+          mkdir -p www/fonts
+          for f in chakra-petch:600 chakra-petch:700 archivo:400 archivo:500 archivo:600 jetbrains-mono:500 jetbrains-mono:700; do
+            n=${f%%:*}; w=${f##*:}
+            cp node_modules/@fontsource/$n/files/$n-latin-$w-normal.woff2 www/fonts/$n-$w.woff2 || echo "missing $n $w"
+          done
+          echo "::warning title=Fonts::$(ls www/fonts | tr '\n' ' ')"
           mkdir -p www/tess/lang
           cp node_modules/tesseract.js/dist/tesseract.min.js node_modules/tesseract.js/dist/worker.min.js www/tess/
           cp node_modules/tesseract.js-core/tesseract-core*.wasm.js www/tess/
@@ -54,7 +60,7 @@ jobs:
           sed -i 's#</application>#    <service android:name=".TrackingService" android:exported="false" android:foregroundServiceType="location" />\n    </application>#' $M
           # car Bluetooth, month-end reminders, restart handling and the home-screen widget
           sed -i 's#</manifest>#    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />\n    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />\n    <uses-permission android:name="android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND" />\n    <uses-permission android:name="android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND" />\n    <uses-feature android:name="android.software.companion_device_setup" android:required="false" />\n</manifest>#' $M
-          sed -i 's#</application>#    <receiver android:name=".ReminderReceiver" android:exported="true"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /><action android:name="android.bluetooth.device.action.ACL_CONNECTED" /></intent-filter></receiver>\n    <receiver android:name=".WidgetProvider" android:exported="true" android:label="MileageBase"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/mbp_widget_info" /></receiver>\n    </application>#' $M
+          sed -i 's#</application>#    <receiver android:name=".ReminderReceiver" android:exported="true"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /><action android:name="android.bluetooth.device.action.ACL_CONNECTED" /></intent-filter></receiver>\n    <receiver android:name=".WidgetProvider" android:exported="true" android:label="Odo"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/mbp_widget_info" /></receiver>\n    </application>#' $M
           cp -r native/res/* android/app/src/main/res/
           RES=android/app/src/main/res
           rm -rf $RES/mipmap-anydpi-v26
@@ -94,18 +100,18 @@ jobs:
             echo "::error title=Build errors::$msg"
             exit $code
           fi
-          cp app/build/outputs/apk/release/app-release.apk $GITHUB_WORKSPACE/MileageBase-Pro.apk
+          cp app/build/outputs/apk/release/app-release.apk $GITHUB_WORKSPACE/Odo.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: MileageBase-Pro-apk
-          path: MileageBase-Pro.apk
+          name: Odo-apk
+          path: Odo.apk
 
       - name: Publish as a release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
-          name: MileageBase Pro (build ${{ github.run_number }})
-          files: MileageBase-Pro.apk
+          name: Odo (build ${{ github.run_number }})
+          files: Odo.apk
           make_latest: true

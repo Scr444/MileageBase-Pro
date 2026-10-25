@@ -112,12 +112,12 @@ public class TrackingService extends Service {
             if (!p.getBoolean("tripOpen", false) && now - since > 3_600_000L && now - p.getLong("nagSort", 0) > 6 * 3_600_000L) {
                 p.edit().putLong("nagSort", now).apply();
                 ReminderReceiver.notify(TrackingService.this, ReminderReceiver.ID_OPEN, "Trip logging, not sorted yet",
-                        "Open MileageBase Pro and mark it Business or Private.", "open", false);
+                        "Open Odo and mark it Business or Private.", "open", false);
             }
             if (now - since > 7 * 86_400_000L && now - p.getLong("nagOpen", 0) > 86_400_000L) {
                 p.edit().putLong("nagOpen", now).apply();
                 ReminderReceiver.notify(TrackingService.this, ReminderReceiver.ID_OPEN, "Trip open for " + ((now - since) / 86_400_000L) + " days",
-                        "If you're back, open MileageBase Pro and finish it.", "finish", false);
+                        "If you're back, open Odo and finish it.", "finish", false);
             }
             handler.postDelayed(this, 3_600_000L);
         }
@@ -241,7 +241,7 @@ public class TrackingService extends Service {
         if (Build.VERSION.SDK_INT >= 26) {
             NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             NotificationChannel ch = new NotificationChannel(CHANNEL, "Trip logging", NotificationManager.IMPORTANCE_LOW);
-            ch.setDescription("Shown while MileageBase Pro is logging a trip");
+            ch.setDescription("Shown while Odo is logging a trip");
             ch.setShowBadge(false);
             if (nm != null) nm.createNotificationChannel(ch);
         }

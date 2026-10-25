@@ -28,7 +28,7 @@ public class ReminderReceiver extends BroadcastReceiver {
             schedule(c);
             WidgetProvider.refresh(c);
             if (p.getBoolean("active", false)) {
-                notify(c, ID_RESUME, "Trip still open", "The phone restarted. Open MileageBase Pro to carry on logging.", "open", false);
+                notify(c, ID_RESUME, "Trip still open", "The phone restarted. Open Odo to carry on logging.", "open", false);
             }
             return;
         }
