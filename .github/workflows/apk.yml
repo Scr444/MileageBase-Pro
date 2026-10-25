@@ -42,7 +42,7 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick
           M=android/app/src/main/AndroidManifest.xml
           sed -i 's#<application#<application android:requestLegacyExternalStorage="true"#' $M
-          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n    <uses-permission </manifest>#' $M
+          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n</manifest>#' $M
           RES=android/app/src/main/res
           rm -rf $RES/mipmap-anydpi-v26
           for d in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
