@@ -33,6 +33,11 @@ jobs:
           cp icon-192.png icon-512.png www/ || true
           cp manifest.webmanifest www/ || true
           cp node_modules/leaflet/dist/leaflet.js node_modules/leaflet/dist/leaflet.css www/
+          mkdir -p www/tess/lang
+          cp node_modules/tesseract.js/dist/tesseract.min.js node_modules/tesseract.js/dist/worker.min.js www/tess/
+          cp node_modules/tesseract.js-core/tesseract-core*.wasm.js www/tess/
+          cp node_modules/@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz www/tess/lang/ || cp $(find node_modules/@tesseract.js-data/eng -name 'eng.traineddata.gz' | head -1) www/tess/lang/
+          echo "::warning title=Receipt reading files::$(ls -la www/tess www/tess/lang | awk '{print $5, $9}' | tr '\n' ' ')"
           cp node_modules/@capacitor/core/dist/capacitor.js www/ || echo 'no capacitor.js - app uses the native bridge directly'
 
       - name: Create the Android project

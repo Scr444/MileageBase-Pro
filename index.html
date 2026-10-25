@@ -91,6 +91,7 @@ details.card[open] > summary::after { content: "–"; }
     <span class="reg" id="regBadge" hidden></span>
   </header>
   <p class="banner" id="storeNote" hidden></p>
+  <section id="monthEnd" class="card live" hidden></section>
   <section id="tripCard" class="card"><p class="hint">Loading your log…</p></section>
 
   <section class="card" aria-labelledby="monthTitle">
@@ -121,10 +122,17 @@ details.card[open] > summary::after { content: "–"; }
     </div>
     <form id="fuelForm" class="card" style="background:var(--bg)">
       <h2>Add fuel</h2>
+      <button class="secondary" type="button" id="fPhoto">Photo of receipt</button>
+      <input type="file" id="fFile" accept="image/*" capture="environment" hidden>
+      <div id="fPreview" style="display:flex;gap:12px;align-items:center" hidden>
+        <img id="fThumb" alt="Receipt" style="width:64px;height:84px;object-fit:cover;border-radius:6px;border:1px solid var(--line)">
+        <p class="hint" id="fRead" style="margin:0"></p>
+      </div>
       <div class="row">
         <div class="field"><label class="lbl" for="fDate">Date</label><input id="fDate" type="date" required></div>
         <div class="field"><label class="lbl" for="fLitres">Litres</label><input id="fLitres" inputmode="decimal" required></div>
       </div>
+      <div class="field"><label class="lbl" for="fCost">Cost £ (for you, not on the sheet)</label><input id="fCost" inputmode="decimal" autocomplete="off"></div>
       <div class="row">
         <div class="field"><label class="lbl" for="fType">For</label><select id="fType"><option value="bus">Business</option><option value="priv">Private</option></select></div>
         <div class="field"><label class="lbl" for="fPaid">Paid by</label><input id="fPaid" placeholder="Fuel card"></div>
@@ -155,9 +163,10 @@ details.card[open] > summary::after { content: "–"; }
       </div>
       <button class="primary" type="submit">Save details</button>
     </form>
+    <div id="carBox" style="display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:14px"></div>
     <div style="display:flex;flex-direction:column;gap:10px;border-top:1px solid var(--line);padding-top:14px">
       <h2>Backup</h2>
-      <p class="hint" id="backupHint">Your whole log is one file on this phone. Share it to your laptop or email to keep a copy.</p>
+      <p class="hint" id="backupHint">Your whole log is one file on this phone. A dated copy is also saved every week in Documents/MileageBase Pro/Backups. Share it to your laptop to keep a copy off the phone.</p>
       <div class="btns">
         <button class="secondary" type="button" id="backupBtn">Share backup file</button>
         <button class="secondary" type="button" id="restoreBtn">Restore from backup</button>
@@ -611,7 +620,18 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   const blankMonth = () => ({ startMiles: null, endMiles: null, trips: [], fuel: [] });
   async function loadMonth(k) { if (!months[k]) months[k] = (await store.get('m-' + k)) || blankMonth(); return months[k]; }
   const saveMonth = k => store.set('m-' + k, months[k]);
-  const saveS = () => store.set('settings', S);
+  const saveS = async () => { await store.set('settings', S); syncNative(); };
+  function tripLabel(t) {
+    if (!t) return '';
+    if (t.type === 'priv') return 'Private journey';
+    if (t.type === 'unsorted') return 'Trip logging, not sorted';
+    return `${t.startPc || ''} → ${t.sitePc || ''}`.trim();
+  }
+  function syncNative() { // tells the widget and reminders about the open trip
+    const T = TR(); if (!T) return;
+    const t = S.openTrip;
+    T.sync({ tripOpen: !!t && t.type !== 'unsorted', label: tripLabel(t) }).catch(() => {});
+  }
 
   // Rows exactly as they go on the sheet
   // Sheet rows. Private journeys get no row of their own: their miles show in the Private column of the
@@ -734,11 +754,33 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       toast('Private journey started.' + gpsMsg);
     };
   }
+  let sortMode = null;
+  function renderUnsortedCard(c, t) { // logging started by itself when the car connected
+    c.append(el('span', { className: 'lbl', textContent: 'Trip logging, not sorted' }));
+    c.append(el('div', { className: 'route', id: 'privMiles', textContent: '0.0 mi' }));
+    c.append(el('p', { className: 'hint', textContent: `Started by itself when your phone connected to the car${t.startDate ? ', ' + fmtD(t.startDate) : ''}. What is this trip?` }));
+    if (TR()) { const box = el('div', { className: 'map' }); c.append(box); initLiveMap(box, t); c.append(el('p', { className: 'hint', id: 'gpsLine', textContent: 'GPS: checking…' })); batteryBanner(c); setTimeout(refreshGps, 0); }
+    const b1 = el('button', { className: 'primary', type: 'button', textContent: 'Business' });
+    const b2 = el('button', { className: 'secondary', type: 'button', textContent: 'Private' });
+    b1.onclick = () => { sortMode = 'bus'; renderTripCard(); };
+    b2.onclick = async () => { S.openTrip = { id: t.id, type: 'priv', startDate: t.startDate, startMiles: t.startMiles ?? suggestedStart() ?? 0 }; await saveS(); renderTripCard(); toast('Marked private'); };
+    c.append(el('div', { className: 'btns' }, [b1, b2]));
+    const cancel = el('button', { className: 'secondary danger', type: 'button', textContent: 'Not a trip, discard' });
+    let armed = false;
+    cancel.onclick = async () => {
+      if (!armed) { armed = true; cancel.textContent = 'Tap again to discard'; setTimeout(() => { armed = false; cancel.textContent = 'Not a trip, discard'; }, 4000); return; }
+      if (TR()) { try { await TR().stop(); } catch (e) {} }
+      S.openTrip = null; await saveS(); renderTripCard(); toast('Discarded');
+    };
+    c.append(cancel);
+  }
   function renderTripCard() {
     const c = $('tripCard'); c.innerHTML = ''; c.classList.toggle('live', !!S.openTrip);
     if (S.openTrip) {
       const t = S.openTrip;
       if (t.type === 'priv') { renderPrivCard(c, t); return; }
+      if (t.type === 'unsorted') { if (sortMode !== 'bus') { renderUnsortedCard(c, t); return; } }
+      else {
       c.append(el('span', { className: 'lbl', textContent: 'On a business trip' }));
       c.append(el('div', { className: 'route' }, [t.startPc, el('i', { textContent: '→' }), t.sitePc]));
       const meta = el('div', { className: 'meta' });
@@ -757,6 +799,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
           catch (e) { fix.textContent = 'Set site postcode to where I am'; toast('GPS: ' + (e.message || e)); }
         };
         if (fix) c.append(fix);
+        if (t.sitePc) { const nav = el('button', { className: 'secondary', type: 'button', textContent: 'Navigate to ' + t.sitePc });
+          nav.onclick = () => TR().openNav({ q: t.sitePc }).catch(e => toast(e.message || 'No satnav app found')); c.append(nav); }
         batteryBanner(c);
         setTimeout(refreshGps, 0);
       }
@@ -795,8 +839,10 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       };
       c.append(cancel);
       return;
+      }
     }
-    c.append(el('h2', { textContent: 'Start a trip' }));
+    const sorting = S.openTrip && S.openTrip.type === 'unsorted' ? S.openTrip : null;
+    c.append(el('h2', { textContent: sorting ? 'Business trip details' : 'Start a trip' }));
     const form = el('form', { style: 'display:flex;flex-direction:column;gap:14px' });
     const kind = el('div', { className: 'chips', role: 'group' });
     kind.setAttribute('aria-label', 'Trip type');
@@ -804,26 +850,44 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       const b = el('button', { type: 'button', className: 'chip', textContent: label });
       b.setAttribute('aria-pressed', String(v === newType)); b.onclick = () => { newType = v; renderTripCard(); };
       return b; });
-    kind.append(...kb); form.append(kind);
+    kind.append(...kb); if (!sorting) form.append(kind);
     const priv = newType === 'priv';
-    if (priv) { privStart(form); c.append(form); return; }
+    if (priv && !sorting) { privStart(form); c.append(form); return; }
     const startAt = S.office;
     if (!priv) {
     const from = field('Start postcode', 'nFrom', { className: 'pc', value: pc(startAt), required: true, autocapitalize: 'characters', autocomplete: 'off' });
-    const chipsFrom = placeChips('nFrom', startAt); if (TR()) chipsFrom.append(gpsChip('nFrom', true));
+    const chipsFrom = placeChips('nFrom', startAt); if (TR() && !sorting) chipsFrom.append(gpsChip('nFrom', true));
     from.append(chipsFrom);
+    from.querySelector('input').addEventListener('input', e => { e.target.dataset.touched = '1'; });
     form.append(from);
-    form.append(field('Site postcode', 'nSite', { className: 'pc', required: true, autocapitalize: 'characters', autocomplete: 'off', placeholder: 'BS11 8AX' }));
+    const site = field('Site postcode', 'nSite', { className: 'pc', required: true, autocapitalize: 'characters', autocomplete: 'off', placeholder: 'BS11 8AX' });
+    if ((S.sites || []).length) {
+      site.append(el('span', { className: 'lbl', textContent: 'Saved sites' }));
+      const sc = el('div', { className: 'chips' });
+      S.sites.slice(0, 8).forEach(s => {
+        const b = el('button', { type: 'button', className: 'chip', textContent: s.pc + (s.desc ? ' · ' + s.desc : s.job ? ' · Job ' + s.job : '') });
+        b.onclick = () => { $('nSite').value = s.pc; if ($('nJob')) $('nJob').value = s.job || ''; if ($('nDesc')) $('nDesc').value = s.desc || '';
+          sc.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', String(x === b))); };
+        b.setAttribute('aria-pressed', 'false'); sc.append(b);
+      });
+      site.append(sc);
+    }
+    form.append(site);
     }
     const r1 = el('div', { className: 'row' });
     if (!priv) r1.append(field('Job number', 'nJob', { inputMode: 'numeric', autocomplete: 'off' }));
-    r1.append(field('Start date', 'nDate', { type: 'date', value: today(), required: true }));
+    r1.append(field('Start date', 'nDate', { type: 'date', value: sorting ? sorting.startDate : today(), required: true }));
     form.append(r1);
     if (!priv) form.append(field('Site name (optional)', 'nDesc', { placeholder: 'e.g. Avonmouth DC', autocomplete: 'off' }));
     else form.append(el('p', { className: 'hint', textContent: 'No places are recorded for a private trip. The sheet just shows "Private" with the dates and miles, all in the Private column.' }));
     const odo = field('Odometer now', 'nMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' });
-    const sug = suggestedStart();
+    const sug = sorting && sorting.startMiles != null ? sorting.startMiles : suggestedStart();
     odo.querySelector('input').value = sug ?? '';
+    if (sorting) setTimeout(async () => { // where the automatic trip began, as a postcode
+      try { const pts = parsePts((await TR().route()).points); if (!pts.length || !$('nFrom')) return;
+        const j = await (await fetch(`https://api.postcodes.io/postcodes?lon=${pts[0][1]}&lat=${pts[0][0]}&limit=1&radius=2000&widesearch=true`)).json();
+        const code = j && j.result && j.result[0] && j.result[0].postcode; if (code && $('nFrom') && !$('nFrom').dataset.touched) $('nFrom').value = code; } catch (e) {}
+    }, 0);
     odo.append(el('p', { className: 'hint', textContent: sug != null
       ? `Filled in from your last trip. If you've driven since, change it and the difference goes on the sheet as private miles.`
       : 'Read it off the dash. After this, each trip carries on from the last one.' }));
@@ -835,19 +899,23 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       const miles = num($('nMiles').value);
       if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
       if (S.lastFinish != null && miles < S.lastFinish) { err.textContent = `That's lower than your last finish reading (${S.lastFinish}). Check the odometer.`; err.hidden = false; return; }
-      const P = newType === 'priv', val = id => $(id) ? $(id).value.trim() : '';
-      const t = { id: uid(), type: newType, startPc: P ? '' : pc(val('nFrom')), sitePc: P ? '' : pc(val('nSite')), job: P ? '' : val('nJob'),
+      const P = !sorting && newType === 'priv', val = id => $(id) ? $(id).value.trim() : '';
+      const t = { id: sorting ? sorting.id : uid(), type: P ? 'priv' : undefined, startPc: P ? '' : pc(val('nFrom')), sitePc: P ? '' : pc(val('nSite')), job: P ? '' : val('nJob'),
                   startDate: $('nDate').value, desc: P ? '' : val('nDesc'), startMiles: miles };
       const k = mKey(t.startDate); await loadMonth(k);
       if (months[k].startMiles == null) { months[k].startMiles = S.lastFinish ?? miles; await saveMonth(k); }
       let gpsMsg = '';
-      if (TR()) {
+      if (TR() && !sorting) {
         try {
           const pm = await TR().permissions();
           if (!pm.location) gpsMsg = ' GPS is off: allow location to log miles.';
           else { await TR().start({ reset: true }); await checkBattery(); }
         } catch (e) { gpsMsg = ' GPS logging did not start: ' + (e.message || e); }
       }
+      if (t.sitePc) { // remember the site for next time
+        S.sites = [{ pc: t.sitePc, job: t.job, desc: t.desc }, ...(S.sites || []).filter(s => s.pc !== t.sitePc)].slice(0, 12);
+      }
+      sortMode = null;
       S.openTrip = t; newType = 'bus'; await saveS(); renderTripCard(); if (k === viewM) renderMonth();
       toast('Trip started.' + (gpsMsg || ' Finish it when you get back.'));
     };
@@ -888,7 +956,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       const it = el('div', { className: 'item' });
       const head = el('div', { className: 'item-head' });
       head.append(el('span', { className: 'r', textContent: fmtD(f.date) }),
-        el('span', { className: 'd', textContent: (f.litresPriv ? 'Private' : 'Business') + (f.paidBy ? ' · ' + f.paidBy : '') }),
+        el('span', { className: 'd', textContent: (f.litresPriv ? 'Private' : 'Business') + (f.paidBy ? ' · ' + f.paidBy : '') + (f.cost != null ? ' · £' + Number(f.cost).toFixed(2) : '') }),
         el('span', { className: 'm', textContent: (f.litresBus || f.litresPriv) + ' L' }));
       const del = el('button', { type: 'button', className: 'secondary danger', textContent: 'Remove' });
       let armed = false;
@@ -896,7 +964,18 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         if (!armed) { armed = true; del.textContent = 'Tap again to remove'; return; }
         M.fuel = M.fuel.filter(x => x.id !== f.id); await saveMonth(viewM); renderMonth();
       };
-      it.append(head, el('div', { className: 'btns' }, [del]));
+      const row = [del];
+      if (f.receipt) {
+        const see = el('button', { type: 'button', className: 'secondary', textContent: 'Receipt' });
+        see.onclick = async () => {
+          if (it.querySelector('img')) { it.querySelector('img').remove(); return; }
+          let src = f.receipt;
+          if (!src.startsWith('data:')) { try { const r = await FS().readFile({ path: DIR + '/' + f.receipt, directory: 'DOCUMENTS' }); src = 'data:image/jpeg;base64,' + r.data; } catch (er) { toast('Receipt photo not found'); return; } }
+          it.append(el('img', { src, alt: 'Receipt', style: 'width:100%;border-radius:8px;border:1px solid var(--line)' }));
+        };
+        row.unshift(see);
+      }
+      it.append(head, el('div', { className: 'btns' }, row));
       fl.append(it);
     });
     $('tFuel').textContent = Math.round(litres * 10) / 10;
@@ -996,13 +1075,64 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   $('nextM').onclick = async () => { viewM = shiftM(viewM, 1); editing = null; await renderMonth(); };
   $('startMiles').onchange = async () => { months[viewM].startMiles = num($('startMiles').value); await saveMonth(viewM); renderMonth(); toast('Start miles saved'); };
   $('endMiles').onchange = async () => { months[viewM].endMiles = num($('endMiles').value); await saveMonth(viewM); renderMonth(); toast('Month-end reading saved'); };
+  // ---------- fuel receipts: photo kept with the entry, litres and cost read off it on the phone ----------
+  let receiptB64 = null, ocrWorker = null;
+  function clearReceipt() { receiptB64 = null; $('fPreview').hidden = true; $('fThumb').removeAttribute('src'); $('fRead').textContent = ''; }
+  $('fPhoto').onclick = () => $('fFile').click();
+  $('fFile').onchange = async e => {
+    const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+    try {
+      const img = await new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = URL.createObjectURL(file); });
+      const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const cv = document.createElement('canvas'); cv.width = Math.round(img.width * scale); cv.height = Math.round(img.height * scale);
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      const url = cv.toDataURL('image/jpeg', 0.75); receiptB64 = url.split(',')[1];
+      $('fThumb').src = url; $('fPreview').hidden = false; $('fRead').textContent = 'Reading the receipt…';
+      const got = await readReceipt(cv);
+      const bits = [];
+      if (got.litres != null) { if (!$('fLitres').value) $('fLitres').value = got.litres; bits.push(got.litres + ' L'); }
+      if (got.cost != null) { if (!$('fCost').value) $('fCost').value = got.cost.toFixed(2); bits.push('£' + got.cost.toFixed(2)); }
+      if (got.date && !$('fDate').dataset.touched) { $('fDate').value = got.date; bits.push(fmtD(got.date)); }
+      $('fRead').textContent = bits.length ? 'Read: ' + bits.join(', ') + '. Check them against the receipt.' : 'Photo saved. Could not read the numbers, type them in.';
+    } catch (er) { $('fRead').textContent = 'Photo saved. Could not read it, type the numbers in.'; }
+  };
+  $('fDate').addEventListener('input', e => { e.target.dataset.touched = '1'; });
+  function loadScript(src) { return new Promise((ok, bad) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => bad(new Error('not available')); document.head.append(s); }); }
+  async function readReceipt(canvas) {
+    if (!window.Tesseract) await loadScript('tess/tesseract.min.js');
+    if (!ocrWorker) {
+      const base = new URL('tess/', location.href).href;
+      ocrWorker = await Tesseract.createWorker('eng', 1, { workerPath: base + 'worker.min.js', corePath: base, langPath: base + 'lang', gzip: true });
+    }
+    const { data } = await ocrWorker.recognize(canvas);
+    return parseReceipt(data.text || '');
+  }
+  function parseReceipt(text) {
+    const t = text.replace(/[Oo](?=\d)|(?<=\d)[Oo]/g, '0').replace(/,(?=\d{2}\b)/g, '.');
+    const out = { litres: null, cost: null, date: null };
+    const lit = t.match(/(\d{1,3}\.\d{1,3})\s*(?:L|LTR|LTRS|LITRE|LITRES)\b/i) || t.match(/(?:LITRES?|LTRS?|VOLUME|QTY)\D{0,12}(\d{1,3}\.\d{1,3})/i);
+    if (lit) { const v = parseFloat(lit[1]); if (v > 1 && v < 200) out.litres = v; }
+    const tot = t.match(/(?:TOTAL|AMOUNT|SALE|PAID|CARD)[^\d£]{0,15}£?\s*(\d{1,4}\.\d{2})/i);
+    if (tot) out.cost = parseFloat(tot[1]);
+    else { const pounds = [...t.matchAll(/£\s*(\d{1,4}\.\d{2})/g)].map(m => parseFloat(m[1])).filter(v => v < 500); if (pounds.length) out.cost = Math.max(...pounds); }
+    const dm = t.match(/\b(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})\b/);
+    if (dm) { let [, d, m, y] = dm; y = y.length === 2 ? '20' + y : y; const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dt = new Date(iso + 'T12:00'); if (!isNaN(dt) && +m <= 12 && +d <= 31 && Math.abs(Date.now() - dt) < 120 * 86400000) out.date = iso; }
+    return out;
+  }
+  window.__parseReceipt = parseReceipt;
   $('fuelForm').onsubmit = async e => {
     e.preventDefault();
     const L = num($('fLitres').value); if (L == null || L <= 0) { toast('Enter the litres'); return; }
     const d = $('fDate').value || today(); const k = mKey(d); await loadMonth(k);
     const isPriv = $('fType').value === 'priv';
-    months[k].fuel.push({ id: uid(), date: d, litresBus: isPriv ? 0 : L, litresPriv: isPriv ? L : 0, paidBy: $('fPaid').value.trim() });
-    await saveMonth(k); $('fLitres').value = ''; viewM = k; renderMonth(); toast(`${L} L added`);
+    const id = uid(); let receipt = null;
+    if (receiptB64) {
+      if (NATIVE) { try { await fsWrite(`Receipts/${d}-${id}.jpg`, receiptB64, true); receipt = `Receipts/${d}-${id}.jpg`; } catch (er) { toast('Receipt photo not saved: ' + (er.message || er)); } }
+      else receipt = 'data:image/jpeg;base64,' + receiptB64;
+    }
+    months[k].fuel.push({ id, date: d, litresBus: isPriv ? 0 : L, litresPriv: isPriv ? L : 0, paidBy: $('fPaid').value.trim(), cost: num($('fCost').value), receipt });
+    await saveMonth(k); $('fLitres').value = ''; $('fCost').value = ''; clearReceipt(); viewM = k; renderMonth(); toast(`${L} L added`);
   };
   $('settingsForm').onsubmit = async e => {
     e.preventDefault();
@@ -1014,23 +1144,115 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     $('regBadge').hidden = !S.reg; $('regBadge').textContent = S.reg;
   }
   let lastSheet = null;
+  async function exportMonth(k, share) {
+    await loadMonth(k);
+    const { rows, startMiles } = sheetRows(k);
+    const bytes = buildMileageXlsx({ name: S.name, reg: S.reg, monthLabel: mLabel(k), startMiles, office: S.office,
+      rows, fuel: months[k].fuel.slice().sort((a, b) => a.date.localeCompare(b.date)) });
+    const name = safeName(`Mileage ${mLabel(k)}${S.name ? ' - ' + S.name : ''}.xlsx`);
+    if (!NATIVE) { download(name, new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); return { name, note: 'Downloaded ' + name + '.' }; }
+    const data = b64(bytes);
+    await fsWrite('Sheets/' + name, data, true);
+    lastSheet = { name, data };
+    if (share) { try { await shareFile(name, data, true); } catch (e) { if (!/cancel/i.test(String(e && e.message || e))) toast('Could not share: ' + (e.message || e)); } }
+    return { name, note: `Saved ${name} in Documents/${DIR}/Sheets.` };
+  }
   $('exportBtn').onclick = async () => {
     const note = $('exportNote');
-    const { rows, startMiles } = sheetRows(viewM);
-    const bytes = buildMileageXlsx({ name: S.name, reg: S.reg, monthLabel: mLabel(viewM), startMiles, office: S.office,
-      rows, fuel: months[viewM].fuel.slice().sort((a, b) => a.date.localeCompare(b.date)) });
-    const name = safeName(`Mileage ${mLabel(viewM)}${S.name ? ' - ' + S.name : ''}.xlsx`);
     const open = S.openTrip && mKey(S.openTrip.startDate) === viewM ? ' Your current trip is not on it yet, finish it first.' : '';
-    if (!NATIVE) { download(name, new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); note.textContent = 'Downloaded ' + name + '.' + open; return; }
-    try {
-      const data = b64(bytes);
-      await fsWrite('Sheets/' + name, data, true);
-      lastSheet = { name, data };
-      note.textContent = `Saved ${name} in Documents/${DIR}/Sheets.` + open;
-      $('shareBtn').hidden = false;
-      toast('Sheet saved');
-    } catch (e) { note.textContent = 'Could not save the sheet: ' + (e.message || e); }
+    try { const r = await exportMonth(viewM, false); note.textContent = r.note + open; if (NATIVE) { $('shareBtn').hidden = false; toast('Sheet saved'); } }
+    catch (e) { note.textContent = 'Could not save the sheet: ' + (e.message || e); }
   };
+  // month end: from the 1st, a card asks for last month's closing odometer and sends the sheet
+  async function renderMonthEnd() {
+    const box = $('monthEnd'); box.innerHTML = ''; box.hidden = true;
+    const k = shiftM(mKey(today()), -1); const M = await loadMonth(k);
+    if (M.sent || (!M.trips.length && !M.fuel.length)) return;
+    box.hidden = false;
+    box.append(el('h2', { textContent: mLabel(k) + ' sheet' }));
+    box.append(el('p', { className: 'hint', textContent: 'Enter the odometer reading at the end of the month, then build the sheet and send it.' }));
+    const f = field('Odometer at month end', 'meMiles', { className: 'odo', inputMode: 'numeric', autocomplete: 'off', value: M.endMiles ?? '' });
+    box.append(f);
+    const go = el('button', { className: 'primary', type: 'button', textContent: 'Build and share' });
+    const skip = el('button', { className: 'secondary', type: 'button', textContent: 'Already sent' });
+    go.onclick = async () => {
+      const v = num($('meMiles').value);
+      if (v != null) { M.endMiles = v; }
+      try { await exportMonth(k, true); M.sent = true; await saveMonth(k); toast(mLabel(k) + ' sheet saved'); renderMonthEnd(); if (k === viewM) renderMonth(); }
+      catch (e) { toast('Could not build the sheet: ' + (e.message || e)); }
+    };
+    skip.onclick = async () => { M.sent = true; await saveMonth(k); renderMonthEnd(); };
+    box.append(el('div', { className: 'btns' }, [go, skip]));
+  }
+  // a dated copy of the log every week, keeping the last 8
+  async function autoBackup() {
+    if (!NATIVE) return;
+    const last = S.lastBackup ? new Date(S.lastBackup + 'T12:00') : null;
+    if (last && (Date.now() - last) / 86400000 < 7) return;
+    try {
+      await fsWrite(`Backups/mileage-log-${today()}.json`, fileText());
+      const r = await FS().readdir({ path: DIR + '/Backups', directory: 'DOCUMENTS' });
+      const names = (r.files || []).map(x => typeof x === 'string' ? x : x.name).filter(n => /^mileage-log-\d{4}-\d{2}-\d{2}\.json$/.test(n)).sort();
+      for (const n of names.slice(0, Math.max(0, names.length - 8))) { try { await FS().deleteFile({ path: DIR + '/Backups/' + n, directory: 'DOCUMENTS' }); } catch (e) {} }
+      S.lastBackup = today(); await saveS();
+    } catch (e) {}
+  }
+  // logging the app doesn't know about yet (the car connected), and taps on the widget or reminders
+  let checking = false;
+  async function checkNative() {
+    const T = TR(); if (!T || checking) return; checking = true;
+    try {
+      const st = await T.status();
+      const act = await T.takeAction();
+      if (st.active && !S.openTrip) {
+        const d = act.since ? new Date(act.since) : new Date();
+        S.openTrip = { id: uid(), type: 'unsorted', startDate: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, startMiles: suggestedStart() };
+        await saveS(); renderTripCard();
+      } else if (S.openTrip && !st.active) { // logging stopped (phone restarted): carry on
+        try { await T.start({ reset: false }); } catch (e) {}
+      }
+      const a = act.action, t = S.openTrip;
+      if (a === 'autostart' && !t) {
+        try { await T.start({ reset: true }); } catch (e) {}
+        S.openTrip = { id: uid(), type: 'unsorted', startDate: today(), startMiles: suggestedStart() }; await saveS(); renderTripCard();
+      } else if (a === 'business') {
+        if (t && t.type === 'unsorted') sortMode = 'bus'; else if (!t) newType = 'bus';
+        renderTripCard(); setTimeout(() => $('nSite') && $('nSite').focus(), 100);
+      } else if (a === 'private') {
+        if (t && t.type === 'unsorted') { S.openTrip = { id: t.id, type: 'priv', startDate: t.startDate, startMiles: t.startMiles ?? suggestedStart() ?? 0 }; await saveS(); renderTripCard(); }
+        else if (!t) { newType = 'priv'; renderTripCard(); const f = $('tripCard').querySelector('form'); if (f && suggestedStart() != null) f.requestSubmit(); }
+      } else if (a === 'finish') {
+        renderTripCard(); const b = $('tripCard').querySelector('form button[type=submit]'); if (b) b.scrollIntoView({ block: 'center' });
+      } else if (a === 'monthend') {
+        await renderMonthEnd(); $('monthEnd').scrollIntoView({ block: 'start' });
+      }
+      await checkBattery();
+    } catch (e) {}
+    checking = false;
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { checkNative(); renderMonthEnd(); } });
+  // car link in Your details
+  async function renderCar() {
+    const box = $('carBox'); if (!box) return;
+    box.innerHTML = '';
+    box.append(el('h2', { textContent: 'Car' }));
+    if (!TR()) { box.append(el('p', { className: 'hint', textContent: 'Car linking works in the installed app.' })); return; }
+    let info = { cars: '', background: false };
+    try { info = await TR().cars(); } catch (e) {}
+    const n = info.cars ? info.cars.split(',').filter(Boolean).length : 0;
+    box.append(el('p', { className: 'hint', textContent: n
+      ? `Linked to ${n} car Bluetooth device${n > 1 ? 's' : ''}. Logging starts by itself when your phone connects.`
+      : 'Link your car\'s Bluetooth and logging starts by itself every time your phone connects to it, Android Auto included.' }));
+    const link = el('button', { className: 'secondary', type: 'button', textContent: n ? 'Link another' : 'Link my car' });
+    link.onclick = async () => { try { await TR().permissions(); await TR().linkCar(); } catch (e) { toast(e.message || 'Could not link'); } renderCar(); };
+    const btns = el('div', { className: 'btns' }, [link]);
+    if (n) { const forget = el('button', { className: 'secondary danger', type: 'button', textContent: 'Unlink' }); forget.onclick = async () => { await TR().forgetCars(); renderCar(); }; btns.append(forget); }
+    box.append(btns);
+    if (n && !info.background) {
+      box.append(el('p', { className: 'err', textContent: 'One more step: set Location to "Allow all the time", or Android may block automatic starts.' }));
+      const s = el('button', { className: 'secondary', type: 'button', textContent: 'Open app settings' }); s.onclick = () => TR().openAppSettings(); box.append(s);
+    }
+  }
   $('shareBtn').onclick = async () => {
     if (!lastSheet) return;
     try { await shareFile(lastSheet.name, lastSheet.data, true); } catch (e) { if (!/cancel/i.test(String(e && e.message || e))) toast('Could not share: ' + (e.message || e)); }
@@ -1068,10 +1290,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     await initStore();
     const saved = await store.get('settings'); if (saved) S = { ...S, ...saved };
     await loadMonth(shiftM(viewM, -1));
-    if (S.openTrip && TR()) { // keep logging after the phone or app restarts
-      try { const st = await TR().status(); if (!st.active) await TR().start({ reset: false }); await checkBattery(); } catch (e) {}
-    }
     fillSettings(); renderTripCard(); await renderMonth();
+    await checkNative(); syncNative(); renderMonthEnd(); renderCar(); autoBackup();
     if (!S.name && !S.reg) $('settingsBox').open = true;
   })();
 })();
