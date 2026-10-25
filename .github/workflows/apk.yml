@@ -43,6 +43,9 @@ jobs:
           M=android/app/src/main/AndroidManifest.xml
           sed -i 's#<application#<application android:requestLegacyExternalStorage="true"#' $M
           sed -i 's#</manifest>#    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n</manifest>#' $M
+          # GPS trip logging: location, a foreground service while a trip is open, and its notification
+          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />\n    <uses-feature android:name="android.hardware.location.gps" android:required="false" />\n</manifest>#' $M
+          sed -i 's#</application>#    <service android:name=".TrackingService" android:exported="false" android:foregroundServiceType="location" />\n    </application>#' $M
           RES=android/app/src/main/res
           rm -rf $RES/mipmap-anydpi-v26
           for d in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
@@ -54,6 +57,12 @@ jobs:
           done
           cat $M
 
+      - name: Add the trip logging code
+        run: |
+          D=$(dirname "$(find android/app/src/main/java -name MainActivity.java | head -1)")
+          cp native/*.java "$D"/
+          ls "$D"
+
       - name: Sync
         run: npx cap sync android
 
@@ -61,11 +70,20 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
+          set +e
           ./gradlew assembleRelease --no-daemon \
             -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/release.jks \
             -Pandroid.injected.signing.store.password=levelsurvey2026 \
             -Pandroid.injected.signing.key.alias=levelsurvey \
-            -Pandroid.injected.signing.key.password=levelsurvey2026
+            -Pandroid.injected.signing.key.password=levelsurvey2026 2>&1 | tee build.log
+          code=${PIPESTATUS[0]}
+          set -e
+          if [ "$code" != "0" ]; then
+            # put the compile errors where they can be read without the full log
+            msg=$(grep -E "error:|: error|What went wrong|^e: |FAILED|Exception" -A3 build.log | head -60 | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=Build errors::$msg"
+            exit $code
+          fi
           cp app/build/outputs/apk/release/app-release.apk $GITHUB_WORKSPACE/MileageBase-Pro.apk
 
       - uses: actions/upload-artifact@v4
