@@ -60,6 +60,8 @@ public class TrackerPlugin extends Plugin {
         SharedPreferences.Editor e = TrackingService.prefs(getContext()).edit()
                 .putBoolean("tripOpen", open).putString("label", call.getString("label", ""))
                 .putInt("expectedMi", call.getInt("expectedMi", 0)).putString("weekText", call.getString("weekText", ""));
+        String homes = call.getString("homes", null);
+        if (homes != null) e.putString("homes", homes); // home and office, "lat,lon;lat,lon": parking there ends a trip
         if (open) e.putBoolean("auto", false);
         e.apply();
         WidgetProvider.refresh(getContext());
@@ -181,7 +183,7 @@ public class TrackerPlugin extends Plugin {
         Context c = getContext();
         boolean reset = Boolean.TRUE.equals(call.getBoolean("reset", true));
         SharedPreferences.Editor e = TrackingService.prefs(c).edit().putBoolean("active", true).putString("mode", "starting");
-        if (reset) { e.putLong("meters", Double.doubleToLongBits(0)).putLong("since", System.currentTimeMillis()).putBoolean("auto", false); TrackingService.routeFile(c).delete(); }
+        if (reset) { e.putLong("meters", Double.doubleToLongBits(0)).putLong("since", System.currentTimeMillis()).putBoolean("auto", false).putLong("maxAway", 0L); TrackingService.routeFile(c).delete(); TrackingService.stopsFile(c).delete(); }
         e.apply();
         try {
             ContextCompat.startForegroundService(c, new Intent(c, TrackingService.class));
@@ -219,6 +221,54 @@ public class TrackerPlugin extends Plugin {
         } catch (Exception e) { /* empty route */ }
         r.put("points", pts);
         call.resolve(r);
+    }
+
+    static String readText(java.io.File f) {
+        if (!f.exists()) return "";
+        try (java.io.FileInputStream in = new java.io.FileInputStream(f)) {
+            byte[] b = new byte[(int) f.length()]; int off = 0, n;
+            while (off < b.length && (n = in.read(b, off, b.length - off)) > 0) off += n;
+            return new String(b, 0, off, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception e) { return ""; }
+    }
+
+    /** Stops on the trip so far: "lat,lon,start,end,metres" lines. */
+    @PluginMethod
+    public void stops(PluginCall call) {
+        JSObject r = new JSObject();
+        r.put("stops", readText(TrackingService.stopsFile(getContext())));
+        call.resolve(r);
+    }
+
+    /** Trips that ended by themselves (parked at home), with their route and stops; handed over once. */
+    @PluginMethod
+    public void takeEnded(PluginCall call) {
+        java.io.File dir = getContext().getFilesDir(), list = new java.io.File(dir, "ended.txt");
+        com.getcapacitor.JSArray out = new com.getcapacitor.JSArray();
+        for (String line : readText(list).split("\n")) {
+            String[] x = line.trim().split(",");
+            if (x.length < 7) continue;
+            JSObject t = new JSObject();
+            t.put("tag", x[0]); t.put("meters", Double.parseDouble(x[1])); t.put("since", Long.parseLong(x[2])); t.put("end", Long.parseLong(x[3]));
+            t.put("lat", Double.parseDouble(x[4])); t.put("lon", Double.parseDouble(x[5])); t.put("from", x[6]);
+            java.io.File rf = new java.io.File(dir, "route-" + x[0] + ".txt"), sf = new java.io.File(dir, "stops-" + x[0] + ".txt");
+            t.put("points", readText(rf)); t.put("stops", readText(sf));
+            out.put(t);
+        }
+        JSObject r = new JSObject(); r.put("trips", out);
+        call.resolve(r);
+    }
+
+    /** The app has saved those trips: remove them. */
+    @PluginMethod
+    public void clearEnded(PluginCall call) {
+        java.io.File dir = getContext().getFilesDir();
+        for (String line : readText(new java.io.File(dir, "ended.txt")).split("\n")) {
+            String tag = line.split(",")[0].trim(); if (tag.isEmpty()) continue;
+            new java.io.File(dir, "route-" + tag + ".txt").delete(); new java.io.File(dir, "stops-" + tag + ".txt").delete();
+        }
+        new java.io.File(dir, "ended.txt").delete();
+        call.resolve();
     }
 
     /** A backup file the user opened with DrivR, if any (handed over once). */

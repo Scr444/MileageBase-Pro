@@ -289,6 +289,7 @@ body.has-dock .toast { bottom: calc(var(--tab-h) + 92px + env(safe-area-inset-bo
       <div class="stat"><span class="lbl">Fuel cost</span><b id="tCost">–</b></div>
       <div class="stat"><span class="lbl">Trips</span><b id="tCount">0</b></div>
     </div>
+    <div class="banner warn" id="needsNote" hidden></div>
     <div class="banner warn" id="unsortedNote" hidden></div>
     <div class="split" id="tSplit" title="Business and private share"></div>
     <div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="lbl">Miles by week</span>
@@ -930,7 +931,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       const b = Math.round(days.reduce((s, d) => s + d.bus, 0)), p = Math.round(days.reduce((s, d) => s + d.priv, 0));
       if (b || p) weekText = `${b} business and ${p} private miles this week.` + (t && t.type === 'unsorted' ? ' One trip still needs sorting.' : '');
     } catch (e) {}
-    T.sync({ tripOpen: !!t && t.type !== 'unsorted', label: tripLabel(t), expectedMi: expRound(t) || 0, weekText }).catch(() => {});
+    const homes = (S.homesLL || []).map(x => x[0] + ',' + x[1]).join(';');
+    T.sync({ tripOpen: !!t && t.type !== 'unsorted', label: tripLabel(t), expectedMi: expRound(t) || 0, weekText, homes }).catch(() => {});
   }
 
   // Rows exactly as they go on the sheet
@@ -942,7 +944,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const M = months[k] || blankMonth();
     const trips = [...M.trips].sort((a, b) => ((a.startMiles ?? 0) - (b.startMiles ?? 0)) || String(a.startDate).localeCompare(String(b.startDate)));
     let lastAny = monthStart(k);
-    const rows = [], list = [], unsorted = [];
+    const rows = [], list = [], unsorted = [], needs = [];
     let privAcc = 0, privTo = null, privDate = null; // private miles since the last business row, the reading they end at, and when
     const privRow = () => { if (privAcc > 0) rows.push({ desc: 'Private', priv: privAcc, bus: 0, driver: S.driver, finishMiles: privTo, finishDate: privDate }); privAcc = 0; };
     trips.forEach(t => {
@@ -951,13 +953,16 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       const gapPriv = gap && t.privGap ? gap : 0, gapOpen = gap && !t.privGap ? gap : 0;
       if (gapPriv) { privAcc += gapPriv; privTo = t.startMiles; privDate = t.startDate; }
       if (gapOpen) unsorted.push({ id: t.id, miles: gapOpen, from: lastAny, to: t.startMiles, date: t.startDate });
-      if (t.type === 'priv') {
+      const nd = needsOf(t); if (nd.length) needs.push({ id: t.id, what: nd, date: t.startDate });
+      if (t.type === 'unsorted') { // not sorted yet: on no row until you say business or private
+        list.push({ id: t.id, type: 'unsorted', miles: run, bus: 0, priv: 0, startPc: t.startPc, startDate: t.startDate, finishDate: t.finishDate, route: t.route, gapOpen, gapPriv, needs: nd, est: t.est });
+      } else if (t.type === 'priv') {
         privAcc += run; if (t.finishMiles != null) { privTo = t.finishMiles; privDate = t.finishDate || t.startDate; }
-        list.push({ id: t.id, type: 'priv', priv: run, bus: 0, startDate: t.startDate, finishDate: t.finishDate, route: t.route, gapOpen, gapPriv, lagAdded: t.lagAdded });
+        list.push({ id: t.id, type: 'priv', priv: run, bus: 0, startDate: t.startDate, finishDate: t.finishDate, route: t.route, gapOpen, gapPriv, lagAdded: t.lagAdded, est: t.est });
       } else {
         const sl = siteList(t);
         const row = { id: t.id, desc: t.desc, startPc: t.startPc, sitePc: t.sitePc, job: t.job, driver: S.driver, sites: sl, segs: sl.length > 1 ? legMiles(t) : null, expR: expRound(t),
-                      startDate: t.startDate, finishMiles: t.finishMiles, finishDate: t.finishDate, priv: 0, bus: run, privBefore: privAcc, gapOpen, gapPriv, lagAdded: t.lagAdded, route: t.route, expected: t.expected };
+                      startDate: t.startDate, finishMiles: t.finishMiles, finishDate: t.finishDate, priv: 0, bus: run, privBefore: privAcc, needs: nd, est: t.est, gapOpen, gapPriv, lagAdded: t.lagAdded, route: t.route, expected: t.expected };
         privRow(); // private driving since the last business trip gets its own row, in order, before this one
         rows.push(row); list.push(row);
       }
@@ -969,7 +974,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       list.push({ desc: 'Month-end reading', finishMiles: M.endMiles, finishDate: lastDay(k), priv: M.endPriv ? g : 0, bus: 0, gapOpen: M.endPriv ? 0 : g, endGap: true });
     }
     privRow();
-    return { rows, list, startMiles: monthStart(k), unsorted };
+    return { rows, list, startMiles: monthStart(k), unsorted, needs };
   }
   // ---------- gaps: odometer miles that weren't logged ----------
   // A small gap right after a trip is GPS lag on that trip: it goes on that trip. Anything bigger, you decide.
@@ -1030,6 +1035,97 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     return Math.min(1.08, Math.max(1, med));
   }
   const gpsToOdo = mi => Math.round(mi * gpsFactor());
+  // a trip whose finish was worked out from GPS: a dash reading that comes in lower corrects it (the dash wins)
+  async function fixEstimate(reading) {
+    const last = lastReading(); if (last == null || reading >= last) return false;
+    const p = tripBefore(last); if (!p || !p.t.est || p.t.finishMiles !== last || reading < p.t.startMiles) return false;
+    const M = await loadMonth(p.k), t = M.trips.find(x => x.id === p.t.id) || p.t;
+    t.finishMiles = reading; t.est = false; await saveMonth(p.k); await recalcLast();
+    toast(`Last trip's GPS estimate corrected to ${reading}`); return true;
+  }
+
+  // ---------- trips that end by themselves, and the site found from where you parked ----------
+  function distM(a, b) { const r = Math.PI / 180, dLa = (b[0] - a[0]) * r, dLo = (b[1] - a[1]) * r;
+    const h = Math.sin(dLa / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLo / 2) ** 2; return 2 * 6371000 * Math.asin(Math.sqrt(h)); }
+  const parseStops = txt => String(txt || '').split('\n').map(l => l.split(',').map(Number)).filter(x => x.length >= 5 && x.every(isFinite))
+    .map(([lat, lon, start, end, m]) => ({ lat, lon, start, end, m }));
+  const isoOf = ms => { const d = new Date(ms); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+  async function reversePc(lat, lon) {
+    try { const j = await (await fetch(`https://api.postcodes.io/postcodes?lon=${lon}&lat=${lat}&limit=1&radius=2000&widesearch=true`)).json();
+      return j && j.result && j.result[0] ? j.result[0].postcode : null; } catch (e) { return null; }
+  }
+  const overnight = s => isoOf(s.start) !== isoOf(s.end) || new Date(s.start).getHours() >= 20 || new Date(s.end).getHours() < 6; // the hotel
+  async function homeLLs() { const out = []; for (const p of [S.home, S.office]) { const ll = p && await postcodeLL(p); if (ll) out.push(ll); } return out; }
+  async function refreshHomes() { // home and office positions for the phone: parking there ends a trip
+    const lls = await homeLLs(); if (!lls.length) return;
+    const key = JSON.stringify(lls.map(x => x.map(v => Math.round(v * 1e5) / 1e5)));
+    if (key !== JSON.stringify(S.homesLL || [])) { S.homesLL = JSON.parse(key); await saveS(); }
+  }
+  async function matchSite(c) { // a site you've been to before, so the job fills itself in
+    for (const s of S.sites || []) { if (c.pc && pc(s.pc) === pc(c.pc)) return s; const ll = await postcodeLL(s.pc); if (ll && distM(ll, [c.lat, c.lon]) < 600) return s; }
+    return null;
+  }
+  // long daytime stops away from home, the office and where the trip began are the sites; overnight ones are the hotel
+  async function findSites(stops, startLL, homes) {
+    const away = s => [startLL, ...homes].filter(Boolean).every(h => distM([s.lat, s.lon], h) > 3000);
+    const cl = [];
+    stops.filter(s => s.end - s.start >= 30 * 60000 && !overnight(s) && away(s)).forEach(s => {
+      const c = cl.find(c => distM([c.lat, c.lon], [s.lat, s.lon]) < 800);
+      if (c) { c.lastM = s.m; } else cl.push({ lat: s.lat, lon: s.lon, first: s.start, lastM: s.m });
+    });
+    for (const c of cl) { c.pc = await reversePc(c.lat, c.lon); const k = await matchSite(c);
+      if (k) Object.assign(c, { pc: k.pc, job: k.job, desc: k.desc, known: true }); }
+    return cl.filter(c => c.pc);
+  }
+  // trips the phone ended by itself when you parked at home: saved with a GPS estimate, details to add later
+  async function processEnded() {
+    const T = TR(); if (!T || !T.takeEnded) return 0;
+    let r; try { r = await T.takeEnded(); } catch (e) { return 0; }
+    const list = ((r && r.trips) || []).sort((x, y) => x.end - y.end); if (!list.length) return 0;
+    const homes = await homeLLs(); let n = 0, lastMi = 0;
+    for (const e of list) {
+      let t = S.openTrip && S.openTrip.startDate <= isoOf(e.since) ? S.openTrip : null;
+      const fromOpen = !!t;
+      if (!t) { const d = new Date(e.since); t = { id: uid(), type: d.getDay() === 0 || d.getDay() === 6 ? 'priv' : 'unsorted', startDate: isoOf(e.since), startMiles: suggestedStart() ?? 0 }; }
+      if (t.startMiles == null) t.startMiles = suggestedStart() ?? 0;
+      const pts = parsePts(e.points), stops = parseStops(e.stops), gpsMi = MI(e.meters);
+      if (gpsMi < 1 && (!fromOpen || t.type === 'unsorted')) { if (fromOpen) S.openTrip = null; continue; } // the car connected but didn't go anywhere
+      const s = { ...t, finishMiles: t.startMiles + gpsToOdo(gpsMi), finishDate: isoOf(e.end), gpsMiles: Math.round(gpsMi * 10) / 10,
+                  route: pts.length > 1 ? encodeRoute(simplify(pts, 12)) : null, est: true, autoEnded: true };
+      if (s.type !== 'priv') {
+        if (!s.startPc && pts.length) s.startPc = (await reversePc(pts[0][0], pts[0][1])) || '';
+        if (!s.sitePc) {
+          const sites = await findSites(stops, pts[0], homes);
+          if (sites.length) {
+            Object.assign(s, { sitePc: sites[0].pc, job: s.job || sites[0].job || '', desc: s.desc || sites[0].desc || '', siteCheck: !sites[0].known });
+            const legs = sites.slice(1).map((c, i) => ({ sitePc: c.pc, job: c.job || '', desc: c.desc || '', fromMiles: s.startMiles + gpsToOdo(MI(sites[i].lastM)), date: isoOf(c.first) }));
+            if (legs.length) { s.legs = legs; s.siteCheck = sites.some(c => !c.known); }
+          }
+        }
+      }
+      const k = mKey(s.startDate); await loadMonth(k);
+      if (!months[k].trips.some(x => x.id === s.id)) { months[k].trips.push(s); n++; lastMi = tripMiles(s); }
+      if (fromOpen) S.openTrip = null;
+      await saveMonth(k);
+    }
+    await saveS(); await recalcLast(); try { await T.clearEnded(); } catch (e) {}
+    renderTripCard(); renderMonth(); renderToday();
+    toast(n === 1 ? `Trip saved when you parked at home: ${lastMi} mi. Add the details when you're ready.` : `${n} trips saved from GPS. Add the details when you're ready.`);
+    return n;
+  }
+  function rememberSites(t) { // sites with a job go in the quick-pick list, and match by themselves next time
+    siteList(t).filter(s => s.pc && s.job).forEach(s => { S.sites = [{ pc: s.pc, job: s.job, desc: s.desc }, ...(S.sites || []).filter(x => x.pc !== s.pc)].slice(0, 12); });
+  }
+  // what a trip still needs before it can go on the sheet
+  function needsOf(t) {
+    if (t.type === 'priv') return [];
+    if (t.type === 'unsorted') return ['business or private'];
+    const n = [];
+    if (!t.sitePc) n.push('site postcode'); else if (t.siteCheck) n.push('check the site postcode');
+    if (!t.job && t.autoEnded) n.push('job number');
+    if (!t.startPc && t.autoEnded) n.push('start postcode');
+    return n;
+  }
 
   // ---------- odometer readings: always worked out from your trips, never a stale stored number ----------
   const monthKeys = () => Object.keys(DATA).filter(k => /^m-\d{4}-\d{2}$/.test(k)).map(k => k.slice(2)).sort();
@@ -1172,6 +1268,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       e.preventDefault();
       const miles = num($('nMiles').value);
       if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
+      await fixEstimate(miles);
       const lastR = lastReading();
       if (lastR != null && miles < lastR) { err.textContent = `That's lower than your last reading (${lastR}). Check the odometer.`; err.hidden = false; return; }
       const settled = await settleGap(miles, err); if (!settled) return;
@@ -1181,7 +1278,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   let sortMode = null;
   function renderUnsortedCard(c, t) { // logging started by itself when the car connected
     headRow(c, 'Not sorted yet', 'live');
-    c.append(el('p', { className: 'hint', textContent: `Logging started by itself when your phone connected to the car${t.startDate ? ', ' + fmtD(t.startDate) : ''}. What is this trip?` }));
+    c.append(el('p', { className: 'hint', textContent: `Logging started by itself when your phone connected to the car${t.startDate ? ', ' + fmtD(t.startDate) : ''}. What is this trip? You can sort it now or later.` }));
     if (TR()) c.append(odometer('mi so far'));
     const starts = el('div', { className: 'starts' });
     const b1 = el('button', { className: 'big biz', type: 'button' }, [svg('i-brief'), el('b', {}, ['Business', el('small', { textContent: 'Pick the site' })])]);
@@ -1413,6 +1510,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       e.preventDefault();
       const miles = num($('nMiles').value);
       if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
+      await fixEstimate(miles);
       const lastR = lastReading();
       if (lastR != null && miles < lastR) { err.textContent = `That's lower than your last reading (${lastR}). Check the odometer.`; err.hidden = false; return; }
       const settled = await settleGap(miles, err); if (!settled) return;
@@ -1468,6 +1566,12 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     let bus = 0, priv = 0;
     rows.forEach(r => { bus += r.bus; priv += r.priv; });
     const statMi = (id, v, unit) => { const b = $(id); b.textContent = String(v); if (unit) b.append(el('small', { textContent: unit })); };
+    { const nd = sheetRows(viewM).needs, w = $('needsNote'), sig = viewM + JSON.stringify(nd);
+      w.hidden = !nd.length;
+      if (nd.length && w.dataset.sig !== sig) { w.dataset.sig = sig; w.innerHTML = '';
+        w.append(el('b', { textContent: `${nd.length} trip${nd.length === 1 ? ' needs' : 's need'} details` }), el('span', { textContent: ' before the sheet can be built: ' + [...new Set(nd.flatMap(x => x.what))].join(', ') + '.' }));
+        const go = el('button', { type: 'button', className: 'secondary', textContent: 'Fill in the first one', style: 'margin-top:10px;width:100%' }); go.onclick = () => openTrip(nd[0].id, viewM); w.append(go); }
+      if (!nd.length) w.dataset.sig = ''; }
     { const un = sheetRows(viewM).unsorted, w = $('unsortedNote');
       w.hidden = !un.length;
       const sig = viewM + JSON.stringify(un); // don't rebuild an unchanged note: a tap on it may be under way
@@ -1601,6 +1705,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       box.append(card);
     }
     const k = mKey(today());
+    if (months[k]) { const nd = sheetRows(k).needs; if (nd.length) { const w = el('button', { type: 'button', className: 'banner warn', style: 'border:0;text-align:left;cursor:pointer;font:inherit' },
+      [el('b', { textContent: `${nd.length} trip${nd.length === 1 ? ' needs' : 's need'} details` }), '. Tap to add them.']); w.onclick = () => openTrip(nd[0].id, k); box.prepend(w); } }
     if (months[k]) { const un = sheetRows(k).unsorted; if (un.length) { const w = el('button', { type: 'button', className: 'banner warn', style: 'border:0;text-align:left;cursor:pointer;font:inherit' },
       [el('b', { textContent: `${un.reduce((s, u) => s + u.miles, 0)} mi not sorted` }), ' this month. Tap to sort.']); w.onclick = () => openGapSort(un[0].id, k); box.prepend(w); } }
     if (months[k]) {
@@ -1615,17 +1721,32 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   async function openTrip(id, k) {
     await loadMonth(k); const M = months[k]; const t = M.trips.find(x => x.id === id); if (!t) return;
     viewM = k;
-    const P = t.type === 'priv';
+    const P = t.type === 'priv', U = t.type === 'unsorted';
     const multi = !P && (t.legs || []).length > 0;
-    const box = openSheet(P ? 'Private journey' : multi ? `${siteList(t).length} sites, one trip` : `${t.startPc} → ${t.sitePc} → back`);
+    const box = openSheet(U ? 'Trip, not sorted yet' : P ? 'Private journey' : multi ? `${siteList(t).length} sites, one trip` : `${t.startPc || '?'} → ${t.sitePc || '?'} → back`);
+    if (U) { // logged by itself: say what it was
+      box.append(el('p', { className: 'hint', textContent: 'Logged by itself when the phone connected to the car. What was it?' }));
+      const b1 = el('button', { type: 'button', className: 'primary biz', textContent: 'Business' }), b2 = el('button', { type: 'button', className: 'primary priv', textContent: 'Private' });
+      b1.onclick = async () => { delete t.type; await saveMonth(k); await openTrip(id, k); const e = [...$('sheet').querySelectorAll('button')].find(x => x.textContent === 'Edit trip'); if (e) e.click(); renderMonth(); };
+      b2.onclick = async () => { Object.assign(t, { type: 'priv', sitePc: '', job: '', desc: '', startPc: '', siteCheck: false }); delete t.legs; await saveMonth(k); closeSheet(); renderMonth(); renderToday(); toast('Marked private'); };
+      box.append(el('div', { className: 'btns' }, [b1, b2]));
+    }
+    if (!P && !U && t.siteCheck) { // postcode looked up from where the car was parked
+      const w = el('div', { className: 'banner warn' });
+      w.append(el('span', { textContent: `Site postcode${(t.legs || []).length ? 's' : ''} found from where you parked: ${siteList(t).map(s => s.pc).join(', ')}. On a big estate it can be next door's, so check it.` }));
+      const ok = el('button', { type: 'button', className: 'secondary', textContent: 'Looks right', style: 'margin-top:10px;width:100%' });
+      ok.onclick = async () => { t.siteCheck = false; rememberSites(t); await saveMonth(k); await saveS(); w.remove(); renderMonth(); renderToday(); toast('Site postcode confirmed'); };
+      w.append(ok); box.append(w);
+    }
+    { const nd = needsOf(t); if (nd.length && !U) box.append(el('p', { className: 'err', textContent: 'Needs: ' + nd.join(', ') + '. Tap Edit trip to add.' })); }
     if (multi) box.append(el('div', { className: 'route', style: 'font-size:16px' }, [t.startPc, ...siteList(t).flatMap(s => [el('i', { textContent: '→' }), s.pc]), el('i', { textContent: '→' }), 'back']));
-    box.append(el('div', { className: 'meta' }, [el('span', { className: 'tag ' + (P ? 'priv' : 'bus'), textContent: P ? 'Private' : 'Business' }),
+    box.append(el('div', { className: 'meta' }, [el('span', { className: 'tag ' + (U ? 'live' : P ? 'priv' : 'bus'), textContent: U ? 'Not sorted' : P ? 'Private' : 'Business' }),
       el('span', { textContent: fmtD(t.startDate) + (t.finishDate && t.finishDate !== t.startDate ? ' – ' + fmtD(t.finishDate) : '') }), !P && !multi && t.desc ? el('span', { textContent: t.desc }) : '', !P && !multi && t.job ? el('span', { textContent: 'Job ' + t.job }) : ''].filter(Boolean)));
     if (t.route) { const m = el('div', { className: 'map' }); box.append(m); drawMap(m, [t]); }
     const kv = el('div', { className: 'kv' });
     const add = (l, v) => kv.append(el('div', {}, [el('span', { className: 'lbl', textContent: l }), el('b', { textContent: v })]));
-    add(P ? 'Private miles' : 'Business miles', String(tripMiles(t)));
-    add('Odometer', `${t.startMiles} → ${t.finishMiles}`);
+    add(U ? 'Miles' : P ? 'Private miles' : 'Business miles', String(tripMiles(t)));
+    add('Odometer', `${t.startMiles} → ${t.finishMiles}` + (t.est ? ' (GPS estimate)' : ''));
     if (expRound(t)) add('Expected', `${expRound(t)} mi`);
     if (t.gpsMiles != null) add('GPS logged', `${t.gpsMiles} mi`);
     const days = Math.max(1, Math.round((new Date((t.finishDate || t.startDate) + 'T12:00') - new Date(t.startDate + 'T12:00')) / 86400000) + 1);
@@ -1654,12 +1775,13 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const P = r.type === 'priv';
     const when = r.startDate && r.startDate.length > 7 ? fmtD(r.startDate) + (r.finishDate && r.finishDate !== r.startDate ? ' – ' + fmtD(r.finishDate) : '') : '';
     const title = el('span', { className: 'r' });
-    if (r.id) title.append(el('span', { className: 'tag ' + (P ? 'priv' : 'bus'), textContent: P ? 'Private' : 'Business' }));
+    const U = r.type === 'unsorted';
+    if (r.id) title.append(el('span', { className: 'tag ' + (U ? 'live' : P ? 'priv' : 'bus'), textContent: U ? 'Not sorted' : P ? 'Private' : 'Business' }));
     const multi = !P && r.id && r.sites && r.sites.length > 1;
     if (multi) title.append(el('span', { className: 'tag multi', textContent: `${r.sites.length} sites` }));
-    title.append(P ? (isRoundTrip(r) ? 'Round trip' : 'Journey') : r.id ? `${r.startPc || '?'} → ` + (multi ? `${r.sites.length} sites` : (r.sitePc || '?')) + ' → back' : r.desc);
+    title.append(U ? (r.startPc ? `From ${r.startPc}` : 'Trip') : P ? (isRoundTrip(r) ? 'Round trip' : 'Journey') : r.id ? `${r.startPc || '?'} → ` + (multi ? `${r.sites.length} sites` : (r.sitePc || '?')) + ' → back' : r.desc);
     head.append(title,
-      el('span', { className: 'd', textContent: [when, multi ? 'one week, one sheet row' : (!P && r.job ? 'Job ' + r.job : ''), !P && r.id && !multi ? r.desc : '', r.expR ? `expected ${r.expR}` : '', r.route ? 'route' : ''].filter(Boolean).join(' · ') || fmtD(r.finishDate) }),
+      el('span', { className: 'd', textContent: [when, r.est ? 'GPS estimate' : '', multi ? 'one week, one sheet row' : (!P && r.job ? 'Job ' + r.job : ''), !P && r.id && !multi ? r.desc : '', r.expR ? `expected ${r.expR}` : '', r.route ? 'route' : ''].filter(Boolean).join(' · ') || fmtD(r.finishDate) }),
       el('span', { className: 'm' }));
     if (multi) { // every site on its own line: where, which job, when, and the miles that went with it
       const ol = el('ol', { className: 'sites' });
@@ -1670,7 +1792,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const m = head.querySelector('.m');
     const extra = '';
     m.classList.add(P || !r.id ? 'priv' : 'biz');
-    m.append(String(P ? r.priv : r.id ? r.bus : (r.gapOpen || r.priv)), el('small', { textContent: P ? 'private' : r.id ? 'business' : (r.gapOpen ? 'not sorted' : 'private') }));
+    m.append(String(U ? r.miles : P ? r.priv : r.id ? r.bus : (r.gapOpen || r.priv)), el('small', { textContent: U ? 'miles' : P ? 'private' : r.id ? 'business' : (r.gapOpen ? 'not sorted' : 'private') }));
+    if (r.id && r.needs && r.needs.length) head.append(el('span', { className: 'd', style: 'grid-column:1 / -1;color:var(--biz-deep);font-weight:700', textContent: `✎ Needs details: ${r.needs.join(', ')}. Tap to add.` }));
     if (r.id && r.gapOpen) head.append(el('span', { className: 'd', style: 'grid-column:1 / -1;color:var(--biz-deep);font-weight:700', textContent: `⚠ ${r.gapOpen} mi before this trip not sorted. Tap to sort.` }));
     if (r.id && r.gapPriv) head.append(el('span', { className: 'd', style: 'grid-column:1 / -1', textContent: `${r.gapPriv} mi before this trip: private driving` }));
     it.append(head);
@@ -1708,11 +1831,14 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       if (clash) { err.textContent = `Those readings overlap your ${tripName(clash)} (${clash.startMiles} to ${clash.finishMiles}).`; err.hidden = false; return; }
       if ($('eFD').value && $('eSD').value && $('eFD').value < $('eSD').value) { err.textContent = 'Finish date is before the start date.'; err.hidden = false; return; }
       const P = $('eType').value === 'priv', ev = id => $(id) ? $(id).value.trim() : '';
+      if (fm !== t.finishMiles) t.est = false; // a real reading replaces the GPS estimate
+      t.siteCheck = false;
       Object.assign(t, { type: P ? 'priv' : undefined, startPc: P ? '' : pc(ev('eFrom')), sitePc: P ? '' : pc(ev('eSite')), startDate: $('eSD').value, finishDate: $('eFD').value,
                          startMiles: sm, finishMiles: fm, job: P ? '' : ev('eJob'), desc: P ? '' : ev('eDesc') });
+      if (!P) rememberSites(t);
       const nk = mKey(t.startDate);
       if (nk !== viewM) { M.trips = M.trips.filter(x => x.id !== id); await loadMonth(nk); months[nk].trips.push(t); await saveMonth(nk); }
-      await saveMonth(viewM); await recalcLast(); editing = null; closeSheet(); renderMonth(); renderToday(); toast('Trip updated');
+      await saveMonth(viewM); await saveS(); await recalcLast(); editing = null; closeSheet(); renderMonth(); renderToday(); toast('Trip updated');
     };
     del.onclick = () => deleteTrip(M, t);
     return f;
@@ -1948,6 +2074,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (v == null) { delete M.startMiles; delete M.startSet; } else { M.startMiles = v; M.startSet = true; }
     await saveMonth(viewM); renderMonth(); toast(v == null ? 'Worked out from your trips' : 'Start reading saved'); };
   $('endMiles').onchange = async () => { const v = num($('endMiles').value), M = months[viewM];
+    if (v != null) await fixEstimate(v);
     if (v == null) { delete M.endMiles; delete M.endPriv; } else { M.endMiles = v; delete M.endPriv; }
     await saveMonth(viewM);
     let note = v == null ? 'Month-end reading cleared' : 'Month-end reading saved';
@@ -2015,7 +2142,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   };
   $('settingsForm').onsubmit = async e => {
     e.preventDefault();
-    Object.assign(S, { name: $('sName').value.trim(), driver: pc($('sDriver').value), reg: pc($('sReg').value), office: pc($('sOffice').value) || 'HD8 0RW', home: pc($('sHome').value) });
+    Object.assign(S, { name: $('sName').value.trim(), driver: pc($('sDriver').value), reg: pc($('sReg').value), office: pc($('sOffice').value) || 'HD8 0RW', home: pc($('sHome').value) }); refreshHomes().catch(() => {});
     await saveS(); fillSettings(); renderTripCard(); renderMonth(); toast('Details saved');
   };
   function fillSettings() {
@@ -2025,7 +2152,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   let lastSheet = null;
   async function exportMonth(k, share) {
     await loadMonth(k);
-    const { rows: rows0, startMiles, unsorted } = sheetRows(k);
+    const { rows: rows0, startMiles, unsorted, needs } = sheetRows(k);
+    if (needs.length) throw new Error(`${needs.length} trip${needs.length === 1 ? ' needs' : 's need'} details first (they're flagged on Trips and Month).`);
     if (unsorted.length) throw new Error(`${unsorted.reduce((s, u) => s + u.miles, 0)} mi between trips aren't sorted yet. Sort them first (they're flagged on Trips and Month).`);
     const rows = rows0.map(r => r.sites && r.sites.length > 1 ? { ...r, sitePc: r.sites.map(s => s.pc).join('\n'), job: r.sites.map(s => s.job || '–').join('\n'), desc: r.sites.map(s => s.desc || s.pc).join(' / '), tall: r.sites.length } : r);
     const bytes = buildMileageXlsx({ name: S.name, reg: S.reg, monthLabel: mLabel(k), startMiles, office: S.office,
@@ -2083,6 +2211,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   async function checkNative() {
     const T = TR(); if (!T || checking) return; checking = true;
     try {
+      await processEnded(); // before anything else: a trip that ended by itself may still be the open one here
+      refreshHomes().catch(() => {});
       const st = await T.status();
       const act = await T.takeAction();
       try { const inc = await T.takeIncoming(); if (inc && inc.text) { showTab('settings'); offerRestore('Opened file', inc.text); $('restoreMsg').scrollIntoView({ block: 'center' }); } } catch (e) {}

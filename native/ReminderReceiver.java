@@ -91,8 +91,9 @@ public class ReminderReceiver extends BroadcastReceiver {
         boolean wasOpen = p.getBoolean("tripOpen", false);
         SharedPreferences.Editor e = p.edit().putBoolean("active", true).putString("mode", "starting");
         if (!wasOpen) {
-            e.putLong("meters", Double.doubleToLongBits(0)).putLong("since", System.currentTimeMillis()).putBoolean("auto", true);
+            e.putLong("meters", Double.doubleToLongBits(0)).putLong("since", System.currentTimeMillis()).putBoolean("auto", true).putLong("maxAway", 0L);
             TrackingService.routeFile(c).delete();
+            TrackingService.stopsFile(c).delete();
         }
         e.apply();
         try {
