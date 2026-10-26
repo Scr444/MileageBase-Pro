@@ -235,6 +235,7 @@ body.has-dock .toast { bottom: calc(var(--tab-h) + 92px + env(safe-area-inset-bo
 
   <section class="view" data-view="trips" hidden>
     <input type="search" id="tripSearch" placeholder="Search every trip: job, postcode, site" autocomplete="off">
+    <button class="secondary" type="button" id="addPast">+ Add a past trip</button>
     <div id="searchBox" hidden><div class="list" id="searchResults"></div></div>
     <div id="monthTrips" class="view">
       <div class="monthbar"><button type="button" class="mprev" aria-label="Previous month"><svg><use href="#i-left"/></svg></button><h2 class="mtitle" id="monthTitle">—</h2><button type="button" class="mnext" aria-label="Next month"><svg><use href="#i-right"/></svg></button></div>
@@ -324,7 +325,8 @@ body.has-dock .toast { bottom: calc(var(--tab-h) + 92px + env(safe-area-inset-bo
       </div>
       <input type="file" id="restoreFile" accept=".json,application/json" hidden>
       <p class="hint" id="restoreMsg" hidden></p>
-      <button class="secondary danger" type="button" id="restoreGo" hidden>Replace my log with this backup</button>
+      <button class="primary" type="button" id="restoreAdd" hidden>Add to my log</button>
+      <button class="secondary danger" type="button" id="restoreGo" hidden>Replace everything instead</button>
     </div>
     <div class="card flat">
       <h2>Setup</h2>
@@ -762,13 +764,27 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       const m = await makeMap(box); if (!m) return;
       const { L, map } = m;
       let bounds = null;
+      const many = trips.length > 1;
       trips.forEach(t => {
         const pts = decodeRoute(t.route); if (pts.length < 2) return;
-        routeLine(L, pts, t.type === 'priv').addTo(map);
-        pin(L, pts[0], COL.start).addTo(map).bindTooltip('Start');
-        pin(L, pts[pts.length - 1], COL.end).addTo(map).bindTooltip('Finish');
+        const priv = t.type === 'priv', miles = priv ? (t.priv ?? tripMiles(t)) : (t.bus ?? tripMiles(t));
+        const when = fmtD(t.startDate) + (t.finishDate && t.finishDate !== t.startDate ? ' – ' + fmtD(t.finishDate) : '');
+        const label = `<b>${priv ? 'Private journey' : escH([t.desc, t.sitePc].filter(Boolean).join(' · '))}</b><br>${escH(when)} · ${miles} mi`;
+        const line = routeLine(L, pts, priv).addTo(map);
+        line.eachLayer(l => l.bindPopup(label));
+        // the furthest point out: where the trip went
+        const o = map.latLngToLayerPoint(pts[0]); let far = pts[0], fd = 0;
+        pts.forEach(q => { const d = (q[0] - pts[0][0]) ** 2 + ((q[1] - pts[0][1]) * Math.cos(q[0] * Math.PI / 180)) ** 2; if (d > fd) { fd = d; far = q; } });
+        const back = (pts[0][0] - pts[pts.length - 1][0]) ** 2 + (pts[0][1] - pts[pts.length - 1][1]) ** 2 < 1e-5;
+        L.circleMarker(far, { radius: 9, color: priv ? COL.priv : COL.bus, weight: 4, fillColor: '#fff', fillOpacity: 1 }).addTo(map)
+          .bindPopup(label).bindTooltip(priv ? 'Private' : (t.desc || t.sitePc || 'Site'), { direction: 'top', offset: [0, -8] });
+        if (!many || !back) {
+          pin(L, pts[0], COL.start).addTo(map).bindTooltip('Start');
+          if (!back) pin(L, pts[pts.length - 1], COL.end).addTo(map).bindTooltip('Finish');
+        }
         const b = L.latLngBounds(pts); bounds = bounds ? bounds.extend(b) : b;
       });
+      if (many) { const home = trips.map(t => decodeRoute(t.route)[0]).filter(Boolean)[0]; if (home) pin(L, home, COL.start, 9).addTo(map).bindTooltip('Home and office'); }
       if (bounds) m.fit(bounds); else map.setView([53.6, -1.7], 9);
     } catch (e) { box.textContent = 'The map shows in the installed app.'; box.style.display = 'grid'; box.style.placeItems = 'center'; box.style.color = 'var(--sub)'; }
   }
@@ -1337,7 +1353,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       const w = $('monthMapWrap');
       if (w.firstChild) { w.innerHTML = ''; $('monthMapBtn').textContent = 'Show this month on a map'; return; }
       const box = el('div', { className: 'map tall', style: 'margin-top:10px' }); w.append(box);
-      w.append(el('p', { className: 'hint', textContent: 'Orange: business. Blue: private. Green dot: start. Black dot: finish.' }));
+      w.append(el('p', { className: 'hint', textContent: 'Orange: business. Blue: private. Ringed dots: where each trip went. Tap a route or ring for the trip.' }));
       $('monthMapBtn').textContent = 'Hide map'; drawMap(box, routed);
     };
     const fl = $('fuelList'); fl.innerHTML = '';
@@ -1384,6 +1400,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     Object.keys(DATA).filter(k => /^m-\d{4}-\d{2}$/.test(k)).forEach(k => (DATA[k].trips || []).forEach(t => out.push(t)));
     return out;
   }
+  const escH = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const tripMiles = t => Math.max(0, (t.finishMiles ?? 0) - (t.startMiles ?? 0));
   // miles per day for a run of dates, split business / private (a multi-day trip is spread across its days)
   function milesByDay(fromIso, days) {
@@ -1539,6 +1556,54 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     del.onclick = () => deleteTrip(M, t);
     return f;
   }
+  // ---------- add a trip after the event: forgotten, lost, or logged on paper ----------
+  function openAddPast() {
+    let type = 'bus';
+    const box = openSheet('Add a past trip');
+    const seg = el('div', { className: 'seg' });
+    const sb = el('button', { type: 'button', textContent: 'Business' }), sp = el('button', { type: 'button', textContent: 'Private' });
+    seg.append(sb, sp); box.append(seg);
+    const form = el('form', { style: 'display:flex;flex-direction:column;gap:12px' });
+    const bizBits = el('div', { style: 'display:flex;flex-direction:column;gap:12px' });
+    const from = field('Start postcode', 'aFrom', { className: 'pc', value: pc(S.office), autocapitalize: 'characters', autocomplete: 'off' });
+    from.append(placeChips('aFrom', S.office)); bizBits.append(from);
+    const site = field('Site postcode', 'aSite', { className: 'pc', autocapitalize: 'characters', autocomplete: 'off', placeholder: 'BS11 8AX' });
+    if ((S.sites || []).length) { const sc = el('div', { className: 'chips' });
+      S.sites.slice(0, 8).forEach(s => { const b = el('button', { type: 'button', className: 'chip', textContent: s.pc + (s.desc ? ' · ' + s.desc : '') });
+        b.onclick = () => { $('aSite').value = s.pc; $('aJob').value = s.job || ''; $('aDesc').value = s.desc || ''; sc.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', String(x === b))); };
+        b.setAttribute('aria-pressed', 'false'); sc.append(b); }); site.append(sc); }
+    bizBits.append(site);
+    const r0 = el('div', { className: 'row' }); r0.append(field('Job number', 'aJob', { inputMode: 'numeric', autocomplete: 'off' }), field('Site name', 'aDesc', { autocomplete: 'off' })); bizBits.append(r0);
+    form.append(bizBits);
+    const r1 = el('div', { className: 'row' }); r1.append(field('Start date', 'aSD', { type: 'date', value: today(), required: true }), field('Finish date', 'aFD', { type: 'date', value: today(), required: true })); form.append(r1);
+    const r2 = el('div', { className: 'row' }); r2.append(field('Start odometer', 'aSM', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }), field('Finish odometer', 'aFM', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' })); form.append(r2);
+    form.append(el('p', { className: 'hint', textContent: 'Readings must fit between your other trips. DrivR checks them against everything already logged.' }));
+    const err = el('p', { className: 'err', hidden: true }); form.append(err);
+    const save = el('button', { className: 'primary biz', type: 'submit', textContent: 'Add trip' }); form.append(save);
+    const paint = () => { sb.setAttribute('aria-pressed', String(type === 'bus')); sp.setAttribute('aria-pressed', String(type === 'priv')); bizBits.hidden = type !== 'bus'; save.className = 'primary ' + (type === 'bus' ? 'biz' : 'priv'); };
+    sb.onclick = () => { type = 'bus'; paint(); }; sp.onclick = () => { type = 'priv'; paint(); }; paint();
+    form.onsubmit = async e => {
+      e.preventDefault(); err.hidden = true;
+      const sm = num($('aSM').value), fm = num($('aFM').value), sd = $('aSD').value, fd = $('aFD').value || sd;
+      if (sm == null || fm == null) { err.textContent = 'Enter both odometer readings.'; err.hidden = false; return; }
+      if (fm < sm) { err.textContent = 'The finish reading is lower than the start.'; err.hidden = false; return; }
+      if (fd < sd) { err.textContent = 'Finish date is before the start date.'; err.hidden = false; return; }
+      if (type === 'bus' && !pc($('aSite').value)) { err.textContent = 'Enter the site postcode.'; err.hidden = false; return; }
+      const clash = overlapping(sm, fm, null);
+      if (clash) { err.textContent = `Those readings overlap your ${tripName(clash)} (${clash.startMiles} to ${clash.finishMiles}).`; err.hidden = false; return; }
+      if (S.openTrip && S.openTrip.startMiles != null && fm > S.openTrip.startMiles && sm < S.openTrip.startMiles + 1e9) {
+        err.textContent = `Those readings run into your open trip, which started at ${S.openTrip.startMiles}.`; err.hidden = false; return; }
+      const t = type === 'priv'
+        ? { id: uid(), type: 'priv', startDate: sd, finishDate: fd, startMiles: sm, finishMiles: fm, added: true }
+        : { id: uid(), startPc: pc($('aFrom').value), sitePc: pc($('aSite').value), job: $('aJob').value.trim(), desc: $('aDesc').value.trim(), startDate: sd, finishDate: fd, startMiles: sm, finishMiles: fm, added: true };
+      const k = mKey(sd); await loadMonth(k); months[k].trips.push(t); await saveMonth(k);
+      if (t.sitePc) S.sites = [{ pc: t.sitePc, job: t.job, desc: t.desc }, ...(S.sites || []).filter(s => s.pc !== t.sitePc)].slice(0, 12);
+      await recalcLast(); closeSheet(); viewM = k; await renderMonth(); renderToday();
+      toast(`Added: ${fm - sm} ${type === 'priv' ? 'private' : 'business'} mi`, async () => { months[k].trips = months[k].trips.filter(x => x.id !== t.id); await saveMonth(k); await recalcLast(); renderMonth(); renderToday(); });
+    };
+    box.append(form);
+  }
+  $('addPast').onclick = openAddPast;
   async function deleteTrip(M, t) {
     const k = viewM;
     M.trips = M.trips.filter(x => x.id !== t.id); await saveMonth(k); await recalcLast(); closeSheet(); renderMonth(); renderToday();
@@ -1918,7 +1983,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     offerRestore(f.name, await f.text());
   };
   function offerRestore(name, text) { // check a backup and show the Replace button
-    const msg = $('restoreMsg'); msg.hidden = false; $('restoreGo').hidden = true; pending = null;
+    const msg = $('restoreMsg'); msg.hidden = false; $('restoreGo').hidden = true; $('restoreAdd').hidden = true; pending = null;
     const f = { name };
     try {
       const d = strip(JSON.parse(text));
@@ -1926,8 +1991,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       if (!d.settings && !ms.length) throw new Error('not a DrivR backup');
       const trips = ms.reduce((n, k) => n + ((d[k].trips || []).length), 0);
       pending = d;
-      msg.textContent = `${f.name}: ${trips} trips over ${ms.length} month${ms.length === 1 ? '' : 's'}. Restoring replaces everything in the app now.`;
-      $('restoreGo').hidden = false;
+      msg.textContent = `${f.name}: ${trips} trips over ${ms.length} month${ms.length === 1 ? '' : 's'} (${ms.map(k => mLabel(k.slice(2))).join(', ')}). Add them to your log, keeping everything you already have, or replace everything with this file.`;
+      $('restoreGo').hidden = false; $('restoreAdd').hidden = false;
     } catch (err) { msg.textContent = 'That file could not be read as a DrivR backup.'; }
   }
   $('restoreGo').onclick = async () => {
@@ -1935,8 +2000,34 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     DATA = pending; pending = null; await saveAll();
     Object.keys(months).forEach(k => delete months[k]);
     S = { ...DEFAULTS, ...(DATA.settings || {}) };
-    $('restoreGo').hidden = true; $('restoreMsg').textContent = 'Backup restored.';
+    $('restoreGo').hidden = true; $('restoreAdd').hidden = true; $('restoreMsg').textContent = 'Backup restored.';
     await loadMonth(shiftM(viewM, -1)); fillSettings(); renderTripCard(); await renderMonth(); toast('Backup restored');
+  };
+  // add a backup to the log: new months come in whole; in months you already have, only trips and fuel that aren't there
+  // (and don't clash with your odometer readings) are added. Nothing you have is changed.
+  $('restoreAdd').onclick = async () => {
+    if (!pending) return;
+    const src = pending; pending = null;
+    let added = 0, clashed = 0, fuel = 0;
+    Object.keys(src).filter(k => /^m-\d{4}-\d{2}$/.test(k)).sort().forEach(k => {
+      const inM = src[k];
+      if (!DATA[k]) { DATA[k] = JSON.parse(JSON.stringify(inM)); added += (inM.trips || []).length; fuel += (inM.fuel || []).length; return; }
+      const M = DATA[k]; M.trips = M.trips || []; M.fuel = M.fuel || [];
+      (inM.trips || []).forEach(t => {
+        if (M.trips.some(x => x.id === t.id)) return;
+        if (t.startMiles != null && t.finishMiles != null && overlapping(t.startMiles, t.finishMiles, t.id)) { clashed++; return; }
+        M.trips.push(JSON.parse(JSON.stringify(t))); added++; });
+      (inM.fuel || []).forEach(f => { if (!M.fuel.some(x => x.id === f.id)) { M.fuel.push({ ...f }); fuel++; } });
+      if (M.endMiles == null && inM.endMiles != null) M.endMiles = inM.endMiles;
+    });
+    const inS = src.settings || {};
+    (inS.sites || []).forEach(s => { S.sites = S.sites || []; if (!S.sites.some(x => x.pc === s.pc)) S.sites.push(s); });
+    S.routeCache = { ...(inS.routeCache || {}), ...(S.routeCache || {}) };
+    Object.keys(months).forEach(k => delete months[k]);
+    await saveAll(); await saveS(); await recalcLast();
+    $('restoreGo').hidden = true; $('restoreAdd').hidden = true;
+    $('restoreMsg').textContent = `Added ${added} trip${added === 1 ? '' : 's'} and ${fuel} fuel entr${fuel === 1 ? 'y' : 'ies'}.` + (clashed ? ` ${clashed} trip${clashed === 1 ? ' was' : 's were'} left out because ${clashed === 1 ? 'it overlaps' : 'they overlap'} your own odometer readings.` : '');
+    await loadMonth(viewM); renderTripCard(); await renderMonth(); toast(`Added ${added} trips`);
   };
 
   (async () => {
