@@ -30,7 +30,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 @CapacitorPlugin(
     name = "Tracker",
-    requestCodes = { TrackerPlugin.CAR_REQUEST },
     permissions = {
         @Permission(alias = "bluetooth", strings = { "android.permission.BLUETOOTH_CONNECT" }),
         @Permission(alias = "location", strings = { Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION }),
@@ -38,8 +37,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
     }
 )
 public class TrackerPlugin extends Plugin {
-    static final int CAR_REQUEST = 4242;
-    private PluginCall carCall;
 
     @Override
     public void load() { ReminderReceiver.schedule(getContext()); }
@@ -72,58 +69,63 @@ public class TrackerPlugin extends Plugin {
         call.resolve();
     }
 
+    private boolean btOk() { return Build.VERSION.SDK_INT < 31 || getPermissionState("bluetooth") == PermissionState.GRANTED; }
+
     @PluginMethod
-    public void linkCar(PluginCall call) {
-        if (Build.VERSION.SDK_INT < 26) { call.reject("Needs Android 8 or newer", "unsupported"); return; }
-        if (Build.VERSION.SDK_INT >= 31 && getPermissionState("bluetooth") != PermissionState.GRANTED) {
-            requestPermissionForAlias("bluetooth", call, "btDone");
-            return;
-        }
-        doLink(call);
+    public void btPermission(PluginCall call) {
+        if (btOk()) { btPermDone(call); return; }
+        requestPermissionForAlias("bluetooth", call, "btPermDone");
     }
 
     @PermissionCallback
-    private void btDone(PluginCall call) {
-        if (getPermissionState("bluetooth") != PermissionState.GRANTED) { call.reject("Nearby devices permission is off", "no_permission"); return; }
-        doLink(call);
-    }
+    private void btPermDone(PluginCall call) { JSObject r = new JSObject(); r.put("bluetooth", btOk()); call.resolve(r); }
 
-    private void doLink(PluginCall call) {
-        if (Build.VERSION.SDK_INT < 26) { call.reject("Needs Android 8 or newer", "unsupported"); return; }
-        carCall = call;
-        CarLink.choose(getActivity(), CAR_REQUEST, new CarLink.Done() {
-            @Override public void ok() { /* the chooser is showing */ }
-            @Override public void fail(String why) { if (carCall != null) { carCall.reject(why, "link_failed"); carCall = null; } }
-        });
-    }
-
-    @Override
-    protected void handleOnActivityResult(int requestCode, int resultCode, Intent data) {
-        super.handleOnActivityResult(requestCode, resultCode, data);
-        if (requestCode != CAR_REQUEST || carCall == null) return;
-        PluginCall call = carCall; carCall = null;
-        String cars = Build.VERSION.SDK_INT >= 26 ? CarLink.cars(getContext()) : "";
-        TrackingService.prefs(getContext()).edit().putString("cars", cars).apply();
+    /** The phone's paired Bluetooth devices, cars first, and which are connected right now. */
+    @PluginMethod
+    public void pairedDevices(PluginCall call) {
+        if (!btOk()) { call.reject("Nearby devices permission is off", "no_permission"); return; }
         JSObject r = new JSObject();
-        r.put("cars", cars);
-        r.put("linked", resultCode == android.app.Activity.RESULT_OK);
+        com.getcapacitor.JSArray list = new com.getcapacitor.JSArray();
+        try {
+            android.bluetooth.BluetoothManager bm = (android.bluetooth.BluetoothManager) getContext().getSystemService(Context.BLUETOOTH_SERVICE);
+            android.bluetooth.BluetoothAdapter ad = bm == null ? null : bm.getAdapter();
+            if (ad == null) { call.reject("This phone has no Bluetooth", "no_bt"); return; }
+            r.put("on", ad.isEnabled());
+            for (android.bluetooth.BluetoothDevice d : ad.getBondedDevices()) {
+                JSObject o = new JSObject();
+                o.put("name", d.getName() == null ? d.getAddress() : d.getName());
+                o.put("address", d.getAddress());
+                o.put("car", ReminderReceiver.looksLikeCar(d));
+                boolean conn = false;
+                try { conn = (Boolean) d.getClass().getMethod("isConnected").invoke(d); } catch (Exception e) { /* unknown */ }
+                o.put("connected", conn);
+                list.put(o);
+            }
+        } catch (SecurityException e) { call.reject("Nearby devices permission is off", "no_permission"); return; }
+        r.put("devices", list);
         call.resolve(r);
     }
 
     @PluginMethod
+    public void setCars(PluginCall call) {
+        TrackingService.prefs(getContext()).edit().putString("cars", call.getString("cars", "")).apply();
+        call.resolve();
+    }
+
+    @PluginMethod
     public void cars(PluginCall call) {
-        String cars = Build.VERSION.SDK_INT >= 26 ? CarLink.cars(getContext()) : "";
-        TrackingService.prefs(getContext()).edit().putString("cars", cars).apply();
+        SharedPreferences p = TrackingService.prefs(getContext());
+        String cars = p.getString("cars", "");
         JSObject r = new JSObject();
         r.put("cars", cars);
-        r.put("bluetooth", Build.VERSION.SDK_INT < 31 || getPermissionState("bluetooth") == PermissionState.GRANTED);
+        r.put("lastCar", Math.max(p.getLong("carIn", 0), p.getLong("carOut", 0)));
+        r.put("bluetooth", btOk());
         r.put("background", backgroundOk());
         call.resolve(r);
     }
 
     @PluginMethod
     public void forgetCars(PluginCall call) {
-        if (Build.VERSION.SDK_INT >= 26) CarLink.forget(getContext());
         TrackingService.prefs(getContext()).edit().putString("cars", "").apply();
         call.resolve();
     }

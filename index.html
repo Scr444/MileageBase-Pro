@@ -83,7 +83,7 @@ button.danger { color: var(--warn); background: var(--warn-soft); }
 
 .starts { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 12px; }
 .big { display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 18px; min-height: 140px; padding: 18px; border-radius: 24px; cursor: pointer; text-align: left; border: 0; color: #fff; background: var(--priv); box-shadow: 0 10px 24px rgba(37,99,235,.28); }
-.big svg { width: 30px; height: 30px; }
+.big > svg { width: 30px; height: 30px; }
 .big b { font: 800 22px/1 var(--display); letter-spacing: -.01em; }
 .big small { display: block; font: 600 13px var(--body); opacity: .88; margin-top: 5px; }
 .big.biz { background: var(--biz); box-shadow: 0 10px 24px rgba(255,106,26,.32); }
@@ -152,7 +152,7 @@ button.danger { color: var(--warn); background: var(--warn-soft); }
 .jobrow span { color: var(--sub); font-size: 13px; font-weight: 600; }
 .jobrow .bar { grid-column: 1 / -1; height: 8px; margin-top: 6px; }
 .map { height: 220px; border-radius: 16px; overflow: hidden; background: var(--raised); }
-.map.big { height: 380px; }
+.map.tall { height: 400px; }
 .leaflet-container { font: 12px var(--body); background: var(--raised); }
 .empty { color: var(--sub); font-size: 15px; padding: 22px 14px; margin: 0; text-align: center; font-weight: 600; }
 .banner { font-size: 14px; background: var(--priv-soft); color: var(--priv-deep); border-radius: 16px; padding: 12px 14px; margin: 0; font-weight: 600; }
@@ -175,8 +175,8 @@ body.has-dock .toast { bottom: calc(var(--tab-h) + 92px + env(safe-area-inset-bo
 .tabbar button[aria-current="page"] svg { background: var(--biz-soft); border-radius: 10px; padding: 2px 10px; width: 45px; height: 29px; }
 .tabbar .dot { position: absolute; top: 9px; left: calc(50% + 14px); width: 10px; height: 10px; border-radius: 50%; background: var(--live); border: 2px solid var(--panel); }
 
-.sheet-bg { position: fixed; inset: 0; z-index: 45; background: rgba(19,23,38,.4); }
-.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 46; background: var(--panel); border-radius: 26px 26px 0 0; max-height: 92vh; overflow-y: auto;
+.sheet-bg { position: fixed; inset: 0; z-index: 55; background: rgba(19,23,38,.4); }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 56; background: var(--panel); border-radius: 26px 26px 0 0; max-height: 92vh; overflow-y: auto;
   padding: 10px max(18px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(18px, env(safe-area-inset-left, 0px)); box-shadow: 0 -10px 40px rgba(19,23,38,.2); }
 .sheet .inner { max-width: 568px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
 .sheet .grab { width: 44px; height: 5px; border-radius: 3px; background: var(--line2); margin: 2px auto 6px; }
@@ -697,7 +697,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       updateLive();
     } catch (e) { box.textContent = 'The map shows in the installed app.'; box.style.display = 'grid'; box.style.placeItems = 'center'; box.style.color = 'var(--sub)'; }
   }
-  async function updateLive() {
+  async function updateLive() { try { await updateLive1(); } catch (e) {} }
+  async function updateLive1() {
     const st = live; if (!st || !st.box.isConnected) return;
     let pts = [];
     if (TR()) { try { pts = parsePts((await TR().route()).points); } catch (e) {} }
@@ -1296,7 +1297,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     $('monthMapBtn').onclick = () => {
       const w = $('monthMapWrap');
       if (w.firstChild) { w.innerHTML = ''; $('monthMapBtn').textContent = 'Show this month on a map'; return; }
-      const box = el('div', { className: 'map big', style: 'margin-top:10px' }); w.append(box);
+      const box = el('div', { className: 'map tall', style: 'margin-top:10px' }); w.append(box);
       w.append(el('p', { className: 'hint', textContent: 'Orange: business. Blue: private. Green dot: start. Black dot: finish.' }));
       $('monthMapBtn').textContent = 'Hide map'; drawMap(box, routed);
     };
@@ -1556,7 +1557,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const T = TR(); if (!T) return st;
     try { st.loc = !!(await T.status()).location; } catch (e) {}
     try { st.bat = !!(await T.batteryOk()).ok; } catch (e) {}
-    try { const c = await T.cars(); st.car = !!c.cars; st.bg = !!c.background; } catch (e) {}
+    try { const c = await T.cars(); st.car = !!c.bluetooth; st.bg = !!c.background; } catch (e) {}
     return st;
   }
   let wizStep = 0;
@@ -1589,7 +1590,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         [el('span', { className: 'ok', textContent: '✓' }), el('div', {}, [el('b', { textContent: title }), el('span', { textContent: text })])]); c.onclick = async () => { try { await fn(); } catch (e) { toast(e.message || 'Not available'); } setTimeout(() => wizStep === 2 && openWizard(2), 1500); }; return c; };
       if (!TR()) inner.append(el('p', { className: 'banner', textContent: 'These settings work in the installed app on your phone.' }));
       inner.append(item(st.loc, 'Location and notifications', 'So GPS can log your drives.', () => TR().permissions()));
-      inner.append(item(st.car, 'Link your car', 'Logging starts by itself when your phone connects, Android Auto included.', () => TR().linkCar()));
+      inner.append(item(st.car, 'Spot your car', 'Lets DrivR see the car connect over Bluetooth, Android Auto included, so logging starts by itself.', () => openCarPicker(() => openWizard(2))));
       inner.append(item(st.bg, 'Location: allow all the time', 'Lets automatic starts work with the app closed. Open Permissions, Location, Allow all the time.', () => TR().openAppSettings()));
       inner.append(item(st.bat, 'Battery: unrestricted', 'Stops the phone pausing logging mid-trip.', () => TR().openBattery()));
       inner.append(el('div', { style: 'flex:1' }), next('Next', () => openWizard(3)));
@@ -1799,27 +1800,63 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   }
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { checkNative(); renderMonthEnd(); } });
   // car link in Your details
+  // ---------- the car: spotted automatically, or picked from the phone's paired devices ----------
+  async function openCarPicker(after) {
+    const T = TR(); if (!T) { toast('Car linking works in the installed app'); return; }
+    let perm;
+    try { perm = await T.btPermission(); } catch (e) { perm = { bluetooth: false }; }
+    const box = openSheet('Pick your car');
+    if (!perm.bluetooth) {
+      box.append(el('p', { className: 'err', textContent: 'DrivR needs the Nearby devices permission to see your car. Allow it in the app settings, then try again.' }));
+      const s = el('button', { className: 'secondary', type: 'button', textContent: 'Open app settings' }); s.onclick = () => T.openAppSettings(); box.append(s); return;
+    }
+    let res;
+    try { res = await T.pairedDevices(); } catch (e) { box.append(el('p', { className: 'err', textContent: e.message || 'Could not read your Bluetooth devices.' })); return; }
+    if (res.on === false) box.append(el('p', { className: 'banner warn', textContent: 'Bluetooth is off. Turn it on to see your car.' }));
+    box.append(el('p', { className: 'hint', textContent: 'These are the devices your phone is paired with. Easiest: open this sat in the car with Android Auto running, and your car shows as Connected now. Cars often have odd names, like SEAT, MIB or a code.' }));
+    const devs = (res.devices || []).sort((x, y) => (y.connected - x.connected) || (y.car - x.car) || String(x.name).localeCompare(String(y.name)));
+    const chosen = new Set(String((await T.cars()).cars || '').split(',').filter(Boolean));
+    if (!devs.length) box.append(el('p', { className: 'empty', textContent: 'No paired devices. Pair your phone with the car in Bluetooth settings first.' }));
+    const list = el('div', { className: 'list', style: 'box-shadow:none;background:var(--raised)' });
+    devs.forEach(d => {
+      const b = el('button', { type: 'button', className: 'item-head', style: 'padding:13px 14px;border-bottom:1px solid var(--line)' });
+      const tags = el('span', { className: 'd' });
+      if (d.connected) tags.append(el('span', { className: 'tag live', textContent: 'Connected now' }));
+      if (d.car) tags.append(el('span', { className: 'tag bus', textContent: 'Car' }));
+      if (!d.connected && !d.car) tags.append(d.address);
+      const tick = el('span', { className: 'm', style: 'font-size:22px' });
+      const paint = () => { tick.textContent = chosen.has(d.address) ? '✓' : ''; tick.style.color = 'var(--live)'; b.style.background = chosen.has(d.address) ? 'var(--live-soft)' : ''; };
+      b.append(el('span', { className: 'r', textContent: d.name }), tags, tick); paint();
+      b.onclick = () => { chosen.has(d.address) ? chosen.delete(d.address) : chosen.add(d.address); paint(); };
+      list.append(b);
+    });
+    box.append(list);
+    const save = el('button', { type: 'button', className: 'primary biz', textContent: 'Save' });
+    save.onclick = async () => { await T.setCars({ cars: [...chosen].join(',') }); closeSheet(); toast(chosen.size ? 'Car linked' : 'Using automatic car spotting'); renderCar(); if (after) after(); };
+    box.append(save);
+  }
   async function renderCar() {
     const box = $('carBox'); if (!box) return;
     box.innerHTML = '';
     box.append(el('h2', { textContent: 'Car' }));
     if (!TR()) { box.append(el('p', { className: 'hint', textContent: 'Car linking works in the installed app.' })); return; }
-    let info = { cars: '', background: false };
+    let info = { cars: '', background: false, bluetooth: false, lastCar: 0 };
     try { info = await TR().cars(); } catch (e) {}
     const n = info.cars ? info.cars.split(',').filter(Boolean).length : 0;
     box.append(el('p', { className: 'hint', textContent: n
-      ? `Linked to ${n} car Bluetooth device${n > 1 ? 's' : ''}. Logging starts by itself when your phone connects.`
-      : 'Link your car\'s Bluetooth and logging starts by itself every time your phone connects to it, Android Auto included.' }));
-    const link = el('button', { className: 'secondary', type: 'button', textContent: n ? 'Link another' : 'Link my car' });
-    link.onclick = async () => { try { await TR().permissions(); await TR().linkCar(); } catch (e) { toast(e.message || 'Could not link'); } renderCar(); };
-    const btns = el('div', { className: 'btns' }, [link]);
-    if (n) { const forget = el('button', { className: 'secondary danger', type: 'button', textContent: 'Unlink' }); forget.onclick = async () => { await TR().forgetCars(); renderCar(); }; btns.append(forget); }
-    box.append(btns);
-    if (n && !info.background) {
-      box.append(el('p', { className: 'err', textContent: 'One more step: set Location to "Allow all the time", or Android may block automatic starts.' }));
+      ? `Linked to your car. Logging starts by itself when your phone connects to it, Android Auto included, and pauses when you leave the car.`
+      : 'Automatic: any car stereo or Android Auto connecting starts logging. Pick your car to make it only yours.' }));
+    if (info.lastCar) box.append(el('p', { className: 'hint', textContent: 'Last seen the car: ' + new Date(info.lastCar).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }));
+    const link = el('button', { className: 'secondary', type: 'button', textContent: n ? 'Change car' : 'Pick my car' });
+    link.onclick = () => openCarPicker();
+    box.append(link);
+    if (!info.bluetooth) box.append(el('p', { className: 'err', textContent: 'Nearby devices permission is off, so DrivR can\'t see the car connect. Tap Pick my car to allow it.' }));
+    if (!info.background) {
+      box.append(el('p', { className: 'err', textContent: 'Set Location to "Allow all the time", or Android may block automatic starts.' }));
       const s = el('button', { className: 'secondary', type: 'button', textContent: 'Open app settings' }); s.onclick = () => TR().openAppSettings(); box.append(s);
     }
   }
+
   $('shareBtn').onclick = async () => {
     if (!lastSheet) return;
     try { await shareFile(lastSheet.name, lastSheet.data, true); } catch (e) { if (!/cancel/i.test(String(e && e.message || e))) toast('Could not share: ' + (e.message || e)); }

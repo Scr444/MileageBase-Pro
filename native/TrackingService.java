@@ -43,6 +43,11 @@ public class TrackingService extends Service {
     static final long PARK_AFTER_MS = 300_000L;  // stopped 5 min = parked
     static final long WAKE_GRACE_MS = 120_000L;  // after a wake-up, park again if no driving within 2 min
     static final long NET_EVERY_MS = 90_000L;
+    static final long PARK_GPS_MS = 60_000L;     // parked: a GPS check every minute, so driving off is never missed
+    static final float MOVED_M = 200f;           // parked: this far from where you stopped = you've driven off
+    static final double ROAD_FACTOR = 1.2;       // a late wake-up: straight-line gap x 1.2, roughly the road distance
+    static final String ACTION_WAKE = "uk.mileagebase.app.WAKE", ACTION_PARK = "uk.mileagebase.app.PARK";
+    private Location wakeFrom;
     static final float MAX_ACCURACY_M = 35f;
 
     private LocationManager lm;
@@ -100,6 +105,9 @@ public class TrackingService extends Service {
             drive();
             handler.postDelayed(nag, 60_000L);
         }
+        String act = intent == null ? null : intent.getAction();
+        if (ACTION_WAKE.equals(act) && parked) wakeUp();       // the car connected again
+        else if (ACTION_PARK.equals(act) && !parked) park();   // the car disconnected: you've stopped
         WidgetProvider.refresh(this);
         return START_STICKY;
     }
@@ -126,6 +134,7 @@ public class TrackingService extends Service {
     // ---------- modes ----------
     private void drive() {
         parked = false;
+        if (handler != null) handler.removeCallbacks(slowDown);
         if (handler != null) handler.removeCallbacks(parkCheck);
         stopAll();
         try {
@@ -146,9 +155,12 @@ public class TrackingService extends Service {
 
     private void park() {
         parked = true;
-        anchor = last;
+        anchor = last != null ? last : lastKnown();
         last = null;
         stopAll();
+        parkChecks(PARK_GPS_MS);
+        handler.removeCallbacks(slowDown);
+        handler.postDelayed(slowDown, 30 * 60_000L); // after half an hour parked, check less often
         try {
             if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER))
                 lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, NET_EVERY_MS, 0f, net, Looper.getMainLooper());
@@ -159,8 +171,23 @@ public class TrackingService extends Service {
         mode("parked");
     }
 
+    private void parkChecks(long every) { // a GPS check every so often while parked
+        try { lm.removeUpdates(parkGps); } catch (Exception e) { /* ignore */ }
+        try { lm.requestLocationUpdates(driveProvider(), every, 0f, parkGps, Looper.getMainLooper()); }
+        catch (SecurityException | IllegalArgumentException e) { /* no GPS */ }
+    }
+    private final Runnable slowDown = () -> { if (parked) parkChecks(5 * 60_000L); };
+
+    private Location lastKnown() {
+        Location best = null;
+        try { for (String pr : lm.getProviders(true)) { Location l = lm.getLastKnownLocation(pr);
+            if (l != null && (best == null || l.getTime() > best.getTime())) best = l; } } catch (SecurityException | IllegalArgumentException e) { /* none */ }
+        return best;
+    }
+
     private void wakeUp() {
         if (!parked) return;
+        wakeFrom = anchor; // to add the distance covered before GPS was back on
         long now = System.currentTimeMillis();
         lastMoving = now - PARK_AFTER_MS + WAKE_GRACE_MS; // must reach driving speed within 2 min or it parks again
         last = null;
@@ -170,6 +197,7 @@ public class TrackingService extends Service {
     private void stopAll() {
         try { lm.removeUpdates(gps); } catch (Exception e) { /* ignore */ }
         try { lm.removeUpdates(net); } catch (Exception e) { /* ignore */ }
+        try { lm.removeUpdates(parkGps); } catch (Exception e) { /* ignore */ }
         if (motion != null) { try { sm.cancelTriggerSensor(wake, motion); } catch (Exception e) { /* ignore */ } }
     }
 
@@ -187,6 +215,16 @@ public class TrackingService extends Service {
         @Override public void onLocationChanged(Location l) {
             if (parked || !l.hasAccuracy() || l.getAccuracy() > MAX_ACCURACY_M) return;
             long now = System.currentTimeMillis();
+            if (last == null && wakeFrom != null) { // first fix after waking: count the miles driven before GPS caught up
+                float gap = l.distanceTo(wakeFrom);
+                if (gap > MOVED_M && gap < 50_000f) {
+                    routePoint(wakeFrom); routePoint(l);
+                    meters += gap * ROAD_FACTOR; lastMoving = now; lastDriving = now;
+                    prefs(TrackingService.this).edit().putLong("meters", Double.doubleToLongBits(meters)).apply();
+                    refreshNote();
+                }
+                wakeFrom = null;
+            }
             if (last != null) {
                 float d = l.distanceTo(last);
                 double dt = Math.max(1.0, (l.getTime() - last.getTime()) / 1000.0);
@@ -214,6 +252,16 @@ public class TrackingService extends Service {
             if (anchor == null) { anchor = l; return; }
             float limit = Math.max(300f, l.getAccuracy() + anchor.getAccuracy());
             if (l.distanceTo(anchor) > limit) wakeUp();
+        }
+    };
+
+    // parked: wake when a GPS check shows you've moved away or are moving at driving speed
+    private final LocationListener parkGps = new Listener() {
+        @Override public void onLocationChanged(Location l) {
+            if (!parked || !l.hasAccuracy() || l.getAccuracy() > 100) return;
+            if (anchor == null) { anchor = l; return; }
+            boolean fast = l.hasSpeed() && l.getSpeed() >= DRIVING_MS;
+            if (fast || l.distanceTo(anchor) > Math.max(MOVED_M, l.getAccuracy() * 2)) wakeUp();
         }
     };
 

@@ -44,16 +44,45 @@ public class ReminderReceiver extends BroadcastReceiver {
             schedule(c);
             return;
         }
-        if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(a)) {
+        boolean in = BluetoothDevice.ACTION_ACL_CONNECTED.equals(a) || "android.app.action.ENTER_CAR_MODE".equals(a);
+        boolean out = BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(a) || "android.app.action.EXIT_CAR_MODE".equals(a);
+        if (!in && !out) return;
+        if (a.startsWith("android.bluetooth")) {
             BluetoothDevice d = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-            if (d == null) return;
-            String addr;
-            try { addr = d.getAddress(); } catch (SecurityException e) { return; }
-            String cars = "," + p.getString("cars", "") + ",";
-            if (addr == null || !cars.contains("," + addr + ",")) return;
-            if (p.getBoolean("active", false)) return; // already logging
-            autoStart(c);
+            if (d == null || !isCar(c, d)) return;
         }
+        p.edit().putLong(in ? "carIn" : "carOut", System.currentTimeMillis()).apply();
+        if (in) {
+            if (p.getBoolean("active", false)) tellService(c, TrackingService.ACTION_WAKE); // already logging: make sure GPS is on
+            else autoStart(c);
+        } else if (p.getBoolean("active", false)) {
+            tellService(c, TrackingService.ACTION_PARK); // left the car: GPS off until you drive again
+        }
+    }
+
+    /** Your linked car, or, if none is linked, anything that says it's a car (car audio or hands-free kit). */
+    static boolean isCar(Context c, BluetoothDevice d) {
+        try {
+            String addr = d.getAddress();
+            String cars = TrackingService.prefs(c).getString("cars", "");
+            if (!cars.isEmpty()) return ("," + cars + ",").contains("," + addr + ",");
+            return looksLikeCar(d);
+        } catch (SecurityException e) { return false; }
+    }
+
+    static boolean looksLikeCar(BluetoothDevice d) {
+        try {
+            android.bluetooth.BluetoothClass bc = d.getBluetoothClass();
+            if (bc == null) return false;
+            int dc = bc.getDeviceClass();
+            return dc == android.bluetooth.BluetoothClass.Device.AUDIO_VIDEO_CAR_AUDIO
+                || dc == android.bluetooth.BluetoothClass.Device.AUDIO_VIDEO_HANDSFREE;
+        } catch (SecurityException e) { return false; }
+    }
+
+    static void tellService(Context c, String action) {
+        try { androidx.core.content.ContextCompat.startForegroundService(c, new Intent(c, TrackingService.class).setAction(action)); }
+        catch (Exception e) { /* picked up next time the app opens */ }
     }
 
     /** Starts logging with no tap. If Android won't allow it from the background, asks with a notification instead. */
