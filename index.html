@@ -678,43 +678,41 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     layer.on('tileerror', () => { if (++fails >= 3 && i < TILES.length - 1) { fails = 0; layer.setUrl(TILES[++i]); } });
     return layer;
   }
-  const dot = (L, ll, fill, r = 6) => L.circleMarker(ll, { radius: r, color: '#fff', weight: 2, fillColor: fill, fillOpacity: 1 });
   let live = null; // the open trip's live map
   async function initLiveMap(box, t) {
     live = null;
     try {
-      const L = await loadLeaflet(); if (!box.isConnected) return;
-      const map = L.map(box, { zoomControl: true }); addTiles(L, map);
+      const m = await makeMap(box); if (!m) return;
+      const { L, map } = m;
       const priv = t.type === 'priv';
-      const st = { map, L, box, priv, fitted: false, here: null, ahead: null, start: null, site: null,
-        line: L.polyline([], { color: priv ? '#7b8790' : '#1f6feb', weight: 5, opacity: .9 }).addTo(map) };
+      const st = { map, L, box, m, priv, fitted: false, here: null, ahead: null, start: null, site: null, line: null };
       live = st;
-      if (!priv) {
+      if (!priv && t.startPc && t.sitePc) {
         st.start = await postcodeLL(t.startPc); st.site = await postcodeLL(t.sitePc);
-        if (st.start) dot(L, st.start, '#2f9e44').addTo(map).bindTooltip('Start · ' + t.startPc);
-        if (st.site) L.circleMarker(st.site, { radius: 8, color: '#d9480f', weight: 3, fillColor: '#fff', fillOpacity: 1 }).addTo(map).bindTooltip('Site · ' + t.sitePc);
+        if (st.start) pin(L, st.start, COL.start).addTo(map).bindTooltip('Start · ' + t.startPc);
+        if (st.site) L.circleMarker(st.site, { radius: 9, color: COL.bus, weight: 4, fillColor: '#fff', fillOpacity: 1 }).addTo(map).bindTooltip('Site · ' + t.sitePc);
       }
-      const c = st.start || st.site || [53.6, -1.7];
-      map.setView(c, 9); setTimeout(() => map.invalidateSize(), 200);
+      const c = st.start || st.site;
+      if (st.start && st.site) m.fit(L.latLngBounds([st.start, st.site])); else map.setView(c || [53.6, -1.7], c ? 12 : 9);
       updateLive();
-    } catch (e) { box.textContent = 'The map shows in the installed app.'; box.style.display = 'grid'; box.style.placeItems = 'center'; box.style.color = 'var(--muted)'; }
+    } catch (e) { box.textContent = 'The map shows in the installed app.'; box.style.display = 'grid'; box.style.placeItems = 'center'; box.style.color = 'var(--sub)'; }
   }
   async function updateLive() {
     const st = live; if (!st || !st.box.isConnected) return;
     let pts = [];
     if (TR()) { try { pts = parsePts((await TR().route()).points); } catch (e) {} }
-    const L = st.L; st.line.setLatLngs(pts);
+    const L = st.L;
+    if (st.line) st.map.removeLayer(st.line);
+    st.line = pts.length > 1 ? routeLine(L, pts, st.priv).addTo(st.map) : null;
     const cur = pts[pts.length - 1];
-    if (cur && !st.priv && pts.length) {
-      if (!st.startDot && !st.start) st.startDot = dot(L, pts[0], '#2f9e44').addTo(st.map);
-    }
+    if (cur && !st.start && !st.startDot) st.startDot = pin(L, pts[0], COL.start).addTo(st.map);
     if (cur) {
-      if (st.here) st.here.setLatLng(cur); else st.here = dot(L, cur, '#1f6feb', 8).addTo(st.map).bindTooltip('You');
-      if (st.site) { const seg = [cur, st.site]; if (st.ahead) st.ahead.setLatLngs(seg); else st.ahead = L.polyline(seg, { color: '#1f6feb', weight: 3, opacity: .7, dashArray: '6 8' }).addTo(st.map); }
+      if (st.here) { st.here.setLatLng(cur); st.here.bringToFront(); } else st.here = pin(L, cur, st.priv ? COL.priv : COL.bus, 10).addTo(st.map).bindTooltip('You');
+      if (st.site) { const seg = [cur, st.site]; if (st.ahead) st.ahead.setLatLngs(seg); else st.ahead = L.polyline(seg, { color: COL.bus, weight: 3, opacity: .8, dashArray: '2 9', lineCap: 'round' }).addTo(st.map); }
     }
-    if (!st.fitted) {
+    if (!st.fitted && cur) {
       const all = pts.concat([st.start, st.site].filter(Boolean));
-      if (all.length > 1) { st.map.fitBounds(L.latLngBounds(all), { padding: [28, 28] }); st.fitted = pts.length > 0; }
+      if (all.length > 1) { st.m.fit(L.latLngBounds(all)); st.fitted = true; }
     }
   }
   async function takeRoute() { // read the recorded route from the phone, packed small
@@ -725,36 +723,53 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       return pts.length > 1 ? encodeRoute(simplify(pts, 12)) : null;
     } catch (e) { return null; }
   }
-  let leafletP = null;
-  function loadLeaflet() {
-    if (window.L) return Promise.resolve(window.L);
+  let leafletP = null, leafletCss = false;
+  function loadLeaflet() { // the map library and its styles, both loaded before any map is made
+    if (window.L && leafletCss) return Promise.resolve(window.L);
     if (leafletP) return leafletP;
-    leafletP = new Promise((ok, bad) => {
-      const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'leaflet.css'; document.head.append(css);
-      const s = document.createElement('script'); s.src = 'leaflet.js'; s.onload = () => ok(window.L); s.onerror = () => { leafletP = null; bad(new Error('map unavailable')); };
-      document.head.append(s);
-    });
+    leafletP = Promise.all([
+      new Promise(ok => { const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'leaflet.css';
+        css.onload = () => { leafletCss = true; ok(); }; css.onerror = () => ok(); document.head.append(css); setTimeout(() => { leafletCss = true; ok(); }, 3000); }),
+      new Promise((ok, bad) => { if (window.L) return ok(); const s = document.createElement('script'); s.src = 'leaflet.js'; s.onload = ok; s.onerror = () => bad(new Error('map unavailable')); document.head.append(s); })
+    ]).then(() => window.L, e => { leafletP = null; throw e; });
     return leafletP;
   }
+  const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const COL = { bus: '#ff6a1a', priv: '#2563eb', start: '#16a34a', end: '#131726' };
+  // a map made after layout, re-fitted whenever its box changes size
+  async function makeMap(box) {
+    const L = await loadLeaflet(); await frame();
+    if (!box.isConnected) return null;
+    const map = L.map(box, { zoomControl: true, attributionControl: true }).setView([53.6, -1.7], 9); // a view first, so routes have something to draw on
+    addTiles(L, map);
+    let fitB = null;
+    const refit = () => { if (!box.isConnected || !box.clientWidth) return; map.invalidateSize(); if (fitB) map.fitBounds(fitB, { padding: [28, 28], maxZoom: 16 }); };
+    if (window.ResizeObserver) new ResizeObserver(refit).observe(box);
+    setTimeout(refit, 350);
+    return { L, map, fit: b => { fitB = b; refit(); } };
+  }
+  // a route nobody could mistake for a road or railway: thick colour with a white edge
+  function routeLine(L, pts, priv) {
+    const g = L.layerGroup();
+    L.polyline(pts, { color: '#ffffff', weight: 11, opacity: 1, lineCap: 'round', lineJoin: 'round' }).addTo(g);
+    L.polyline(pts, { color: priv ? COL.priv : COL.bus, weight: 6, opacity: 1, lineCap: 'round', lineJoin: 'round' }).addTo(g);
+    return g;
+  }
+  const pin = (L, ll, fill, r = 8) => L.circleMarker(ll, { radius: r, color: '#fff', weight: 3, fillColor: fill, fillOpacity: 1 });
   async function drawMap(box, trips) { // trips: [{route, type}]
     try {
-      const L = await loadLeaflet();
-      const map = L.map(box, { zoomControl: true, attributionControl: true });
-      addTiles(L, map);
-      const cs = getComputedStyle(document.documentElement);
-      const col = { bus: '#1f6feb', priv: '#7b8790' };
+      const m = await makeMap(box); if (!m) return;
+      const { L, map } = m;
       let bounds = null;
       trips.forEach(t => {
         const pts = decodeRoute(t.route); if (pts.length < 2) return;
-        const priv = t.type === 'priv';
-        const line = L.polyline(pts, { color: priv ? col.priv : col.bus, weight: 5, opacity: .9, dashArray: priv ? '8 8' : null }).addTo(map);
-        L.circleMarker(pts[0], { radius: 6, color: '#fff', weight: 2, fillColor: '#2f9e44', fillOpacity: 1 }).addTo(map);
-        L.circleMarker(pts[pts.length - 1], { radius: 6, color: '#fff', weight: 2, fillColor: '#d9480f', fillOpacity: 1 }).addTo(map);
-        bounds = bounds ? bounds.extend(line.getBounds()) : line.getBounds();
+        routeLine(L, pts, t.type === 'priv').addTo(map);
+        pin(L, pts[0], COL.start).addTo(map).bindTooltip('Start');
+        pin(L, pts[pts.length - 1], COL.end).addTo(map).bindTooltip('Finish');
+        const b = L.latLngBounds(pts); bounds = bounds ? bounds.extend(b) : b;
       });
-      if (bounds) map.fitBounds(bounds, { padding: [24, 24] }); else map.setView([53.6, -1.7], 7);
-      setTimeout(() => map.invalidateSize(), 200);
-    } catch (e) { box.textContent = 'The map shows in the installed app.'; box.style.display = 'grid'; box.style.placeItems = 'center'; box.style.color = 'var(--muted)'; }
+      if (bounds) m.fit(bounds); else map.setView([53.6, -1.7], 9);
+    } catch (e) { box.textContent = 'The map shows in the installed app.'; box.style.display = 'grid'; box.style.placeItems = 'center'; box.style.color = 'var(--sub)'; }
   }
   async function gpsPostcode() { // where the phone is now, as a postcode
     const T = TR(); if (!T) throw new Error('GPS works in the installed app');
@@ -1282,7 +1297,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       const w = $('monthMapWrap');
       if (w.firstChild) { w.innerHTML = ''; $('monthMapBtn').textContent = 'Show this month on a map'; return; }
       const box = el('div', { className: 'map big', style: 'margin-top:10px' }); w.append(box);
-      w.append(el('p', { className: 'hint', textContent: 'Blue: business. Grey dashed: private. Green start, orange finish.' }));
+      w.append(el('p', { className: 'hint', textContent: 'Orange: business. Blue: private. Green dot: start. Black dot: finish.' }));
       $('monthMapBtn').textContent = 'Hide map'; drawMap(box, routed);
     };
     const fl = $('fuelList'); fl.innerHTML = '';
