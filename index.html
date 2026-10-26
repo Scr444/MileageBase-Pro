@@ -372,6 +372,7 @@ function buildMileageXlsx(data) {
     headY: xf(mk(2, 3, 1, 0, al('center', 'top'))),
     headB: xf(mk(1, 0, 1, 0, al('center', 'center', true))),
     txt: xf(mk(3, 0, 1, 0, al('center', 'center'))),
+    txtWrap: xf(mk(5, 0, 1, 0, al('center', 'center', true))),
     txtL: xf(mk(3, 0, 1, 0, al('left', 'center', true))),
     txtY: xf(mk(3, 0, 1, 0, al('center', 'center'))),
     txtG: xf(mk(3, 2, 1, 0, al('center', 'center'))),
@@ -388,7 +389,7 @@ function buildMileageXlsx(data) {
   const styles = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
 <numFmts count="3"><numFmt numFmtId="164" formatCode="dd/mm/yy"/><numFmt numFmtId="165" formatCode="0"/><numFmt numFmtId="166" formatCode="0.0"/></numFmts>
-<fonts count="5"><font><sz val="9"/><name val="Arial"/></font><font><b/><sz val="9"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FFFF0000"/><name val="Arial"/></font><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><name val="Arial"/></font></fonts>
+<fonts count="6"><font><sz val="9"/><name val="Arial"/></font><font><b/><sz val="9"/><name val="Arial"/></font><font><b/><sz val="9"/><color rgb="FFFF0000"/><name val="Arial"/></font><font><sz val="10"/><name val="Arial"/></font><font><b/><sz val="10"/><name val="Arial"/></font><font><sz val="8"/><name val="Arial"/></font></fonts>
 <fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9D9D9"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/><bgColor indexed="64"/></patternFill></fill></fills>
 <borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color auto="1"/></left><right style="thin"><color auto="1"/></right><top style="thin"><color auto="1"/></top><bottom style="thin"><color auto="1"/></bottom><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
@@ -442,8 +443,9 @@ function buildMileageXlsx(data) {
   const first = 5, last = first + n - 1, tot = last + 1;
   for (let i = 0; i < n; i++) {
     const r = first + i, t = rows[i] || {}, f = fuel[i] || {};
-    put('A' + r, S.txtL, t.desc); put('B' + r, S.txt, (t.startPc || '').toUpperCase()); put('C' + r, S.txt, (t.sitePc || '').toUpperCase());
-    put('D' + r, S.txt, t.job); put('E' + r, S.txtY, t.driver);
+    const multi = (t.tall || 1) > 1;
+    put('A' + r, S.txtL, t.desc); put('B' + r, S.txt, (t.startPc || '').toUpperCase()); put('C' + r, multi ? S.txtWrap : S.txt, (t.sitePc || '').toUpperCase());
+    put('D' + r, multi ? S.txtWrap : S.txt, t.job); put('E' + r, S.txtY, t.driver);
     put('F' + r, t.startDate ? S.dateG : S.txtG, t.startDate ? serial(t.startDate) : '');
     put('G' + r, S.numG, t.finishMiles === '' || t.finishMiles == null ? '' : Number(t.finishMiles));
     put('H' + r, t.finishDate ? S.dateG : S.txtG, t.finishDate ? serial(t.finishDate) : '');
@@ -472,7 +474,8 @@ function buildMileageXlsx(data) {
   let sheetRows = '';
   for (let r = 1; r <= tot; r++) {
     const cells = COLS.map(c => grid[c + r]).filter(Boolean).join('');
-    const ht = heights[r] || 26;
+    const rowData = rows[r - first] || {};
+    const ht = heights[r] || ((rowData.tall || 1) > 1 ? Math.max(26, 11 * rowData.tall + 6) : 26);
     sheetRows += `<row r="${r}" ht="${ht}" customHeight="1">${cells}</row>`;
   }
   const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -690,12 +693,17 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       const st = { map, L, box, m, priv, fitted: false, here: null, ahead: null, start: null, site: null, line: null };
       live = st;
       if (!priv && t.startPc && t.sitePc) {
-        st.start = await postcodeLL(t.startPc); st.site = await postcodeLL(t.sitePc);
+        st.start = await postcodeLL(t.startPc);
         if (st.start) pin(L, st.start, COL.start).addTo(map).bindTooltip('Start · ' + t.startPc);
-        if (st.site) L.circleMarker(st.site, { radius: 9, color: COL.bus, weight: 4, fillColor: '#fff', fillOpacity: 1 }).addTo(map).bindTooltip('Site · ' + t.sitePc);
+        st.all = [];
+        const sl = siteList(t);
+        for (let i = 0; i < sl.length; i++) { const ll = await postcodeLL(sl[i].pc); if (!ll) continue; st.all.push(ll); st.site = ll;
+          L.circleMarker(ll, { radius: 9, color: COL.bus, weight: 4, fillColor: i === sl.length - 1 ? '#fff' : COL.bus, fillOpacity: 1 }).addTo(map)
+            .bindTooltip(`${sl.length > 1 ? 'Site ' + (i + 1) + ' · ' : 'Site · '}${sl[i].desc || sl[i].pc}`); }
       }
       const c = st.start || st.site;
-      if (st.start && st.site) m.fit(L.latLngBounds([st.start, st.site])); else map.setView(c || [53.6, -1.7], c ? 12 : 9);
+      const pinsLL = [st.start, ...(st.all || [])].filter(Boolean);
+      if (pinsLL.length > 1) m.fit(L.latLngBounds(pinsLL)); else map.setView(c || [53.6, -1.7], c ? 12 : 9);
       updateLive();
     } catch (e) { box.textContent = 'The map shows in the installed app.'; box.style.display = 'grid'; box.style.placeItems = 'center'; box.style.color = 'var(--sub)'; }
   }
@@ -714,7 +722,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       if (st.site) { const seg = [cur, st.site]; if (st.ahead) st.ahead.setLatLngs(seg); else st.ahead = L.polyline(seg, { color: COL.bus, weight: 3, opacity: .8, dashArray: '2 9', lineCap: 'round' }).addTo(st.map); }
     }
     if (!st.fitted && cur) {
-      const all = pts.concat([st.start, st.site].filter(Boolean));
+      const all = pts.concat([st.start, ...(st.all || [])].filter(Boolean));
       if (all.length > 1) { st.m.fit(L.latLngBounds(all)); st.fitted = true; }
     }
   }
@@ -834,17 +842,33 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (m != null) S.routeCache[key] = m;
     return m;
   }
+  // ---------- multi-site trips: the first site is sitePc/job/desc; later ones are legs, each starting at an odometer reading ----------
+  const siteList = t => [{ pc: t.sitePc, job: t.job, desc: t.desc }, ...((t.legs || []).map(l => ({ pc: l.sitePc, job: l.job, desc: l.desc })))].filter(s => s.pc);
+  const curSite = t => { const s = siteList(t); return s[s.length - 1] || {}; };
+  const expRound = t => t ? (t.expectedTotal ?? (t.expected ? t.expected * 2 : null)) : null;
+  function legMiles(t) { // miles at each site: getting there plus driving around it; the drive home counts on the last
+    const sites = siteList(t), b = [t.startMiles, ...((t.legs || []).map(l => l.fromMiles)), t.finishMiles];
+    return sites.map((s, i) => ({ ...s, miles: Math.max(0, (b[i + 1] ?? b[i]) - b[i]) }));
+  }
+  const expText = t => (t.legs || []).length
+    ? `Expected: ${expRound(t)} mi for the whole run, ${siteList(t).length} sites and back`
+    : `Expected: ${t.expected} mi each way, ${t.expected * 2} mi round trip`;
   async function fillExpected() { // looks up the open business trip's expected miles; tries again later if no signal
     const t = S.openTrip;
-    if (!t || t.type || !t.startPc || !t.sitePc || t.expected != null) return;
+    if (!t || t.type || !t.startPc || !t.sitePc) return;
+    const chain = [t.startPc, ...siteList(t).map(s => s.pc), t.startPc], key = chain.join('|');
+    if (t.expKey === key && expRound(t) != null) return;
     if (Date.now() - expTried < 120000) return;
     expTried = Date.now();
     try {
-      const m = await roadMiles(t.startPc, t.sitePc);
-      if (m != null && S.openTrip && S.openTrip.id === t.id) { S.openTrip.expected = m; await saveS(); renderTripCard(); }
+      const parts = [];
+      for (let i = 0; i < chain.length - 1; i++) { if (chain.length === 3 && i === 1) break; parts.push(await roadMiles(chain[i], chain[i + 1])); }
+      if (parts.some(m => m == null) || !S.openTrip || S.openTrip.id !== t.id) return;
+      if (chain.length === 3) { S.openTrip.expected = parts[0]; delete S.openTrip.expectedTotal; }
+      else { S.openTrip.expected = parts[0]; S.openTrip.expectedTotal = parts.reduce((x, y) => x + y, 0); }
+      S.openTrip.expKey = key; await saveS(); renderTripCard();
     } catch (e) {}
   }
-  const expText = m => `Expected: ${m} mi each way, ${m * 2} mi round trip`;
   setInterval(fillExpected, 30000);
   async function refreshGps() { // live miles on the open trip
     const T = TR(); if (!T || !S.openTrip) return;
@@ -855,7 +879,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (pill) { const words = { driving: 'Logging', parked: 'Parked · GPS off', starting: 'Finding GPS', stopped: 'Not logging' };
       pill.textContent = words[gpsLive.mode] || gpsLive.mode; pill.classList.toggle('parked', gpsLive.mode !== 'driving'); }
     const bar = $('expBar'); const t = S.openTrip;
-    if (bar && t && t.expected) { const f = mi / (t.expected * 2); bar.firstChild.style.width = Math.min(100, f * 100).toFixed(1) + '%'; bar.classList.toggle('over', f >= 1); }
+    if (bar && t && expRound(t)) { const f = mi / expRound(t); bar.firstChild.style.width = Math.min(100, f * 100).toFixed(1) + '%'; bar.classList.toggle('over', f >= 1); }
     updateLive();
     const odo = $('cMiles');
     if (odo && !odo.dataset.touched && gpsLive.meters > 0) {
@@ -884,7 +908,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (!t) return '';
     if (t.type === 'priv') return 'Private journey';
     if (t.type === 'unsorted') return 'Trip logging, not sorted';
-    return `${t.startPc || ''} → ${t.sitePc || ''}`.trim();
+    const n = siteList(t).length;
+    return `${t.startPc || ''} → ${curSite(t).pc || ''}`.trim() + (n > 1 ? ` (${n} sites)` : '');
   }
   function syncNative() { // tells the widget and reminders about the open trip
     const T = TR(); if (!T) return;
@@ -896,7 +921,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       const b = Math.round(days.reduce((s, d) => s + d.bus, 0)), p = Math.round(days.reduce((s, d) => s + d.priv, 0));
       if (b || p) weekText = `${b} business and ${p} private miles this week.` + (t && t.type === 'unsorted' ? ' One trip still needs sorting.' : '');
     } catch (e) {}
-    T.sync({ tripOpen: !!t && t.type !== 'unsorted', label: tripLabel(t), expectedMi: t && t.expected ? t.expected * 2 : 0, weekText }).catch(() => {});
+    T.sync({ tripOpen: !!t && t.type !== 'unsorted', label: tripLabel(t), expectedMi: expRound(t) || 0, weekText }).catch(() => {});
   }
 
   // Rows exactly as they go on the sheet
@@ -917,7 +942,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         return;
       }
       const gap = prev != null && t.startMiles != null ? Math.max(0, t.startMiles - prev) : 0;
-      const row = { id: t.id, desc: t.desc, startPc: t.startPc, sitePc: t.sitePc, job: t.job, driver: S.driver,
+      const sl = siteList(t);
+      const row = { id: t.id, desc: t.desc, startPc: t.startPc, sitePc: t.sitePc, job: t.job, driver: S.driver, sites: sl, segs: sl.length > 1 ? legMiles(t) : null, expR: expRound(t),
                     startDate: t.startDate, finishMiles: t.finishMiles, finishDate: t.finishDate, priv: gap, bus: run, untracked: Math.max(0, gap - privRun), route: t.route, expected: t.expected };
       rows.push(row); list.push(row);
       prev = t.finishMiles ?? prev; privRun = 0;
@@ -1113,8 +1139,9 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
       if (miles < t.startMiles) { err.textContent = `That's lower than the start reading (${t.startMiles}). Check the odometer.`; err.hidden = false; return; }
       const done = miles - t.startMiles;
-      if (t.expected && done < t.expected * 2 * 0.95 && form.dataset.checked !== String(miles)) {
-        err.textContent = `Logged ${done} mi, but the round trip alone is about ${t.expected * 2} mi. Check the odometer, or tap Save trip again to keep it.`;
+      const er = expRound(t);
+      if (er && done < er * 0.95 && form.dataset.checked !== String(miles)) {
+        err.textContent = `Logged ${done} mi, but the ${(t.legs || []).length ? 'whole run' : 'round trip'} alone is about ${er} mi. Check the odometer, or tap Save trip again to keep it.`;
         err.hidden = false; form.dataset.checked = String(miles); return;
       }
       if (date < t.startDate) { err.textContent = 'Finish date is before the start date.'; err.hidden = false; return; }
@@ -1131,30 +1158,73 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       S.openTrip = null;
       await saveMonth(k); await saveS(); closeSheet(); buzz(60);
       viewM = k; await renderMonth(); renderTripCard();
-      const extra = t.expected ? done - t.expected * 2 : 0;
+      const extra = er ? done - er : 0;
       toast(`Saved: ${done} business mi` + (extra > 0 ? ` (+${extra} local)` : ''), async () => { // undo: reopen the trip
         months[k].trips = months[k].trips.filter(x => x.id !== t.id); S.openTrip = t;
         await saveMonth(k); await saveS(); if (TR()) { try { await TR().start({ reset: false }); } catch (e) {} } renderMonth(); renderTripCard(); });
     };
     box.append(form);
   }
+  function openNextSite(t) { // moving on to another site during the same business trip
+    const box = openSheet('Next site');
+    const boundary = (t.legs || []).length ? t.legs[t.legs.length - 1].fromMiles : t.startMiles;
+    const gps = gpsLive && gpsLive.meters > 0 ? Math.round(MI(gpsLive.meters)) : null;
+    box.append(el('p', { className: 'hint', textContent: `Leaving ${curSite(t).pc}. Everything stays on one trip and one row of the sheet, with each site's postcode and job number.` }));
+    const form = el('form', { style: 'display:flex;flex-direction:column;gap:12px' });
+    const site = field('Next site postcode', 'xSite', { className: 'pc', required: true, autocapitalize: 'characters', autocomplete: 'off', placeholder: 'B46 1AL' });
+    const sc = el('div', { className: 'chips' });
+    (S.sites || []).filter(s => !siteList(t).some(x => x.pc === s.pc)).slice(0, 8).forEach(s => {
+      const b = el('button', { type: 'button', className: 'chip', textContent: s.pc + (s.desc ? ' · ' + s.desc : '') });
+      b.onclick = () => { $('xSite').value = s.pc; $('xJob').value = s.job || ''; $('xDesc').value = s.desc || ''; sc.querySelectorAll('.chip').forEach(x => x.setAttribute('aria-pressed', String(x === b))); };
+      b.setAttribute('aria-pressed', 'false'); sc.append(b); });
+    if (TR()) sc.append(gpsChip('xSite', false));
+    site.append(sc); form.append(site);
+    const r = el('div', { className: 'row' }); r.append(field('Job number', 'xJob', { inputMode: 'numeric', autocomplete: 'off' }), field('Site name', 'xDesc', { autocomplete: 'off' })); form.append(r);
+    const odo = field('Odometer now', 'xMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off', value: gps != null ? t.startMiles + gps : '' });
+    odo.append(el('p', { className: 'hint', textContent: gps != null ? 'Worked out from GPS. Change it if the dash says otherwise.' : 'Read it off the dash.' }));
+    form.append(odo);
+    const err = el('p', { className: 'err', hidden: true }); form.append(err);
+    form.append(el('button', { className: 'primary biz', type: 'submit', textContent: 'Move to this site' }));
+    form.onsubmit = async e => {
+      e.preventDefault();
+      const pcv = pc($('xSite').value), m = num($('xMiles').value);
+      if (!pcv) { err.textContent = 'Enter the next site\'s postcode.'; err.hidden = false; return; }
+      if (m == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
+      if (m < boundary) { err.textContent = `That's lower than the last reading on this trip (${boundary}).`; err.hidden = false; return; }
+      const leg = { sitePc: pcv, job: $('xJob').value.trim(), desc: $('xDesc').value.trim(), fromMiles: m, date: today() };
+      S.openTrip.legs = [...(S.openTrip.legs || []), leg];
+      S.sites = [{ pc: leg.sitePc, job: leg.job, desc: leg.desc }, ...(S.sites || []).filter(s => s.pc !== leg.sitePc)].slice(0, 12);
+      delete S.openTrip.expKey; expTried = 0;
+      await saveS(); closeSheet(); buzz(); renderTripCard(); fillExpected();
+      const prev = S.openTrip.legs.length - 1;
+      toast(`Now at ${pcv}`, async () => { S.openTrip.legs.splice(prev, 1); delete S.openTrip.expKey; expTried = 0; await saveS(); renderTripCard(); fillExpected(); });
+    };
+    box.append(form);
+  }
   function renderBusinessCard(c, t) {
     headRow(c, 'Business · day ' + daysOn(t.startDate), 'bus');
-    c.append(el('div', { className: 'route' }, [t.startPc, el('i', { textContent: '→' }), t.sitePc]));
-    const meta = el('div', { className: 'meta' });
-    if (t.desc) meta.append(el('span', { textContent: t.desc }));
-    if (t.job) meta.append(el('span', { textContent: 'Job ' + t.job }));
+    const route = el('div', { className: 'route' }, [t.startPc]);
+    siteList(t).forEach(s => route.append(el('i', { textContent: '→' }), s.pc));
+    c.append(route);
+    const meta = el('div', { className: 'meta' }), cs = curSite(t);
+    if ((t.legs || []).length) meta.append(el('span', { textContent: `Site ${siteList(t).length} of the run` }));
+    if (cs.desc) meta.append(el('span', { textContent: cs.desc }));
+    if (cs.job) meta.append(el('span', { textContent: 'Job ' + cs.job }));
     meta.append(el('span', { textContent: 'Since ' + fmtD(t.startDate) }));
     c.append(meta);
     if (TR()) c.append(odometer('mi logged'));
     const bar = el('div', { className: 'bar', id: 'expBar' }, [el('i', { style: 'width:0%' })]);
-    if (t.expected != null) c.append(bar);
-    c.append(el('p', { className: 'hint', id: 'expLine', textContent: t.expected != null ? expText(t.expected) : 'Expected miles: looking up the road distance…' }));
-    if (t.expected == null) setTimeout(fillExpected, 0);
+    const er0 = expRound(t), fresh = t.expKey === [t.startPc, ...siteList(t).map(s => s.pc), t.startPc].join('|') || (!t.legs && t.expected != null);
+    if (er0 != null && fresh) c.append(bar);
+    c.append(el('p', { className: 'hint', id: 'expLine', textContent: er0 != null && fresh ? expText(t) : 'Expected miles: looking up the road distance…' }));
+    if (!fresh || er0 == null) setTimeout(fillExpected, 0);
     const tiles = el('div', { className: 'tiles2' });
-    if (TR() && t.sitePc) {
+    const nextBtn = el('button', { className: 'tile-btn', type: 'button' }, [svg('i-brief'), 'Next site']);
+    nextBtn.onclick = () => openNextSite(t);
+    tiles.append(nextBtn);
+    if (TR() && cs.pc) {
       const nav = el('button', { className: 'tile-btn', type: 'button' }, [svg('i-nav'), 'Navigate']);
-      nav.onclick = () => TR().openNav({ q: t.sitePc }).catch(e => toast(e.message || 'No satnav app found'));
+      nav.onclick = () => TR().openNav({ q: cs.pc }).catch(e => toast(e.message || 'No satnav app found'));
       tiles.append(nav);
     }
     const fuel = el('button', { className: 'tile-btn', type: 'button' }, [svg('i-fuel'), 'Add fuel']);
@@ -1164,12 +1234,13 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       const fix = el('button', { className: 'tile-btn', type: 'button' }, [svg('i-pin'), 'Site is here']);
       fix.onclick = async () => {
         fix.lastChild.textContent = 'Finding…';
-        try { const code = await gpsPostcode(); S.openTrip.sitePc = code; S.openTrip.expected = undefined; expTried = 0; await saveS(); renderTripCard(); toast('Site postcode set to ' + code); }
+        try { const code = await gpsPostcode(); const L2 = S.openTrip.legs || []; if (L2.length) L2[L2.length - 1].sitePc = code; else S.openTrip.sitePc = code;
+          delete S.openTrip.expKey; delete S.openTrip.expected; delete S.openTrip.expectedTotal; expTried = 0; await saveS(); renderTripCard(); toast('Site postcode set to ' + code); }
         catch (e) { fix.lastChild.textContent = 'Site is here'; toast('GPS: ' + (e.message || e)); }
       };
       tiles.append(fix);
     }
-    if (tiles.children.length === 3) tiles.className = 'tiles3';
+    tiles.className = tiles.children.length === 3 ? 'tiles3' : 'tiles2';
     c.append(tiles);
     liveMap(c, t);
     batteryBanner(c);
@@ -1337,8 +1408,9 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (bus + priv > 0) sp.append(el('i', { style: `width:${(bus / (bus + priv) * 100).toFixed(1)}%;background:var(--biz)` }), el('i', { style: `width:${(priv / (bus + priv) * 100).toFixed(1)}%;background:var(--priv)` }));
     // business miles by job
     const jobs = {};
-    items.filter(r => r.id && r.type !== 'priv').forEach(r => { const key = r.job ? 'Job ' + r.job : (r.desc || r.sitePc || 'No job number');
-      const j = jobs[key] || (jobs[key] = { key, desc: r.job ? (r.desc || r.sitePc) : (r.desc ? r.sitePc : ''), miles: 0, trips: 0 }); j.miles += r.bus; j.trips++; });
+    items.filter(r => r.id && r.type !== 'priv').forEach(r => (r.segs || [{ pc: r.sitePc, job: r.job, desc: r.desc, miles: r.bus }]).forEach(s => {
+      const key = s.job ? 'Job ' + s.job : (s.desc || s.pc || 'No job number');
+      const j = jobs[key] || (jobs[key] = { key, desc: s.job ? (s.desc || s.pc) : (s.desc ? s.pc : ''), miles: 0, trips: 0 }); j.miles += s.miles; j.trips++; }));
     const jl = Object.values(jobs).sort((x, y) => y.miles - x.miles), top = jl.length ? jl[0].miles || 1 : 1;
     const bj = $('byJob'); bj.innerHTML = '';
     if (!jl.length) bj.append(el('p', { className: 'empty', textContent: 'No business trips this month.' }));
@@ -1469,12 +1541,19 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const add = (l, v) => kv.append(el('div', {}, [el('span', { className: 'lbl', textContent: l }), el('b', { textContent: v })]));
     add(P ? 'Private miles' : 'Business miles', String(tripMiles(t)));
     add('Odometer', `${t.startMiles} → ${t.finishMiles}`);
-    if (t.expected) add('Expected', `${t.expected * 2} mi`);
+    if (expRound(t)) add('Expected', `${expRound(t)} mi`);
     if (t.gpsMiles != null) add('GPS logged', `${t.gpsMiles} mi`);
     const days = Math.max(1, Math.round((new Date((t.finishDate || t.startDate) + 'T12:00') - new Date(t.startDate + 'T12:00')) / 86400000) + 1);
     add('Days', String(days));
-    if (!P && t.expected && tripMiles(t) > t.expected * 2) add('Local driving', `${tripMiles(t) - t.expected * 2} mi`);
+    if (!P && expRound(t) && tripMiles(t) > expRound(t)) add('Local driving', `${tripMiles(t) - expRound(t)} mi`);
     box.append(kv);
+    if (!P && (t.legs || []).length) { // each site on the run
+      box.append(el('span', { className: 'lbl', textContent: 'Sites on this trip' }));
+      const ls = el('div', { className: 'list', style: 'box-shadow:none;background:var(--raised)' });
+      legMiles(t).forEach((s, i) => ls.append(el('div', { className: 'jobrow' }, [el('b', { textContent: `${i + 1}. ${s.pc}` }), el('b', { textContent: s.miles + ' mi' }),
+        el('span', { textContent: [s.desc, s.job ? 'Job ' + s.job : ''].filter(Boolean).join(' · ') + (i === siteList(t).length - 1 ? ' · includes the drive back' : '') }), el('span')])));
+      box.append(ls);
+    }
     if (!P && t.sitePc && TR()) { const nav = el('button', { type: 'button', className: 'secondary', textContent: 'Navigate to ' + t.sitePc }); nav.onclick = () => TR().openNav({ q: t.sitePc }).catch(() => toast('No satnav app found')); box.append(nav); }
     const edit = el('button', { type: 'button', className: 'secondary', textContent: 'Edit trip' });
     edit.onclick = () => { edit.remove(); box.append(editForm(id)); };
@@ -1487,9 +1566,9 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const when = r.startDate && r.startDate.length > 7 ? fmtD(r.startDate) + (r.finishDate && r.finishDate !== r.startDate ? ' – ' + fmtD(r.finishDate) : '') : '';
     const title = el('span', { className: 'r' });
     if (r.id) title.append(el('span', { className: 'tag ' + (P ? 'priv' : 'bus'), textContent: P ? 'Private' : 'Business' }));
-    title.append(P ? 'Journey' : r.id ? `${r.startPc || '?'} → ${r.sitePc || '?'}` : r.desc);
+    title.append(P ? 'Journey' : r.id ? `${r.startPc || '?'} → ` + ((r.sites && r.sites.length > 1) ? r.sites.map(s => s.pc).join(' → ') : (r.sitePc || '?')) : r.desc);
     head.append(title,
-      el('span', { className: 'd', textContent: [when, !P && r.job ? 'Job ' + r.job : '', !P && r.id ? r.desc : '', r.expected ? `expected ${r.expected * 2}` : '', r.route ? 'route' : ''].filter(Boolean).join(' · ') || fmtD(r.finishDate) }),
+      el('span', { className: 'd', textContent: [when, !P && r.sites && r.sites.length > 1 ? r.sites.length + ' sites · jobs ' + r.sites.map(s => s.job || '–').join(', ') : (!P && r.job ? 'Job ' + r.job : ''), !P && r.id && !(r.sites && r.sites.length > 1) ? r.desc : '', r.expR ? `expected ${r.expR}` : '', r.route ? 'route' : ''].filter(Boolean).join(' · ') || fmtD(r.finishDate) }),
       el('span', { className: 'm' }));
     const m = head.querySelector('.m');
     const extra = r.untracked ? ` · +${r.untracked} not logged` : '';
@@ -1734,11 +1813,11 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     let n = 0;
     keys.forEach(mk => { const M = DATA[mk]; (M.trips || []).forEach(t => {
       if (t.type === 'priv') return;
-      const hay = [t.startPc, t.sitePc, t.job, t.desc, t.startDate].join(' ').toLowerCase();
+      const hay = [t.startPc, t.startDate, ...siteList(t).flatMap(s => [s.pc, s.job, s.desc])].join(' ').toLowerCase();
       if (!hay.includes(q)) return;
       n++;
       const h = el('div', { className: 'item' });
-      h.append(el('div', { className: 'item-head' }, [el('span', { className: 'r' }, [el('span', { className: 'tag bus', textContent: 'Business' }), `${t.startPc || '?'} → ${t.sitePc || '?'}`]),
+      h.append(el('div', { className: 'item-head' }, [el('span', { className: 'r' }, [el('span', { className: 'tag bus', textContent: 'Business' }), `${t.startPc || '?'} → ${siteList(t).map(s => s.pc).join(' → ') || '?'}`]),
         el('span', { className: 'd', textContent: [fmtD(t.startDate), t.job ? 'Job ' + t.job : '', t.desc].filter(Boolean).join(' · ') }),
         el('span', { className: 'm', textContent: String(Math.max(0, (t.finishMiles ?? 0) - (t.startMiles ?? 0))) })]));
       out.append(h);
@@ -1820,7 +1899,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   let lastSheet = null;
   async function exportMonth(k, share) {
     await loadMonth(k);
-    const { rows, startMiles } = sheetRows(k);
+    const { rows: rows0, startMiles } = sheetRows(k);
+    const rows = rows0.map(r => r.sites && r.sites.length > 1 ? { ...r, sitePc: r.sites.map(s => s.pc).join('\n'), job: r.sites.map(s => s.job || '–').join('\n'), desc: r.sites.map(s => s.desc || s.pc).join(' / '), tall: r.sites.length } : r);
     const bytes = buildMileageXlsx({ name: S.name, reg: S.reg, monthLabel: mLabel(k), startMiles, office: S.office,
       rows, fuel: months[k].fuel.slice().sort((a, b) => a.date.localeCompare(b.date)) });
     const name = safeName(`Mileage ${mLabel(k)}${S.name ? ' - ' + S.name : ''}.xlsx`);
