@@ -777,7 +777,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         const pts = decodeRoute(t.route); if (pts.length < 2) return;
         const priv = t.type === 'priv', miles = priv ? (t.priv ?? tripMiles(t)) : (t.bus ?? tripMiles(t));
         const when = fmtD(t.startDate) + (t.finishDate && t.finishDate !== t.startDate ? ' – ' + fmtD(t.finishDate) : '');
-        const label = `<b>${priv ? 'Private journey' : escH([t.desc, t.sitePc].filter(Boolean).join(' · '))}</b><br>${escH(when)} · ${miles} mi`;
+        const sl = t.sites || (t.sitePc ? [{ pc: t.sitePc, desc: t.desc }] : []);
+        const label = `<b>${priv ? 'Private journey' : escH(sl.map(s => s.desc || s.pc).join(' → '))}</b><br>${escH(when)} · ${miles} mi${isRoundTrip(t) ? ' there and back' : ''}`;
         const line = routeLine(L, pts, priv).addTo(map);
         line.eachLayer(l => l.bindPopup(label));
         // the furthest point out: where the trip went
@@ -1473,6 +1474,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     return out;
   }
   const escH = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const isRoundTrip = t => { const p = t.route ? decodeRoute(t.route) : []; if (p.length < 2) return true;
+    const a = p[0], b = p[p.length - 1]; return Math.hypot(a[0] - b[0], (a[1] - b[1]) * Math.cos(a[0] * Math.PI / 180)) < 0.02; }; // within ~2 km
   const tripMiles = t => Math.max(0, (t.finishMiles ?? 0) - (t.startMiles ?? 0));
   // miles per day for a run of dates, split business / private (a multi-day trip is spread across its days)
   function milesByDay(fromIso, days) {
@@ -1533,9 +1536,11 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     await loadMonth(k); const M = months[k]; const t = M.trips.find(x => x.id === id); if (!t) return;
     viewM = k;
     const P = t.type === 'priv';
-    const box = openSheet(P ? 'Private journey' : `${t.startPc} → ${t.sitePc}`);
+    const multi = !P && (t.legs || []).length > 0;
+    const box = openSheet(P ? 'Private journey' : multi ? `${siteList(t).length} sites, one trip` : `${t.startPc} → ${t.sitePc} → back`);
+    if (multi) box.append(el('div', { className: 'route', style: 'font-size:16px' }, [t.startPc, ...siteList(t).flatMap(s => [el('i', { textContent: '→' }), s.pc]), el('i', { textContent: '→' }), 'back']));
     box.append(el('div', { className: 'meta' }, [el('span', { className: 'tag ' + (P ? 'priv' : 'bus'), textContent: P ? 'Private' : 'Business' }),
-      el('span', { textContent: fmtD(t.startDate) + (t.finishDate && t.finishDate !== t.startDate ? ' – ' + fmtD(t.finishDate) : '') }), !P && t.desc ? el('span', { textContent: t.desc }) : '', !P && t.job ? el('span', { textContent: 'Job ' + t.job }) : ''].filter(Boolean)));
+      el('span', { textContent: fmtD(t.startDate) + (t.finishDate && t.finishDate !== t.startDate ? ' – ' + fmtD(t.finishDate) : '') }), !P && !multi && t.desc ? el('span', { textContent: t.desc }) : '', !P && !multi && t.job ? el('span', { textContent: 'Job ' + t.job }) : ''].filter(Boolean)));
     if (t.route) { const m = el('div', { className: 'map' }); box.append(m); drawMap(m, [t]); }
     const kv = el('div', { className: 'kv' });
     const add = (l, v) => kv.append(el('div', {}, [el('span', { className: 'lbl', textContent: l }), el('b', { textContent: v })]));
@@ -1545,6 +1550,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (t.gpsMiles != null) add('GPS logged', `${t.gpsMiles} mi`);
     const days = Math.max(1, Math.round((new Date((t.finishDate || t.startDate) + 'T12:00') - new Date(t.startDate + 'T12:00')) / 86400000) + 1);
     add('Days', String(days));
+    if (!P) add('Route', isRoundTrip(t) ? 'There and back' : 'One way');
     if (!P && expRound(t) && tripMiles(t) > expRound(t)) add('Local driving', `${tripMiles(t) - expRound(t)} mi`);
     box.append(kv);
     if (!P && (t.legs || []).length) { // each site on the run
@@ -1566,14 +1572,15 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const when = r.startDate && r.startDate.length > 7 ? fmtD(r.startDate) + (r.finishDate && r.finishDate !== r.startDate ? ' – ' + fmtD(r.finishDate) : '') : '';
     const title = el('span', { className: 'r' });
     if (r.id) title.append(el('span', { className: 'tag ' + (P ? 'priv' : 'bus'), textContent: P ? 'Private' : 'Business' }));
-    title.append(P ? 'Journey' : r.id ? `${r.startPc || '?'} → ` + ((r.sites && r.sites.length > 1) ? r.sites.map(s => s.pc).join(' → ') : (r.sitePc || '?')) : r.desc);
+    title.append(P ? (isRoundTrip(r) ? 'Round trip' : 'Journey') : r.id ? `${r.startPc || '?'} → ` + ((r.sites && r.sites.length > 1) ? r.sites.map(s => s.pc).join(' → ') : (r.sitePc || '?')) + ' → back' : r.desc);
     head.append(title,
       el('span', { className: 'd', textContent: [when, !P && r.sites && r.sites.length > 1 ? r.sites.length + ' sites · jobs ' + r.sites.map(s => s.job || '–').join(', ') : (!P && r.job ? 'Job ' + r.job : ''), !P && r.id && !(r.sites && r.sites.length > 1) ? r.desc : '', r.expR ? `expected ${r.expR}` : '', r.route ? 'route' : ''].filter(Boolean).join(' · ') || fmtD(r.finishDate) }),
       el('span', { className: 'm' }));
     const m = head.querySelector('.m');
-    const extra = r.untracked ? ` · +${r.untracked} not logged` : '';
+    const extra = '';
     m.classList.add(P || !r.id ? 'priv' : 'biz');
-    m.append(String(P ? r.priv : r.id ? r.bus : (r.untracked ?? r.priv)), el('small', { textContent: P ? 'private' : r.id ? 'business' + extra : 'private' }));
+    m.append(String(P ? r.priv : r.id ? r.bus : (r.untracked ?? r.priv)), el('small', { textContent: P ? 'private' : r.id ? 'business' : 'private' }));
+    if (r.id && !P && r.untracked) head.append(el('span', { className: 'd', style: 'grid-column:1 / -1;color:var(--priv-deep)', textContent: `${r.untracked} mi driven before this trip weren't logged, so they count as private` }));
     it.append(head);
     if (!r.id) { head.disabled = true; head.style.cursor = 'default'; return it; }
     head.onclick = () => openTrip(r.id, viewM);
