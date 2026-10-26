@@ -1813,6 +1813,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     try {
       const st = await T.status();
       const act = await T.takeAction();
+      try { const inc = await T.takeIncoming(); if (inc && inc.text) { showTab('settings'); offerRestore('Opened file', inc.text); $('restoreMsg').scrollIntoView({ block: 'center' }); } } catch (e) {}
       if (st.active && !S.openTrip) {
         const d = act.since ? new Date(act.since) : new Date();
         const iso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, weekend = d.getDay() === 0 || d.getDay() === 6;
@@ -1914,9 +1915,13 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   $('restoreBtn').onclick = () => $('restoreFile').click();
   $('restoreFile').onchange = async e => {
     const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    offerRestore(f.name, await f.text());
+  };
+  function offerRestore(name, text) { // check a backup and show the Replace button
     const msg = $('restoreMsg'); msg.hidden = false; $('restoreGo').hidden = true; pending = null;
+    const f = { name };
     try {
-      const d = strip(JSON.parse(await f.text()));
+      const d = strip(JSON.parse(text));
       const ms = Object.keys(d).filter(k => /^m-\d{4}-\d{2}$/.test(k));
       if (!d.settings && !ms.length) throw new Error('not a DrivR backup');
       const trips = ms.reduce((n, k) => n + ((d[k].trips || []).length), 0);
@@ -1924,7 +1929,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       msg.textContent = `${f.name}: ${trips} trips over ${ms.length} month${ms.length === 1 ? '' : 's'}. Restoring replaces everything in the app now.`;
       $('restoreGo').hidden = false;
     } catch (err) { msg.textContent = 'That file could not be read as a DrivR backup.'; }
-  };
+  }
   $('restoreGo').onclick = async () => {
     if (!pending) return;
     DATA = pending; pending = null; await saveAll();

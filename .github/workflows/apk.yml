@@ -62,6 +62,13 @@ jobs:
           sed -i 's#</manifest>#    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />\n    <uses-permission android:name="android.permission.VIBRATE" />\n    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />\n    <uses-permission android:name="android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND" />\n    <uses-permission android:name="android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND" />\n    <uses-feature android:name="android.software.companion_device_setup" android:required="false" />\n</manifest>#' $M
           sed -i 's#</application>#    <receiver android:name=".ReminderReceiver" android:exported="true"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /><action android:name="android.bluetooth.device.action.ACL_CONNECTED" /><action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" /><action android:name="android.app.action.ENTER_CAR_MODE" /><action android:name="android.app.action.EXIT_CAR_MODE" /></intent-filter></receiver>\n    <receiver android:name=".WidgetProvider" android:exported="true" android:label="DrivR"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/mbp_widget_info" /></receiver>\n    </application>#' $M
           cp -r native/res/* android/app/src/main/res/
+          # DrivR backup files (.json) tapped in Downloads open in the app
+          python3 - "$M" <<'PY'
+          import sys
+          p=sys.argv[1]; s=open(p).read()
+          f='<intent-filter><action android:name="android.intent.action.VIEW" /><category android:name="android.intent.category.DEFAULT" /><category android:name="android.intent.category.BROWSABLE" /><data android:scheme="content" /><data android:scheme="file" /><data android:mimeType="application/json" /></intent-filter>'
+          s=s.replace('</activity>', f+'</activity>', 1); open(p,'w').write(s)
+          PY
           RES=android/app/src/main/res
           rm -rf $RES/mipmap-anydpi-v26
           for d in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do

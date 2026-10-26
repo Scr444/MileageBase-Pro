@@ -221,6 +221,15 @@ public class TrackerPlugin extends Plugin {
         call.resolve(r);
     }
 
+    /** A backup file the user opened with DrivR, if any (handed over once). */
+    @PluginMethod
+    public void takeIncoming(PluginCall call) {
+        JSObject r = new JSObject();
+        r.put("text", MainActivity.incoming == null ? "" : MainActivity.incoming);
+        MainActivity.incoming = null;
+        call.resolve(r);
+    }
+
     @PluginMethod
     public void status(PluginCall call) { call.resolve(status(getContext())); }
 
