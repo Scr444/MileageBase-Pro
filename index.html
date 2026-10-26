@@ -146,6 +146,13 @@ button.danger { color: var(--warn); background: var(--warn-soft); }
 .tag.bus { background: var(--biz-soft); color: var(--biz-deep); }
 .tag.priv { background: var(--priv-soft); color: var(--priv-deep); }
 .tag.live { background: var(--live-soft); color: var(--live); }
+.tag.multi { background: var(--biz-deep); color: #fff; }
+.sites { grid-column: 1 / -1; list-style: none; margin: 6px 0 0; padding: 0 0 0 14px; border-left: 3px solid var(--biz-soft); display: flex; flex-direction: column; gap: 7px; }
+.sites li { display: grid; grid-template-columns: 22px minmax(0,1fr) auto; gap: 2px 8px; align-items: baseline; }
+.sites .n { font: 800 12px var(--body); color: #fff; background: var(--biz); border-radius: 999px; width: 20px; height: 20px; display: grid; place-items: center; align-self: center; }
+.sites .pc { font: 800 14px var(--mono); }
+.sites .mi { font: 800 13px var(--mono); color: var(--biz-deep); text-align: right; }
+.sites .j { grid-column: 2 / -1; font-size: 12.5px; color: var(--sub); font-weight: 600; }
 .jobrow { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 2px 12px; padding: 13px 14px; border-bottom: 1px solid var(--line); }
 .jobrow:last-child { border-bottom: 0; }
 .jobrow b { font: 800 15.5px var(--mono); }
@@ -845,7 +852,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     return m;
   }
   // ---------- multi-site trips: the first site is sitePc/job/desc; later ones are legs, each starting at an odometer reading ----------
-  const siteList = t => [{ pc: t.sitePc, job: t.job, desc: t.desc }, ...((t.legs || []).map(l => ({ pc: l.sitePc, job: l.job, desc: l.desc })))].filter(s => s.pc);
+  const siteList = t => [{ pc: t.sitePc, job: t.job, desc: t.desc, date: t.startDate }, ...((t.legs || []).map(l => ({ pc: l.sitePc, job: l.job, desc: l.desc, date: l.date })))].filter(s => s.pc);
   const curSite = t => { const s = siteList(t); return s[s.length - 1] || {}; };
   const expRound = t => t ? (t.expectedTotal ?? (t.expected ? t.expected * 2 : null)) : null;
   function legMiles(t) { // miles at each site: getting there plus driving around it; the drive home counts on the last
@@ -1647,10 +1654,18 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const when = r.startDate && r.startDate.length > 7 ? fmtD(r.startDate) + (r.finishDate && r.finishDate !== r.startDate ? ' – ' + fmtD(r.finishDate) : '') : '';
     const title = el('span', { className: 'r' });
     if (r.id) title.append(el('span', { className: 'tag ' + (P ? 'priv' : 'bus'), textContent: P ? 'Private' : 'Business' }));
-    title.append(P ? (isRoundTrip(r) ? 'Round trip' : 'Journey') : r.id ? `${r.startPc || '?'} → ` + ((r.sites && r.sites.length > 1) ? r.sites.map(s => s.pc).join(' → ') : (r.sitePc || '?')) + ' → back' : r.desc);
+    const multi = !P && r.id && r.sites && r.sites.length > 1;
+    if (multi) title.append(el('span', { className: 'tag multi', textContent: `${r.sites.length} sites` }));
+    title.append(P ? (isRoundTrip(r) ? 'Round trip' : 'Journey') : r.id ? `${r.startPc || '?'} → ` + (multi ? `${r.sites.length} sites` : (r.sitePc || '?')) + ' → back' : r.desc);
     head.append(title,
-      el('span', { className: 'd', textContent: [when, !P && r.sites && r.sites.length > 1 ? r.sites.length + ' sites · jobs ' + r.sites.map(s => s.job || '–').join(', ') : (!P && r.job ? 'Job ' + r.job : ''), !P && r.id && !(r.sites && r.sites.length > 1) ? r.desc : '', r.expR ? `expected ${r.expR}` : '', r.route ? 'route' : ''].filter(Boolean).join(' · ') || fmtD(r.finishDate) }),
+      el('span', { className: 'd', textContent: [when, multi ? 'one week, one sheet row' : (!P && r.job ? 'Job ' + r.job : ''), !P && r.id && !multi ? r.desc : '', r.expR ? `expected ${r.expR}` : '', r.route ? 'route' : ''].filter(Boolean).join(' · ') || fmtD(r.finishDate) }),
       el('span', { className: 'm' }));
+    if (multi) { // every site on its own line: where, which job, when, and the miles that went with it
+      const ol = el('ol', { className: 'sites' });
+      (r.segs || r.sites).forEach((s, i) => ol.append(el('li', {}, [el('span', { className: 'n', textContent: String(i + 1) }), el('span', { className: 'pc', textContent: s.pc }),
+        el('span', { className: 'mi', textContent: s.miles != null ? s.miles + ' mi' : '' }),
+        el('span', { className: 'j', textContent: [s.job ? 'Job ' + s.job : '', s.desc, s.date ? fmtD(s.date) : ''].filter(Boolean).join(' · ') })])));
+      head.append(ol); }
     const m = head.querySelector('.m');
     const extra = '';
     m.classList.add(P || !r.id ? 'priv' : 'biz');
