@@ -943,31 +943,32 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const trips = [...M.trips].sort((a, b) => ((a.startMiles ?? 0) - (b.startMiles ?? 0)) || String(a.startDate).localeCompare(String(b.startDate)));
     let lastAny = monthStart(k);
     const rows = [], list = [], unsorted = [];
-    let privAcc = 0; // private miles since the last business row
+    let privAcc = 0, privTo = null, privDate = null; // private miles since the last business row, the reading they end at, and when
+    const privRow = () => { if (privAcc > 0) rows.push({ desc: 'Private', priv: privAcc, bus: 0, driver: S.driver, finishMiles: privTo, finishDate: privDate }); privAcc = 0; };
     trips.forEach(t => {
       const run = Math.max(0, (t.finishMiles ?? 0) - (t.startMiles ?? 0));
       const gap = lastAny != null && t.startMiles != null ? Math.max(0, t.startMiles - lastAny) : 0;
       const gapPriv = gap && t.privGap ? gap : 0, gapOpen = gap && !t.privGap ? gap : 0;
-      privAcc += gapPriv;
+      if (gapPriv) { privAcc += gapPriv; privTo = t.startMiles; privDate = t.startDate; }
       if (gapOpen) unsorted.push({ id: t.id, miles: gapOpen, from: lastAny, to: t.startMiles, date: t.startDate });
       if (t.type === 'priv') {
-        privAcc += run;
+        privAcc += run; if (t.finishMiles != null) { privTo = t.finishMiles; privDate = t.finishDate || t.startDate; }
         list.push({ id: t.id, type: 'priv', priv: run, bus: 0, startDate: t.startDate, finishDate: t.finishDate, route: t.route, gapOpen, gapPriv, lagAdded: t.lagAdded });
       } else {
         const sl = siteList(t);
         const row = { id: t.id, desc: t.desc, startPc: t.startPc, sitePc: t.sitePc, job: t.job, driver: S.driver, sites: sl, segs: sl.length > 1 ? legMiles(t) : null, expR: expRound(t),
-                      startDate: t.startDate, finishMiles: t.finishMiles, finishDate: t.finishDate, priv: privAcc, bus: run, gapOpen, gapPriv, lagAdded: t.lagAdded, route: t.route, expected: t.expected };
-        rows.push(row); list.push(row); privAcc = 0;
+                      startDate: t.startDate, finishMiles: t.finishMiles, finishDate: t.finishDate, priv: 0, bus: run, privBefore: privAcc, gapOpen, gapPriv, lagAdded: t.lagAdded, route: t.route, expected: t.expected };
+        privRow(); // private driving since the last business trip gets its own row, in order, before this one
+        rows.push(row); list.push(row);
       }
       if (t.finishMiles != null) lastAny = Math.max(lastAny ?? 0, t.finishMiles);
     });
-    let endRow = null;
     if (M.endMiles != null && lastAny != null && M.endMiles > lastAny) {
       const g = M.endMiles - lastAny;
-      if (M.endPriv) privAcc += g; else unsorted.push({ id: 'end', miles: g, from: lastAny, to: M.endMiles, date: lastDay(k) });
+      if (M.endPriv) { privAcc += g; privTo = M.endMiles; privDate = lastDay(k); } else unsorted.push({ id: 'end', miles: g, from: lastAny, to: M.endMiles, date: lastDay(k) });
       list.push({ desc: 'Month-end reading', finishMiles: M.endMiles, finishDate: lastDay(k), priv: M.endPriv ? g : 0, bus: 0, gapOpen: M.endPriv ? 0 : g, endGap: true });
     }
-    if (privAcc > 0) { endRow = { desc: 'Private', priv: privAcc, bus: 0, driver: S.driver, finishMiles: M.endMiles != null && M.endPriv ? M.endMiles : lastAny, finishDate: M.endMiles != null && M.endPriv ? lastDay(k) : undefined }; rows.push(endRow); }
+    privRow();
     return { rows, list, startMiles: monthStart(k), unsorted };
   }
   // ---------- gaps: odometer miles that weren't logged ----------
