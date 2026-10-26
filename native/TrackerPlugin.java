@@ -291,7 +291,8 @@ public class TrackerPlugin extends Plugin {
                 .putExtra(Intent.EXTRA_TEXT, call.getString("body", ""))
                 .putExtra(Intent.EXTRA_STREAM, uri)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        Intent mailOnly = new Intent(send).setSelector(new Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:"))); // email apps only
+        Intent mailOnly = new Intent(send);
+        mailOnly.setSelector(new Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:"))); // email apps only
         try {
             Intent go = Intent.createChooser(mailOnly, "Send backup").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             if (getActivity() != null) getActivity().startActivity(Intent.createChooser(mailOnly, "Send backup")); else c.startActivity(go);
