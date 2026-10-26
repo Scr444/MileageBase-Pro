@@ -17,8 +17,9 @@ import java.util.Calendar;
 public class ReminderReceiver extends BroadcastReceiver {
     static final String MONTH_END = "uk.mileagebase.app.MONTH_END";
     static final String WEEK_END = "uk.mileagebase.app.WEEK_END";
+    static final String BACKUP = "uk.mileagebase.app.BACKUP";
     static final String CHANNEL = "reminders";
-    static final int ID_WEEK = 7005, ID_MONTH = 7001, ID_CAR = 7002, ID_OPEN = 7003, ID_RESUME = 7004;
+    static final int ID_WEEK = 7005, ID_MONTH = 7001, ID_CAR = 7002, ID_OPEN = 7003, ID_RESUME = 7004, ID_BACKUP = 7006;
 
     @Override
     public void onReceive(Context c, Intent intent) {
@@ -36,6 +37,13 @@ public class ReminderReceiver extends BroadcastReceiver {
         if (WEEK_END.equals(a)) {
             String w = p.getString("weekText", "");
             if (!w.isEmpty()) notify(c, ID_WEEK, "Your week", w, "open", false);
+            schedule(c);
+            return;
+        }
+        if (BACKUP.equals(a)) { // every 3 days: a reminder that opens the email with the log attached
+            long last = p.getLong("lastEmail", 0);
+            if (!p.getString("backupEmail", "").isEmpty() && System.currentTimeMillis() - last > 3 * 86_400_000L - 3_600_000L)
+                notify(c, ID_BACKUP, "Back up your mileage log", "Tap, then press Send. It goes to " + p.getString("backupEmail", "") + ".", "backup", false);
             schedule(c);
             return;
         }
@@ -124,6 +132,12 @@ public class ReminderReceiver extends BroadcastReceiver {
         while (f.get(Calendar.DAY_OF_WEEK) != Calendar.FRIDAY || f.getTimeInMillis() <= System.currentTimeMillis()) f.add(Calendar.DAY_OF_MONTH, 1);
         PendingIntent wp = PendingIntent.getBroadcast(c, 9002, new Intent(c, ReminderReceiver.class).setAction(WEEK_END), PendingIntent.FLAG_UPDATE_CURRENT | immutable());
         try { am.set(AlarmManager.RTC_WAKEUP, f.getTimeInMillis(), wp); } catch (Exception e) { /* ignore */ }
+        // 7pm each day: the backup reminder, shown only when the last backup email was 3 or more days ago
+        Calendar b = Calendar.getInstance();
+        b.set(Calendar.HOUR_OF_DAY, 19); b.set(Calendar.MINUTE, 0); b.set(Calendar.SECOND, 0); b.set(Calendar.MILLISECOND, 0);
+        if (b.getTimeInMillis() <= System.currentTimeMillis()) b.add(Calendar.DAY_OF_MONTH, 1);
+        PendingIntent bp = PendingIntent.getBroadcast(c, 9003, new Intent(c, ReminderReceiver.class).setAction(BACKUP), PendingIntent.FLAG_UPDATE_CURRENT | immutable());
+        try { am.set(AlarmManager.RTC_WAKEUP, b.getTimeInMillis(), bp); } catch (Exception e) { /* ignore */ }
     }
 
     static int immutable() { return Build.VERSION.SDK_INT >= 23 ? PendingIntent.FLAG_IMMUTABLE : 0; }

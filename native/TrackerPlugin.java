@@ -60,6 +60,10 @@ public class TrackerPlugin extends Plugin {
         SharedPreferences.Editor e = TrackingService.prefs(getContext()).edit()
                 .putBoolean("tripOpen", open).putString("label", call.getString("label", ""))
                 .putInt("expectedMi", call.getInt("expectedMi", 0)).putString("weekText", call.getString("weekText", ""));
+        String mail = call.getString("backupEmail", null);
+        if (mail != null) e.putString("backupEmail", mail);
+        Double sent = call.getDouble("lastEmail");
+        if (sent != null) e.putLong("lastEmail", sent.longValue());
         String homes = call.getString("homes", null);
         if (homes != null) e.putString("homes", homes); // home and office, "lat,lon;lat,lon": parking there ends a trip
         if (open) e.putBoolean("auto", false);
@@ -268,6 +272,33 @@ public class TrackerPlugin extends Plugin {
             new java.io.File(dir, "route-" + tag + ".txt").delete(); new java.io.File(dir, "stops-" + tag + ".txt").delete();
         }
         new java.io.File(dir, "ended.txt").delete();
+        call.resolve();
+    }
+
+    /** Opens the email app with the backup attached and the address filled in: the user taps Send. */
+    @PluginMethod
+    public void emailFile(PluginCall call) {
+        Context c = getContext();
+        java.io.File f = new java.io.File(c.getCacheDir(), call.getString("path", ""));
+        if (!f.exists()) { call.reject("Backup file not found", "no_file"); return; }
+        Uri uri;
+        try { uri = androidx.core.content.FileProvider.getUriForFile(c, c.getPackageName() + ".fileprovider", f); }
+        catch (Exception e) { call.reject("Could not attach the file: " + e.getMessage(), "no_uri"); return; }
+        Intent send = new Intent(Intent.ACTION_SEND)
+                .setType("application/json")
+                .putExtra(Intent.EXTRA_EMAIL, new String[] { call.getString("to", "") })
+                .putExtra(Intent.EXTRA_SUBJECT, call.getString("subject", "DrivR backup"))
+                .putExtra(Intent.EXTRA_TEXT, call.getString("body", ""))
+                .putExtra(Intent.EXTRA_STREAM, uri)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        Intent mailOnly = new Intent(send).setSelector(new Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:"))); // email apps only
+        try {
+            Intent go = Intent.createChooser(mailOnly, "Send backup").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            if (getActivity() != null) getActivity().startActivity(Intent.createChooser(mailOnly, "Send backup")); else c.startActivity(go);
+        } catch (Exception e) {
+            try { Intent go = Intent.createChooser(send, "Send backup").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); c.startActivity(go); }
+            catch (Exception e2) { call.reject("No email app found", "no_app"); return; }
+        }
         call.resolve();
     }
 

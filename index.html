@@ -277,8 +277,6 @@ body.has-dock .toast { bottom: calc(var(--tab-h) + 92px + env(safe-area-inset-bo
   </section>
 
   <section class="view" data-view="month" hidden>
-    <div class="seg" role="group" aria-label="Period"><button type="button" id="segMonth" aria-pressed="true">Month</button><button type="button" id="segYear" aria-pressed="false">Tax year</button></div>
-    <div id="yearView" class="view" hidden></div>
     <div id="monthView" class="view">
     <div class="monthbar"><button type="button" class="mprev" aria-label="Previous month"><svg><use href="#i-left"/></svg></button><h2 class="mtitle">—</h2><button type="button" class="mnext" aria-label="Next month"><svg><use href="#i-right"/></svg></button></div>
     <div class="stats">
@@ -327,7 +325,10 @@ body.has-dock .toast { bottom: calc(var(--tab-h) + 92px + env(safe-area-inset-bo
     <div id="carBox" class="card"></div>
     <div class="card">
       <h2>Backup</h2>
-      <p class="hint" id="backupHint">Your whole log is one file on this phone, in Documents/DrivR. A dated copy is saved every week in Documents/DrivR/Backups. Share one to your laptop to keep a copy off the phone.</p>
+      <p class="hint" id="backupHint">Your whole log is one file on this phone, in Documents/DrivR. A dated copy is saved every week in Documents/DrivR/Backups.</p>
+      <div class="field"><label class="lbl" for="sBackupEmail">Email backups to</label><input id="sBackupEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com"></div>
+      <p class="hint" id="emailHint">Every 3 days a reminder opens your email with the log attached. You just press Send.</p>
+      <button class="primary" type="button" id="emailBtn">Email backup now</button>
       <div class="btns">
         <button class="secondary" type="button" id="backupBtn">Share backup</button>
         <button class="secondary" type="button" id="restoreBtn">Restore</button>
@@ -932,7 +933,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       if (b || p) weekText = `${b} business and ${p} private miles this week.` + (t && t.type === 'unsorted' ? ' One trip still needs sorting.' : '');
     } catch (e) {}
     const homes = (S.homesLL || []).map(x => x[0] + ',' + x[1]).join(';');
-    T.sync({ tripOpen: !!t && t.type !== 'unsorted', label: tripLabel(t), expectedMi: expRound(t) || 0, weekText, homes }).catch(() => {});
+    T.sync({ tripOpen: !!t && t.type !== 'unsorted', label: tripLabel(t), expectedMi: expRound(t) || 0, weekText, homes,
+             backupEmail: S.backupEmail || '', lastEmail: S.lastEmail || 0 }).catch(() => {});
   }
 
   // Rows exactly as they go on the sheet
@@ -1941,48 +1943,6 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   // ---------- wiring ----------
   document.querySelectorAll('.mprev').forEach(b => { b.onclick = async () => { viewM = shiftM(viewM, -1); editing = null; await renderMonth(); }; });
   document.querySelectorAll('.mnext').forEach(b => { b.onclick = async () => { viewM = shiftM(viewM, 1); editing = null; await renderMonth(); }; });
-  // ---------- tax year (6 April to 5 April) ----------
-  let taxStart = (() => { const d = new Date(today() + 'T12:00'), y = d.getFullYear(); return (d.getMonth() > 3 || (d.getMonth() === 3 && d.getDate() >= 6)) ? y : y - 1; })();
-  function taxRange(y) { return [`${y}-04-06`, `${y + 1}-04-05`]; }
-  function renderYear() {
-    const box = $('yearView'); box.innerHTML = '';
-    const [from, to] = taxRange(taxStart);
-    const bar = el('div', { className: 'monthbar' });
-    const pv = el('button', { type: 'button' }, [svg('i-left')]); pv.setAttribute('aria-label', 'Previous tax year'); pv.onclick = () => { taxStart--; renderYear(); };
-    const nx = el('button', { type: 'button' }, [svg('i-right')]); nx.setAttribute('aria-label', 'Next tax year'); nx.onclick = () => { taxStart++; renderYear(); };
-    bar.append(pv, el('h2', { textContent: `Tax year ${taxStart}–${String(taxStart + 1).slice(2)}` }), nx); box.append(bar);
-    const trips = allTrips().filter(t => t.startDate >= from && t.startDate <= to && t.finishMiles != null);
-    // business and private per month, through the same sheet rules as the monthly sheets
-    const cols = []; let bus = 0, priv = 0, litres = 0, cost = 0;
-    for (let i = 0; i < 12; i++) {
-      const m = (3 + i) % 12, y = taxStart + (3 + i >= 12 ? 1 : 0), k = `${y}-${pad(m + 1)}`, M = DATA['m-' + k];
-      let b = 0, pr = 0;
-      if (M) { months[k] = months[k] || M; sheetRows(k).rows.forEach(r => { const d = r.startDate || r.finishDate || lastDay(k); if (d >= from && d <= to) { b += r.bus; pr += r.priv; } });
-        (M.fuel || []).forEach(f => { if (f.date >= from && f.date <= to) { litres += (f.litresBus || 0) + (f.litresPriv || 0); cost += Number(f.cost) || 0; } }); }
-      bus += b; priv += pr; cols.push({ label: MONTHS[m].slice(0, 1), bus: b, priv: pr });
-    }
-    const st = el('div', { className: 'stats' });
-    const stat = (l, v, u, cls) => el('div', { className: 'stat ' + (cls || '') }, [el('span', { className: 'lbl', textContent: l }), el('b', {}, [v, el('small', { textContent: u })])]);
-    st.append(stat('Business', bus.toLocaleString('en-GB'), 'mi', 'biz'), stat('Private', priv.toLocaleString('en-GB'), 'mi', 'priv'),
-      stat('Business share', bus + priv ? Math.round(bus / (bus + priv) * 100) + '' : '–', bus + priv ? '%' : ''), stat('Trips', String(trips.length), ''),
-      stat('Fuel', Math.round(litres).toLocaleString('en-GB'), 'L'), stat('Fuel cost', cost ? '£' + Math.round(cost).toLocaleString('en-GB') : '–', ''));
-    box.append(st);
-    const ch = el('div', { className: 'card' }); ch.append(el('span', { className: 'lbl', textContent: 'Miles by month, April to March' }), barChart(cols)); box.append(ch);
-    box.append(el('p', { className: 'hint', textContent: 'For your records. If you claim mileage allowance yourself, HMRC rates are 45p a mile for the first 10,000 business miles and 25p after. Check with your accountant.' }));
-    const ex = el('button', { type: 'button', className: 'primary', textContent: 'Export tax year (.csv)' });
-    ex.onclick = async () => {
-      const lines = [['Start date', 'Finish date', 'Type', 'Start postcode', 'Site postcode', 'Job', 'Site', 'Start miles', 'Finish miles', 'Miles'].join(',')];
-      trips.sort((x, y) => (x.startMiles ?? 0) - (y.startMiles ?? 0)).forEach(t => { const P = t.type === 'priv';
-        lines.push([t.startDate, t.finishDate || '', P ? 'Private' : 'Business', P ? '' : t.startPc, P ? '' : t.sitePc, P ? '' : (t.job || ''), P ? '' : '"' + String(t.desc || '').replace(/"/g, '""') + '"', t.startMiles, t.finishMiles, tripMiles(t)].join(',')); });
-      lines.push('', `Business miles,${bus}`, `Private miles,${priv}`);
-      const name = `DrivR tax year ${taxStart}-${String(taxStart + 1).slice(2)}.csv`, txt = lines.join('\n');
-      if (!NATIVE) { download(name, new Blob([txt], { type: 'text/csv' })); return; }
-      try { await fsWrite('Sheets/' + name, txt); await shareFile(name, txt, false); } catch (e) { if (!/cancel/i.test(String(e && e.message || e))) toast('Could not share: ' + (e.message || e)); }
-    };
-    box.append(ex);
-  }
-  $('segMonth').onclick = () => { $('segMonth').setAttribute('aria-pressed', 'true'); $('segYear').setAttribute('aria-pressed', 'false'); $('monthView').hidden = false; $('yearView').hidden = true; };
-  $('segYear').onclick = () => { $('segYear').setAttribute('aria-pressed', 'true'); $('segMonth').setAttribute('aria-pressed', 'false'); $('monthView').hidden = true; $('yearView').hidden = false; renderYear(); };
   // ---------- first-run setup ----------
   async function wizState() {
     const st = { loc: false, bat: false, car: false, bg: false };
@@ -2146,6 +2106,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     await saveS(); fillSettings(); renderTripCard(); renderMonth(); toast('Details saved');
   };
   function fillSettings() {
+    $('sBackupEmail').value = S.backupEmail || '';
     $('sName').value = S.name; $('sDriver').value = S.driver; $('sReg').value = S.reg; $('sOffice').value = S.office; $('sHome').value = S.home;
     $('regBadge').hidden = !S.reg; $('regBadge').textContent = S.reg;
   }
@@ -2238,6 +2199,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         else if (!t) { const sg = suggestedStart(); if (sg != null) await startPrivate(sg); else { newType = 'priv'; renderTripCard(); } }
       } else if (a === 'finish') {
         renderTripCard(); const b = $('tripCard').querySelector('form button[type=submit]'); if (b) b.scrollIntoView({ block: 'center' });
+      } else if (a === 'backup') {
+        await emailBackup();
       } else if (a === 'monthend') {
         await renderMonthEnd(); $('monthEnd').scrollIntoView({ block: 'start' });
       }
@@ -2308,6 +2271,20 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (!lastSheet) return;
     try { await shareFile(lastSheet.name, lastSheet.data, true); } catch (e) { if (!/cancel/i.test(String(e && e.message || e))) toast('Could not share: ' + (e.message || e)); }
   };
+  async function emailBackup() { // opens the email app with the log attached and the address filled in
+    const to = (S.backupEmail || '').trim();
+    if (!to) { showTab('settings'); $('sBackupEmail').focus(); toast('Add the email address for backups first'); return; }
+    const txt = fileText(), name = safeName(`DrivR backup ${today()}.json`);
+    if (!NATIVE) { download(name, new Blob([txt], { type: 'application/json' })); return; }
+    try {
+      await FS().writeFile({ path: 'share/' + name, data: txt, directory: 'CACHE', recursive: true, encoding: 'utf8' });
+      await TR().emailFile({ path: 'share/' + name, to, subject: `DrivR backup ${fmtD(today())}`,
+        body: 'My DrivR mileage log. To restore it, open the attached file on the phone and choose DrivR.' });
+      S.lastEmail = Date.now(); await saveS();
+    } catch (e) { toast('Could not open email: ' + (e.message || e)); }
+  }
+  $('emailBtn').onclick = emailBackup;
+  $('sBackupEmail').onchange = async () => { S.backupEmail = $('sBackupEmail').value.trim(); await saveS(); toast(S.backupEmail ? 'Backup email saved' : 'Backup email cleared'); };
   $('backupBtn').onclick = async () => {
     const txt = fileText(), name = `DrivR backup ${today()}.json`;
     if (!NATIVE) { download(name, new Blob([txt], { type: 'application/json' })); return; }
