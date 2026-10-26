@@ -282,6 +282,7 @@ body.has-dock .toast { bottom: calc(var(--tab-h) + 92px + env(safe-area-inset-bo
       <div class="stat"><span class="lbl">Fuel cost</span><b id="tCost">–</b></div>
       <div class="stat"><span class="lbl">Trips</span><b id="tCount">0</b></div>
     </div>
+    <div class="banner warn" id="unsortedNote" hidden></div>
     <div class="split" id="tSplit" title="Business and private share"></div>
     <div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="lbl">Miles by week</span>
       <span class="legend"><span><i style="background:var(--biz)"></i>Business</span><span><i style="background:var(--priv)"></i>Private</span></span></div><div id="weekChart"></div></div>
@@ -884,7 +885,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     updateLive();
     const odo = $('cMiles');
     if (odo && !odo.dataset.touched && gpsLive.meters > 0) {
-      odo.value = S.openTrip.startMiles + Math.round(MI(gpsLive.meters));
+      odo.value = S.openTrip.startMiles + gpsToOdo(MI(gpsLive.meters));
       const h = $('cHint'); if (h) h.textContent = 'Worked out from GPS. Check the dash and change it if you want it exact.';
     }
   }
@@ -928,38 +929,100 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   // Rows exactly as they go on the sheet
   // Sheet rows. Private journeys get no row of their own: their miles show in the Private column of the
   // next business row (or one closing "Private" row), so nothing about where or when goes on the sheet.
+  // Sheet rows. Each trip may have a gap before it: odometer miles nobody logged. A gap is only ever private if you
+  // said so (privGap); otherwise it's "not sorted" and the sheet won't build until you sort it.
   function sheetRows(k) {
     const M = months[k] || blankMonth();
     const trips = [...M.trips].sort((a, b) => ((a.startMiles ?? 0) - (b.startMiles ?? 0)) || String(a.startDate).localeCompare(String(b.startDate)));
-    const first = trips[0];
-    let prev = monthStart(k);
-    const rows = [], list = [];
-    let privRun = 0; // private journey miles since the last business row
+    let lastAny = monthStart(k);
+    const rows = [], list = [], unsorted = [];
+    let privAcc = 0; // private miles since the last business row
     trips.forEach(t => {
       const run = Math.max(0, (t.finishMiles ?? 0) - (t.startMiles ?? 0));
+      const gap = lastAny != null && t.startMiles != null ? Math.max(0, t.startMiles - lastAny) : 0;
+      const gapPriv = gap && t.privGap ? gap : 0, gapOpen = gap && !t.privGap ? gap : 0;
+      privAcc += gapPriv;
+      if (gapOpen) unsorted.push({ id: t.id, miles: gapOpen, from: lastAny, to: t.startMiles, date: t.startDate });
       if (t.type === 'priv') {
-        privRun += run;
-        list.push({ id: t.id, type: 'priv', priv: run, bus: 0, startDate: t.startDate, finishDate: t.finishDate, route: t.route });
-        return;
+        privAcc += run;
+        list.push({ id: t.id, type: 'priv', priv: run, bus: 0, startDate: t.startDate, finishDate: t.finishDate, route: t.route, gapOpen, gapPriv, lagAdded: t.lagAdded });
+      } else {
+        const sl = siteList(t);
+        const row = { id: t.id, desc: t.desc, startPc: t.startPc, sitePc: t.sitePc, job: t.job, driver: S.driver, sites: sl, segs: sl.length > 1 ? legMiles(t) : null, expR: expRound(t),
+                      startDate: t.startDate, finishMiles: t.finishMiles, finishDate: t.finishDate, priv: privAcc, bus: run, gapOpen, gapPriv, lagAdded: t.lagAdded, route: t.route, expected: t.expected };
+        rows.push(row); list.push(row); privAcc = 0;
       }
-      const gap = prev != null && t.startMiles != null ? Math.max(0, t.startMiles - prev) : 0;
-      const sl = siteList(t);
-      const row = { id: t.id, desc: t.desc, startPc: t.startPc, sitePc: t.sitePc, job: t.job, driver: S.driver, sites: sl, segs: sl.length > 1 ? legMiles(t) : null, expR: expRound(t),
-                    startDate: t.startDate, finishMiles: t.finishMiles, finishDate: t.finishDate, priv: gap, bus: run, untracked: Math.max(0, gap - privRun), route: t.route, expected: t.expected };
-      rows.push(row); list.push(row);
-      prev = t.finishMiles ?? prev; privRun = 0;
+      if (t.finishMiles != null) lastAny = Math.max(lastAny ?? 0, t.finishMiles);
     });
-    const last = trips[trips.length - 1];
-    const reached = last ? Math.max(prev ?? 0, last.finishMiles ?? 0) : prev;
-    if (M.endMiles != null && prev != null && M.endMiles > prev) {
-      const r = { desc: 'Private', finishMiles: M.endMiles, finishDate: lastDay(k), priv: M.endMiles - prev, bus: 0, driver: S.driver };
-      rows.push(r); list.push({ ...r, desc: 'Private miles to month end', untracked: Math.max(0, M.endMiles - reached) });
-    } else if (privRun > 0) {
-      const base = prev ?? (trips.find(t => t.type === 'priv') || {}).startMiles ?? 0;
-      rows.push({ desc: 'Private', priv: Math.max(privRun, reached - base), bus: 0, driver: S.driver });
+    let endRow = null;
+    if (M.endMiles != null && lastAny != null && M.endMiles > lastAny) {
+      const g = M.endMiles - lastAny;
+      if (M.endPriv) privAcc += g; else unsorted.push({ id: 'end', miles: g, from: lastAny, to: M.endMiles, date: lastDay(k) });
+      list.push({ desc: 'Month-end reading', finishMiles: M.endMiles, finishDate: lastDay(k), priv: M.endPriv ? g : 0, bus: 0, gapOpen: M.endPriv ? 0 : g, endGap: true });
     }
-    return { rows, list, startMiles: monthStart(k) };
+    if (privAcc > 0) { endRow = { desc: 'Private', priv: privAcc, bus: 0, driver: S.driver, finishMiles: M.endMiles != null && M.endPriv ? M.endMiles : lastAny, finishDate: M.endMiles != null && M.endPriv ? lastDay(k) : undefined }; rows.push(endRow); }
+    return { rows, list, startMiles: monthStart(k), unsorted };
   }
+  // ---------- gaps: odometer miles that weren't logged ----------
+  // A small gap right after a trip is GPS lag on that trip: it goes on that trip. Anything bigger, you decide.
+  const lagLimit = run => Math.min(15, Math.max(5, Math.round((run || 0) * 0.03)));
+  function tripBefore(reading, exceptId) { // the trip that finished last at or before this reading
+    let best = null, bk = null;
+    monthKeys().forEach(k => (DATA['m-' + k].trips || []).forEach(t => {
+      if (t.id === exceptId || t.finishMiles == null || t.finishMiles > reading) return;
+      if (!best || t.finishMiles > best.finishMiles) { best = t; bk = k; } }));
+    return best ? { t: best, k: bk } : null;
+  }
+  async function addToTrip(p, miles, newFinish) { // extend a trip's finish reading to cover lag
+    const M = await loadMonth(p.k), t = M.trips.find(x => x.id === p.t.id) || p.t;
+    for (const x of new Set([t, p.t])) { x.finishMiles = newFinish; x.lagAdded = (x.lagAdded || 0) + miles; }
+    await saveMonth(p.k);
+  }
+  // where a new reading leaves a gap: 'none', 'auto' (small: added to the last trip), or 'ask'
+  function gapCheck(reading) {
+    const last = lastReading(); if (last == null || reading <= last) return { kind: 'none' };
+    const g = reading - last, p0 = tripBefore(last);
+    // a trip in a month that's been closed with a month-end reading can't take the miles: they were driven after it
+    const p = p0 && DATA['m-' + p0.k].endMiles == null ? p0 : null;
+    const runPrev = p ? Math.max(0, p.t.finishMiles - p.t.startMiles) : 0;
+    if (p && p.t.finishMiles === last && g <= lagLimit(runPrev)) return { kind: 'auto', gap: g, prev: p };
+    return { kind: 'ask', gap: g, prev: p && p.t.finishMiles === last ? p : null };
+  }
+  const prevName = p => p.t.type === 'priv' ? `your private journey on ${fmtD(p.t.startDate)}` : `your trip to ${curSite(p.t).pc || p.t.sitePc} on ${fmtD(p.t.startDate)}`;
+  // shows the two choices in a form's error box; resolves with 'prev', 'priv' or null (fix the reading)
+  function askGap(err, g) {
+    return new Promise(res => {
+      err.innerHTML = ''; err.hidden = false;
+      err.append(el('span', { textContent: `${g.gap} miles since your last reading weren't logged. What were they?` }));
+      const row = el('div', { className: 'btns', style: 'margin-top:10px' });
+      if (g.prev) { const b1 = el('button', { type: 'button', className: 'secondary', textContent: 'Part of my last trip' }); b1.onclick = () => res('prev'); row.append(b1); }
+      const b2 = el('button', { type: 'button', className: 'secondary', textContent: 'Private driving' }); b2.onclick = () => res('priv'); row.append(b2);
+      const b3 = el('button', { type: 'button', className: 'secondary', textContent: 'Fix the reading' }); b3.onclick = () => { err.hidden = true; res(null); }; row.append(b3);
+      err.append(row);
+      if (g.prev) err.append(el('p', { className: 'hint', style: 'margin-top:8px', textContent: `"Part of my last trip" adds them to ${prevName(g.prev)}.` }));
+    });
+  }
+  // settle the gap before a trip starting at this reading; returns { privGap } or null if the user wants to fix the reading
+  async function settleGap(reading, err) {
+    const g = gapCheck(reading);
+    if (g.kind === 'none') return { privGap: false };
+    if (g.kind === 'auto') { await addToTrip(g.prev, g.gap, reading); toast(`${g.gap} mi of GPS lag added to ${prevName(g.prev)}`); return { privGap: false }; }
+    const choice = await askGap(err, g);
+    if (choice === 'prev') { await addToTrip(g.prev, g.gap, reading); return { privGap: false }; }
+    if (choice === 'priv') return { privGap: true };
+    return null;
+  }
+  // ---------- learn how far GPS runs short in this car: dash miles / GPS miles on trips where you typed the dash ----------
+  function gpsFactor() {
+    const r = [];
+    monthKeys().forEach(k => (DATA['m-' + k].trips || []).forEach(t => { if (t.odoTyped && t.gpsMiles > 15) r.push((t.finishMiles - t.startMiles - (t.lagAdded || 0)) / t.gpsMiles); }));
+    const last = r.slice(-10).filter(x => x > 0.9 && x < 1.2).sort((x, y) => x - y);
+    if (last.length < 2) return 1;
+    const med = last[Math.floor(last.length / 2)];
+    return Math.min(1.08, Math.max(1, med));
+  }
+  const gpsToOdo = mi => Math.round(mi * gpsFactor());
+
   // ---------- odometer readings: always worked out from your trips, never a stale stored number ----------
   const monthKeys = () => Object.keys(DATA).filter(k => /^m-\d{4}-\d{2}$/.test(k)).map(k => k.slice(2)).sort();
   function lastReading(exceptId) { // the highest odometer reading on record: trip finishes and month-end readings
@@ -1078,7 +1141,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     discardBtn(c, 'Discard journey');
     setTimeout(refreshGps, 0);
   }
-  async function startPrivate(miles) {
+  async function startPrivate(miles, privGap) {
     const k = mKey(today()); await loadMonth(k);
     let gpsMsg = '';
     if (TR()) {
@@ -1088,7 +1151,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         else { await TR().start({ reset: true }); await checkBattery(); }
       } catch (er) { gpsMsg = ' GPS logging did not start: ' + (er.message || er); }
     }
-    S.openTrip = { id: uid(), type: 'priv', startDate: today(), startMiles: miles }; newType = null;
+    S.openTrip = { id: uid(), type: 'priv', startDate: today(), startMiles: miles, privGap: !!privGap }; newType = null;
     await saveS(); renderTripCard();
     buzz(); toast('Private journey started.' + gpsMsg);
   }
@@ -1103,7 +1166,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
       const lastR = lastReading();
       if (lastR != null && miles < lastR) { err.textContent = `That's lower than your last reading (${lastR}). Check the odometer.`; err.hidden = false; return; }
-      await startPrivate(miles);
+      const settled = await settleGap(miles, err); if (!settled) return;
+      await startPrivate(miles, settled.privGap);
     };
   }
   let sortMode = null;
@@ -1124,12 +1188,13 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   }
   function openFinish(t) { // bottom sheet: finish date and the dash reading
     const box = openSheet('Finish trip');
-    const gps = gpsLive && gpsLive.meters > 0 ? Math.round(MI(gpsLive.meters)) : null;
-    box.append(el('p', { className: 'hint', textContent: `${t.startPc} → ${t.sitePc} · started at ${t.startMiles}` + (gps != null ? ` · GPS ${gps} mi` : '') }));
+    const gps = gpsLive && gpsLive.meters > 0 ? gpsToOdo(MI(gpsLive.meters)) : null;
+    box.append(el('p', { className: 'hint', textContent: `${t.startPc} → ${curSite(t).pc} · started at ${t.startMiles}` + (gps != null ? ` · GPS ${gps} mi` : '') }));
     const form = el('form', { style: 'display:flex;flex-direction:column;gap:12px' });
     const row = el('div', { className: 'row' });
     row.append(field('Finish date', 'cDate', { type: 'date', value: today(), required: true }),
                field('Odometer now', 'cMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off', value: gps != null ? t.startMiles + gps : '' }));
+    row.querySelector('#cMiles').addEventListener('input', e => { e.target.dataset.typed = '1'; });
     form.append(row);
     form.append(el('p', { className: 'hint', textContent: gps != null ? 'Worked out from GPS. Check it against the dash and change it if it\'s out.' : 'Read it off the dash.' }));
     const err = el('p', { className: 'err', hidden: true }); form.append(err);
@@ -1154,7 +1219,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       let gpsMiles = null, route = null;
       if (TR()) { route = await takeRoute(); try { const st = await TR().stop(); gpsMiles = Math.round(MI(st.meters) * 10) / 10; } catch (e) {} }
       const k = mKey(t.startDate); await loadMonth(k);
-      const saved = { ...t, finishMiles: miles, finishDate: date, gpsMiles, route };
+      const saved = { ...t, finishMiles: miles, finishDate: date, gpsMiles, route, odoTyped: !!$('cMiles').dataset.typed };
       months[k].trips.push(saved);
       S.openTrip = null;
       await saveMonth(k); await saveS(); closeSheet(); buzz(60);
@@ -1169,7 +1234,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   function openNextSite(t) { // moving on to another site during the same business trip
     const box = openSheet('Next site');
     const boundary = (t.legs || []).length ? t.legs[t.legs.length - 1].fromMiles : t.startMiles;
-    const gps = gpsLive && gpsLive.meters > 0 ? Math.round(MI(gpsLive.meters)) : null;
+    const gps = gpsLive && gpsLive.meters > 0 ? gpsToOdo(MI(gpsLive.meters)) : null;
     box.append(el('p', { className: 'hint', textContent: `Leaving ${curSite(t).pc}. Everything stays on one trip and one row of the sheet, with each site's postcode and job number.` }));
     const form = el('form', { style: 'display:flex;flex-direction:column;gap:12px' });
     const site = field('Next site postcode', 'xSite', { className: 'pc', required: true, autocapitalize: 'characters', autocomplete: 'off', placeholder: 'B46 1AL' });
@@ -1331,7 +1396,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         const code = j && j.result && j.result[0] && j.result[0].postcode; if (code && $('nFrom') && !$('nFrom').dataset.touched) $('nFrom').value = code; } catch (e) {}
     }, 0);
     odo.append(el('p', { className: 'hint', textContent: sug != null
-      ? `Carried on from your last trip. If you've driven since, change it and the difference goes on the sheet as private miles.`
+      ? `Carried on from your last trip. If you've driven since, change it. You'll be asked what the extra miles were.`
       : 'Read it off the dash. After this, each trip carries on from the last one.' }));
     form.append(odo);
     const err = el('p', { className: 'err', hidden: true }); form.append(err);
@@ -1342,12 +1407,10 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
       const lastR = lastReading();
       if (lastR != null && miles < lastR) { err.textContent = `That's lower than your last reading (${lastR}). Check the odometer.`; err.hidden = false; return; }
-      if (lastR != null && miles - lastR > 50 && form.dataset.jump !== String(miles)) {
-        err.textContent = `That's ${miles - lastR} miles since your last reading (${lastR}). They'll go on the sheet as private miles you didn't log. Tap again if that's right, or fix the reading.`;
-        err.hidden = false; form.dataset.jump = String(miles); return; }
+      const settled = await settleGap(miles, err); if (!settled) return;
       const val = id => $(id) ? $(id).value.trim() : '';
       const t = { id: sorting ? sorting.id : uid(), startPc: pc(val('nFrom')), sitePc: pc(val('nSite')), job: val('nJob'),
-                  startDate: $('nDate').value, desc: val('nDesc'), startMiles: miles };
+                  startDate: $('nDate').value, desc: val('nDesc'), startMiles: miles, privGap: settled.privGap };
       const k = mKey(t.startDate); await loadMonth(k);
       let gpsMsg = '';
       if (TR() && !sorting) {
@@ -1397,6 +1460,13 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     let bus = 0, priv = 0;
     rows.forEach(r => { bus += r.bus; priv += r.priv; });
     const statMi = (id, v, unit) => { const b = $(id); b.textContent = String(v); if (unit) b.append(el('small', { textContent: unit })); };
+    { const un = sheetRows(viewM).unsorted, w = $('unsortedNote');
+      w.hidden = !un.length;
+      const sig = viewM + JSON.stringify(un); // don't rebuild an unchanged note: a tap on it may be under way
+      if (un.length && w.dataset.sig !== sig) { w.dataset.sig = sig; w.innerHTML = ''; const tot = un.reduce((s, u) => s + u.miles, 0);
+        w.append(el('b', { textContent: `${tot} mi not sorted yet` }), el('span', { textContent: ` in ${un.length} gap${un.length === 1 ? '' : 's'} between trips. Sort them before building the sheet; nothing is counted as private unless you say so.` }));
+        const go = el('button', { type: 'button', className: 'secondary', textContent: 'Sort the first one', style: 'margin-top:10px;width:100%' }); go.onclick = () => openGapSort(un[0].id, viewM); w.append(go); }
+      if (!un.length) w.dataset.sig = ''; }
     { // miles by week of the month
       const first = viewM + '-01', n = +lastDay(viewM).slice(8), days = milesByDay(first, n), cols = [];
       for (let s = 0; s < n; s += 7) { const ch = days.slice(s, s + 7); cols.push({ label: `${s + 1}–${Math.min(n, s + 7)}`, bus: ch.reduce((x, d) => x + d.bus, 0), priv: ch.reduce((x, d) => x + d.priv, 0) }); }
@@ -1523,6 +1593,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       box.append(card);
     }
     const k = mKey(today());
+    if (months[k]) { const un = sheetRows(k).unsorted; if (un.length) { const w = el('button', { type: 'button', className: 'banner warn', style: 'border:0;text-align:left;cursor:pointer;font:inherit' },
+      [el('b', { textContent: `${un.reduce((s, u) => s + u.miles, 0)} mi not sorted` }), ' this month. Tap to sort.']); w.onclick = () => openGapSort(un[0].id, k); box.prepend(w); } }
     if (months[k]) {
       const { rows } = sheetRows(k); let bus = 0, priv = 0; rows.forEach(r => { bus += r.bus; priv += r.priv; });
       const g = el('div', { className: 'stats' });
@@ -1551,6 +1623,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const days = Math.max(1, Math.round((new Date((t.finishDate || t.startDate) + 'T12:00') - new Date(t.startDate + 'T12:00')) / 86400000) + 1);
     add('Days', String(days));
     if (!P) add('Route', isRoundTrip(t) ? 'There and back' : 'One way');
+    if (t.lagAdded) add('GPS lag added', `${t.lagAdded} mi`);
     if (!P && expRound(t) && tripMiles(t) > expRound(t)) add('Local driving', `${tripMiles(t) - expRound(t)} mi`);
     box.append(kv);
     if (!P && (t.legs || []).length) { // each site on the run
@@ -1561,6 +1634,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       box.append(ls);
     }
     if (!P && t.sitePc && TR()) { const nav = el('button', { type: 'button', className: 'secondary', textContent: 'Navigate to ' + t.sitePc }); nav.onclick = () => TR().openNav({ q: t.sitePc }).catch(() => toast('No satnav app found')); box.append(nav); }
+    { const g = sheetRows(k).unsorted.find(u => u.id === t.id);
+      if (g) { const s = el('button', { type: 'button', className: 'primary biz', textContent: `Sort the ${g.miles} unlogged miles before this trip` }); s.onclick = () => openGapSort(t.id, k); box.append(s); } }
     const edit = el('button', { type: 'button', className: 'secondary', textContent: 'Edit trip' });
     edit.onclick = () => { edit.remove(); box.append(editForm(id)); };
     box.append(edit);
@@ -1579,10 +1654,11 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const m = head.querySelector('.m');
     const extra = '';
     m.classList.add(P || !r.id ? 'priv' : 'biz');
-    m.append(String(P ? r.priv : r.id ? r.bus : (r.untracked ?? r.priv)), el('small', { textContent: P ? 'private' : r.id ? 'business' : 'private' }));
-    if (r.id && !P && r.untracked) head.append(el('span', { className: 'd', style: 'grid-column:1 / -1;color:var(--priv-deep)', textContent: `${r.untracked} mi driven before this trip weren't logged, so they count as private` }));
+    m.append(String(P ? r.priv : r.id ? r.bus : (r.gapOpen || r.priv)), el('small', { textContent: P ? 'private' : r.id ? 'business' : (r.gapOpen ? 'not sorted' : 'private') }));
+    if (r.id && r.gapOpen) head.append(el('span', { className: 'd', style: 'grid-column:1 / -1;color:var(--biz-deep);font-weight:700', textContent: `⚠ ${r.gapOpen} mi before this trip not sorted. Tap to sort.` }));
+    if (r.id && r.gapPriv) head.append(el('span', { className: 'd', style: 'grid-column:1 / -1', textContent: `${r.gapPriv} mi before this trip: private driving` }));
     it.append(head);
-    if (!r.id) { head.disabled = true; head.style.cursor = 'default'; return it; }
+    if (!r.id) { if (r.endGap && r.gapOpen) { head.onclick = () => openGapSort('end', viewM); head.append(el('span', { className: 'd', style: 'grid-column:1 / -1;color:var(--biz-deep);font-weight:700', textContent: `⚠ ${r.gapOpen} mi after your last trip not sorted. Tap to sort.` })); } else { head.disabled = true; head.style.cursor = 'default'; } return it; }
     head.onclick = () => openTrip(r.id, viewM);
     return it;
   }
@@ -1690,6 +1766,27 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     box.append(form);
   }
   $('addPast').onclick = openAddPast;
+  // sort a gap: the miles before trip `id` (or after the last trip, id 'end') in month k
+  async function openGapSort(id, k) {
+    await loadMonth(k); const M = months[k];
+    const info = sheetRows(k).unsorted.find(u => u.id === id); if (!info) return;
+    const box = openSheet('Sort unlogged miles');
+    const p = tripBefore(info.from);
+    box.append(el('p', { className: 'hint', textContent: `The odometer went from ${info.from} to ${info.to}, ${info.miles} miles, with no trip logged.` + (p && info.miles <= 3 * lagLimit(p.t.finishMiles - p.t.startMiles) ? ` That size of gap is usually GPS falling short on the trip before.` : ` Were they part of the trip before, or private driving?`) }));
+    const btns = el('div', { style: 'display:flex;flex-direction:column;gap:10px' });
+    if (p && p.t.finishMiles === info.from && (p.k === k || DATA['m-' + p.k].endMiles == null)) {
+      const b = el('button', { type: 'button', className: 'primary ' + (p.t.type === 'priv' ? 'priv' : 'biz'), textContent: `Add to ${prevName(p).replace('your ', 'my ')}` });
+      b.onclick = async () => { await addToTrip(p, info.miles, info.to); if (id === 'end') { delete M.endPriv; await saveMonth(k); } await recalcLast(); closeSheet(); renderMonth(); renderToday(); toast(`${info.miles} mi added to that trip`); };
+      btns.append(b);
+    }
+    const pb = el('button', { type: 'button', className: 'secondary', textContent: 'It was private driving' });
+    pb.onclick = async () => {
+      if (id === 'end') M.endPriv = true; else { const t = M.trips.find(x => x.id === id); if (t) t.privGap = true; }
+      await saveMonth(k); closeSheet(); renderMonth(); renderToday(); toast('Marked as private'); };
+    btns.append(pb);
+    btns.append(el('p', { className: 'hint', textContent: id === 'end' ? 'Or correct the month-end reading on the Month screen.' : 'Or tap the trip and Edit it if its start reading is wrong. A forgotten business trip can go in with + Add a past trip.' }));
+    box.append(btns);
+  }
   async function deleteTrip(M, t) {
     const k = viewM;
     M.trips = M.trips.filter(x => x.id !== t.id); await saveMonth(k); await recalcLast(); closeSheet(); renderMonth(); renderToday();
@@ -1834,7 +1931,13 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   $('startMiles').onchange = async () => { const v = num($('startMiles').value), M = months[viewM];
     if (v == null) { delete M.startMiles; delete M.startSet; } else { M.startMiles = v; M.startSet = true; }
     await saveMonth(viewM); renderMonth(); toast(v == null ? 'Worked out from your trips' : 'Start reading saved'); };
-  $('endMiles').onchange = async () => { const v = num($('endMiles').value); if (v == null) delete months[viewM].endMiles; else months[viewM].endMiles = v; await saveMonth(viewM); await recalcLast(); renderMonth(); toast(v == null ? 'Month-end reading cleared' : 'Month-end reading saved'); };
+  $('endMiles').onchange = async () => { const v = num($('endMiles').value), M = months[viewM];
+    if (v == null) { delete M.endMiles; delete M.endPriv; } else { M.endMiles = v; delete M.endPriv; }
+    await saveMonth(viewM);
+    let note = v == null ? 'Month-end reading cleared' : 'Month-end reading saved';
+    if (v != null) { const last = Math.max(0, ...M.trips.map(t => t.finishMiles ?? 0)), p = tripBefore(last);
+      if (p && v > last && p.t.finishMiles === last && v - last <= lagLimit(p.t.finishMiles - p.t.startMiles)) { await addToTrip(p, v - last, v); note = `${v - last} mi of GPS lag added to ${prevName(p)}`; } }
+    await recalcLast(); renderMonth(); toast(note); };
   // ---------- fuel receipts: photo kept with the entry, litres and cost read off it on the phone ----------
   let receiptB64 = null, ocrWorker = null;
   function clearReceipt() { receiptB64 = null; $('fPreview').hidden = true; $('fThumb').removeAttribute('src'); $('fRead').textContent = ''; }
@@ -1906,7 +2009,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   let lastSheet = null;
   async function exportMonth(k, share) {
     await loadMonth(k);
-    const { rows: rows0, startMiles } = sheetRows(k);
+    const { rows: rows0, startMiles, unsorted } = sheetRows(k);
+    if (unsorted.length) throw new Error(`${unsorted.reduce((s, u) => s + u.miles, 0)} mi between trips aren't sorted yet. Sort them first (they're flagged on Trips and Month).`);
     const rows = rows0.map(r => r.sites && r.sites.length > 1 ? { ...r, sitePc: r.sites.map(s => s.pc).join('\n'), job: r.sites.map(s => s.job || '–').join('\n'), desc: r.sites.map(s => s.desc || s.pc).join(' / '), tall: r.sites.length } : r);
     const bytes = buildMileageXlsx({ name: S.name, reg: S.reg, monthLabel: mLabel(k), startMiles, office: S.office,
       rows, fuel: months[k].fuel.slice().sort((a, b) => a.date.localeCompare(b.date)) });

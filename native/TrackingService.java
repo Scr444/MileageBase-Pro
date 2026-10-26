@@ -102,6 +102,10 @@ public class TrackingService extends Service {
             handler = new Handler(Looper.getMainLooper());
             long now = System.currentTimeMillis();
             lastDriving = 0; lastMoving = now - PARK_AFTER_MS + WAKE_GRACE_MS * 2;
+            // GPS can take a minute or two to lock: start the route from where the phone last knew it was,
+            // so the miles driven before the first fix still count
+            Location lk = lastKnown();
+            if (lk != null && now - lk.getTime() < 10 * 60_000L && (!lk.hasAccuracy() || lk.getAccuracy() < 150f)) wakeFrom = lk;
             drive();
             handler.postDelayed(nag, 60_000L);
         }
