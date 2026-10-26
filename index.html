@@ -890,7 +890,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const M = months[k] || blankMonth();
     const trips = [...M.trips].sort((a, b) => ((a.startMiles ?? 0) - (b.startMiles ?? 0)) || String(a.startDate).localeCompare(String(b.startDate)));
     const first = trips[0];
-    let prev = M.startMiles ?? (first ? first.startMiles : null);
+    let prev = monthStart(k);
     const rows = [], list = [];
     let privRun = 0; // private journey miles since the last business row
     trips.forEach(t => {
@@ -915,11 +915,39 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       const base = prev ?? (trips.find(t => t.type === 'priv') || {}).startMiles ?? 0;
       rows.push({ desc: 'Private', priv: Math.max(privRun, reached - base), bus: 0, driver: S.driver });
     }
-    return { rows, list, startMiles: M.startMiles ?? (first ? first.startMiles : null) };
+    return { rows, list, startMiles: monthStart(k) };
   }
-  function suggestedStart() { // odometer to pre-fill when starting a trip
-    return S.lastFinish ?? months[viewM]?.startMiles ?? null;
+  // ---------- odometer readings: always worked out from your trips, never a stale stored number ----------
+  const monthKeys = () => Object.keys(DATA).filter(k => /^m-\d{4}-\d{2}$/.test(k)).map(k => k.slice(2)).sort();
+  function lastReading(exceptId) { // the highest odometer reading on record: trip finishes and month-end readings
+    let best = null;
+    monthKeys().forEach(k => { const M = DATA['m-' + k];
+      (M.trips || []).forEach(t => { if (t.id !== exceptId && t.finishMiles != null) best = Math.max(best ?? 0, t.finishMiles); });
+      if (M.endMiles != null) best = Math.max(best ?? 0, M.endMiles); });
+    return best;
   }
+  function monthStart(k) { // odometer on the 1st: what you typed in, otherwise worked out
+    const M = DATA['m-' + k] || months[k];
+    if (M && M.startSet && M.startMiles != null) return M.startMiles;
+    let prevEnd = null;
+    monthKeys().filter(x => x < k).forEach(x => { const P = DATA['m-' + x];
+      (P.trips || []).forEach(t => { if (t.finishMiles != null) prevEnd = Math.max(prevEnd ?? 0, t.finishMiles); });
+      if (P.endMiles != null) prevEnd = Math.max(prevEnd ?? 0, P.endMiles); });
+    const starts = M ? (M.trips || []).map(t => t.startMiles).filter(v => v != null) : [];
+    const first = starts.length ? Math.min(...starts) : null;
+    if (prevEnd != null && (first == null || prevEnd <= first)) return prevEnd;
+    return first;
+  }
+  // a trip that would overlap another's odometer readings, if any
+  function overlapping(sm, fm, exceptId) {
+    let hit = null;
+    monthKeys().forEach(k => (DATA['m-' + k].trips || []).forEach(t => {
+      if (t.id === exceptId || t.startMiles == null || t.finishMiles == null) return;
+      if (sm < t.finishMiles && fm > t.startMiles) hit = t; }));
+    return hit;
+  }
+  const tripName = t => t.type === 'priv' ? 'private journey on ' + fmtD(t.startDate) : `trip to ${t.sitePc} on ${fmtD(t.startDate)}`;
+  function suggestedStart() { return lastReading(); } // odometer to pre-fill when starting a trip
 
   // ---------- trip card ----------
   function placeChips(inputId, current) {
@@ -997,12 +1025,11 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       else { miles = num($('pDone') && $('pDone').value); if (miles == null || miles < 0) { toast('Enter the miles driven'); return; } miles = Math.round(miles); }
       const k = mKey(t.startDate); await loadMonth(k);
       months[k].trips.push({ id: t.id, type: 'priv', startDate: t.startDate, finishDate: today(), startMiles: t.startMiles, finishMiles: t.startMiles + miles, route });
-      const prevLast = S.lastFinish;
-      S.lastFinish = Math.max(S.lastFinish ?? 0, t.startMiles + miles); S.openTrip = null;
+      S.openTrip = null;
       await saveMonth(k); await saveS(); buzz(60);
       viewM = k; await renderMonth(); renderTripCard();
       toast(`Private: ${miles} mi`, async () => {
-        months[k].trips = months[k].trips.filter(x => x.id !== t.id); S.lastFinish = prevLast; S.openTrip = t;
+        months[k].trips = months[k].trips.filter(x => x.id !== t.id); S.openTrip = t;
         await saveMonth(k); await saveS(); if (TR()) { try { await TR().start({ reset: false }); } catch (e) {} } renderMonth(); renderTripCard(); });
     });
     discardBtn(c, 'Discard journey');
@@ -1010,7 +1037,6 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   }
   async function startPrivate(miles) {
     const k = mKey(today()); await loadMonth(k);
-    if (months[k].startMiles == null) { months[k].startMiles = S.lastFinish ?? miles; await saveMonth(k); }
     let gpsMsg = '';
     if (TR()) {
       try {
@@ -1032,6 +1058,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       e.preventDefault();
       const miles = num($('nMiles').value);
       if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
+      const lastR = lastReading();
+      if (lastR != null && miles < lastR) { err.textContent = `That's lower than your last reading (${lastR}). Check the odometer.`; err.hidden = false; return; }
       await startPrivate(miles);
     };
   }
@@ -1074,18 +1102,22 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         err.hidden = false; form.dataset.checked = String(miles); return;
       }
       if (date < t.startDate) { err.textContent = 'Finish date is before the start date.'; err.hidden = false; return; }
+      if (gps != null && gps > 5 && done > gps * 1.5 + 25 && form.dataset.big !== String(miles)) {
+        err.textContent = `That's ${done} mi on the odometer but GPS logged ${gps} mi. Check the reading, or tap Save trip again if it's right.`;
+        err.hidden = false; form.dataset.big = String(miles); return; }
+      const clash = overlapping(t.startMiles, miles, t.id);
+      if (clash) { err.textContent = `That overlaps your ${tripName(clash)} (${clash.startMiles} to ${clash.finishMiles}). Check the reading.`; err.hidden = false; return; }
       let gpsMiles = null, route = null;
       if (TR()) { route = await takeRoute(); try { const st = await TR().stop(); gpsMiles = Math.round(MI(st.meters) * 10) / 10; } catch (e) {} }
       const k = mKey(t.startDate); await loadMonth(k);
       const saved = { ...t, finishMiles: miles, finishDate: date, gpsMiles, route };
       months[k].trips.push(saved);
-      const prevLast = S.lastFinish;
-      S.lastFinish = Math.max(S.lastFinish ?? 0, miles); S.openTrip = null;
+      S.openTrip = null;
       await saveMonth(k); await saveS(); closeSheet(); buzz(60);
       viewM = k; await renderMonth(); renderTripCard();
       const extra = t.expected ? done - t.expected * 2 : 0;
       toast(`Saved: ${done} business mi` + (extra > 0 ? ` (+${extra} local)` : ''), async () => { // undo: reopen the trip
-        months[k].trips = months[k].trips.filter(x => x.id !== t.id); S.lastFinish = prevLast; S.openTrip = t;
+        months[k].trips = months[k].trips.filter(x => x.id !== t.id); S.openTrip = t;
         await saveMonth(k); await saveS(); if (TR()) { try { await TR().start({ reset: false }); } catch (e) {} } renderMonth(); renderTripCard(); });
     };
     box.append(form);
@@ -1220,12 +1252,15 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       e.preventDefault();
       const miles = num($('nMiles').value);
       if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
-      if (S.lastFinish != null && miles < S.lastFinish) { err.textContent = `That's lower than your last finish reading (${S.lastFinish}). Check the odometer.`; err.hidden = false; return; }
+      const lastR = lastReading();
+      if (lastR != null && miles < lastR) { err.textContent = `That's lower than your last reading (${lastR}). Check the odometer.`; err.hidden = false; return; }
+      if (lastR != null && miles - lastR > 50 && form.dataset.jump !== String(miles)) {
+        err.textContent = `That's ${miles - lastR} miles since your last reading (${lastR}). They'll go on the sheet as private miles you didn't log. Tap again if that's right, or fix the reading.`;
+        err.hidden = false; form.dataset.jump = String(miles); return; }
       const val = id => $(id) ? $(id).value.trim() : '';
       const t = { id: sorting ? sorting.id : uid(), startPc: pc(val('nFrom')), sitePc: pc(val('nSite')), job: val('nJob'),
                   startDate: $('nDate').value, desc: val('nDesc'), startMiles: miles };
       const k = mKey(t.startDate); await loadMonth(k);
-      if (months[k].startMiles == null) { months[k].startMiles = S.lastFinish ?? miles; await saveMonth(k); }
       let gpsMsg = '';
       if (TR() && !sorting) {
         try {
@@ -1259,12 +1294,16 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   async function renderMonth() {
     const M = await loadMonth(viewM);
     document.querySelectorAll('.mtitle').forEach(h => { h.textContent = mLabel(viewM); });
-    $('startMiles').value = M.startMiles ?? '';
+    const ms = monthStart(viewM); $('startMiles').value = M.startSet ? (M.startMiles ?? '') : ''; $('startMiles').placeholder = ms != null ? String(ms) : '';
     $('endMiles').value = M.endMiles ?? '';
     const prevM = months[shiftM(viewM, -1)];
     const sug = prevM?.endMiles ?? null;
-    $('startHint').textContent = M.startMiles == null
-      ? (sug != null ? `Last month ended on ${sug}.` : 'Set automatically from your first trip if left blank.') : '';
+    { const lastInMonth = Math.max(0, ...M.trips.map(t => t.finishMiles ?? 0));
+      const bad = M.endMiles != null && M.endMiles < lastInMonth;
+      $('startHint').className = bad ? 'err' : 'hint';
+      $('startHint').textContent = bad ? `The month-end reading (${M.endMiles}) is lower than your last trip's finish (${lastInMonth}). Check it.`
+        : M.startSet ? 'You typed the reading on the 1st. Clear it to have it worked out from your trips.'
+        : ms != null ? `Worked out from your trips (${ms}). Type the dash reading on the 1st to override it.` : 'Worked out from your trips once you log one.'; }
     const { rows, list: items } = sheetRows(viewM);
     const list = $('tripList'); list.innerHTML = '';
     let bus = 0, priv = 0;
@@ -1470,6 +1509,9 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       e.preventDefault();
       const sm = num($('eSM').value), fm = num($('eFM').value);
       if (sm == null || fm == null || fm < sm) { err.textContent = 'Finish miles must be at or above start miles.'; err.hidden = false; return; }
+      const clash = overlapping(sm, fm, t.id);
+      if (clash) { err.textContent = `Those readings overlap your ${tripName(clash)} (${clash.startMiles} to ${clash.finishMiles}).`; err.hidden = false; return; }
+      if ($('eFD').value && $('eSD').value && $('eFD').value < $('eSD').value) { err.textContent = 'Finish date is before the start date.'; err.hidden = false; return; }
       const P = $('eType').value === 'priv', ev = id => $(id) ? $(id).value.trim() : '';
       Object.assign(t, { type: P ? 'priv' : undefined, startPc: P ? '' : pc(ev('eFrom')), sitePc: P ? '' : pc(ev('eSite')), startDate: $('eSD').value, finishDate: $('eFD').value,
                          startMiles: sm, finishMiles: fm, job: P ? '' : ev('eJob'), desc: P ? '' : ev('eDesc') });
@@ -1489,6 +1531,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     f.onsubmit = async e => {
       e.preventDefault();
       const v = num($('pMiles').value); if (v == null || v < 0) { err.textContent = 'Enter the miles.'; err.hidden = false; return; }
+      const clash = overlapping(t.startMiles ?? 0, (t.startMiles ?? 0) + Math.round(v), t.id);
+      if (clash) { err.textContent = `That would overlap your ${tripName(clash)} (from ${clash.startMiles}).`; err.hidden = false; return; }
       t.finishMiles = (t.startMiles ?? 0) + Math.round(v);
       await saveMonth(viewM); await recalcLast(); editing = null; closeSheet(); renderMonth(); renderToday(); toast('Saved');
     };
@@ -1501,9 +1545,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     toast('Trip deleted', async () => { M.trips.push(t); await saveMonth(k); await recalcLast(); renderMonth(); renderToday(); });
   }
   async function recalcLast() {
-    let best = null;
-    Object.values(months).forEach(M => M.trips.forEach(t => { if (t.finishMiles != null) best = Math.max(best ?? 0, t.finishMiles); }));
-    S.lastFinish = best; await saveS();
+    S.lastFinish = lastReading(); await saveS(); renderGlance();
   }
 
   // ---------- wiring ----------
@@ -1638,8 +1680,10 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     }); });
     if (!n) out.append(el('p', { className: 'empty', textContent: 'No trips match.' }));
   });
-  $('startMiles').onchange = async () => { months[viewM].startMiles = num($('startMiles').value); await saveMonth(viewM); renderMonth(); toast('Start miles saved'); };
-  $('endMiles').onchange = async () => { months[viewM].endMiles = num($('endMiles').value); await saveMonth(viewM); renderMonth(); toast('Month-end reading saved'); };
+  $('startMiles').onchange = async () => { const v = num($('startMiles').value), M = months[viewM];
+    if (v == null) { delete M.startMiles; delete M.startSet; } else { M.startMiles = v; M.startSet = true; }
+    await saveMonth(viewM); renderMonth(); toast(v == null ? 'Worked out from your trips' : 'Start reading saved'); };
+  $('endMiles').onchange = async () => { const v = num($('endMiles').value); if (v == null) delete months[viewM].endMiles; else months[viewM].endMiles = v; await saveMonth(viewM); await recalcLast(); renderMonth(); toast(v == null ? 'Month-end reading cleared' : 'Month-end reading saved'); };
   // ---------- fuel receipts: photo kept with the entry, litres and cost read off it on the phone ----------
   let receiptB64 = null, ocrWorker = null;
   function clearReceipt() { receiptB64 = null; $('fPreview').hidden = true; $('fThumb').removeAttribute('src'); $('fRead').textContent = ''; }
@@ -1893,6 +1937,9 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   (async () => {
     await initStore();
     const saved = await store.get('settings'); if (saved) S = { ...S, ...saved };
+    { let fixed = false; // month start readings used to be stored automatically; they're worked out now
+      Object.keys(DATA).filter(k => /^m-\d{4}-\d{2}$/.test(k)).forEach(k => { const M = DATA[k]; if (M.startMiles != null && !M.startSet) { delete M.startMiles; fixed = true; } });
+      if (fixed) { try { await saveAll(); } catch (e) {} } }
     await loadMonth(shiftM(viewM, -1));
     fillSettings(); renderTripCard(); await renderMonth();
     await checkNative(); syncNative(); renderMonthEnd(); renderCar(); autoBackup(); renderGlance();
