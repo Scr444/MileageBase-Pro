@@ -241,7 +241,7 @@ public class TrackingService extends Service {
         handler.postDelayed(endCheck, 45_000L);
     }
     private final Runnable endCheck = () -> {
-        try { lm.removeUpdates(check); } catch (Exception e) { /* ignore */ }
+        try { lm.removeUpdates(TrackingService.this.check); } catch (Exception e) { /* ignore */ }
         checking = false;
         if (parked) armMotion();
     };
