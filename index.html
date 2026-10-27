@@ -2034,6 +2034,9 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     toast('Trip deleted', async () => { M.trips.push(t); await saveMonth(k); await recalcLast(); renderMonth(); renderToday(); });
   }
   async function recalcLast() {
+    for (const k of monthKeys()) { const M = DATA['m-' + k];
+      const over = (M.trips || []).filter(t => t.finishMiles != null && t.finishDate > lastDay(k)).reduce((m, t) => Math.max(m, t.finishMiles), -1);
+      if (over >= 0 && M.endMiles != null && M.endMiles < over) { M.endMiles = over; if (!months[k]) months[k] = M; await saveMonth(k); } }
     S.lastFinish = lastReading(); await saveS(); renderGlance(); try { renderMonthsBox(); } catch (e) {}
   }
 
@@ -2212,6 +2215,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   async function exportMonth(k, share) {
     await loadMonth(k);
     const { rows: rows0, startMiles, unsorted, needs } = sheetRows(k);
+    if (S.openTrip && S.openTrip.startDate && S.openTrip.startDate <= lastDay(k) && mKey(S.openTrip.startDate) === k)
+      throw new Error(`your trip that started on ${fmtD(S.openTrip.startDate)} is still open. It goes on this sheet in one piece, so finish it first.`);
     if (needs.length) throw new Error(`${needs.length} trip${needs.length === 1 ? ' needs' : 's need'} details first (they're flagged on Trips and Month).`);
     if (unsorted.length) throw new Error(`${unsorted.reduce((s, u) => s + u.miles, 0)} mi between trips aren't sorted yet. Sort them first (they're flagged on Trips and Month).`);
     const rows = rows0.map(r => r.sites && r.sites.length > 1 ? { ...r, sitePc: r.sites.map(s => s.pc).join('\n'), job: r.sites.map(s => s.job || '–').join('\n'), desc: r.sites.map(s => s.desc || s.pc).join(' / '), tall: r.sites.length } : r);
@@ -2235,21 +2240,33 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   async function renderMonthEnd() {
     const box = $('monthEnd'); box.innerHTML = ''; box.hidden = true;
     const k = shiftM(mKey(today()), -1); const M = await loadMonth(k);
-    if (M.sent || (!M.trips.length && !M.fuel.length)) return;
+    const open = S.openTrip && S.openTrip.startDate && S.openTrip.startDate <= lastDay(k) ? S.openTrip : null;
+    if (M.sent || (!M.trips.length && !M.fuel.length && !open)) return;
     box.hidden = false;
     box.append(el('h2', { textContent: mLabel(k) + ' sheet' }));
-    box.append(el('p', { className: 'hint', textContent: 'Enter the odometer reading at the end of the month, then build the sheet and send it.' }));
-    const f = field('Odometer at month end', 'meMiles', { className: 'odo', inputMode: 'numeric', autocomplete: 'off', value: M.endMiles ?? '' });
-    box.append(f);
-    const go = el('button', { className: 'primary', type: 'button', textContent: 'Build and share' });
     const skip = el('button', { className: 'secondary', type: 'button', textContent: 'Already sent' });
+    skip.onclick = async () => { M.sent = true; await saveMonth(k); renderMonthEnd(); };
+    if (open) { // a trip that runs into this month stays whole on the month it started: the sheet waits for it
+      box.append(el('p', { className: 'hint', textContent: `Your trip that started on ${fmtD(open.startDate)} is still going. It goes on the ${mLabel(k)} sheet in one piece, so the sheet will be ready as soon as you finish it.` }));
+      box.append(el('div', { className: 'btns' }, [skip])); return;
+    }
+    const over = M.trips.filter(t => t.finishMiles != null && t.finishDate > lastDay(k)).sort((x, y) => y.finishMiles - x.finishMiles)[0];
+    let f = null;
+    if (over) { // the month closes where that trip finished; miles after it go on next month's sheet
+      if (M.endMiles == null || M.endMiles < over.finishMiles) { M.endMiles = over.finishMiles; await saveMonth(k); }
+      box.append(el('p', { className: 'hint', textContent: `Your trip ${over.sitePc ? 'to ' + curSite(over).pc + ' ' : ''}ran into ${fmtD(over.finishDate)}, so ${mLabel(k)} closes at ${over.finishMiles}, where it finished. Miles after that go on next month's sheet.` }));
+    } else {
+      box.append(el('p', { className: 'hint', textContent: 'Enter the odometer reading at the end of the month, then build the sheet and send it.' }));
+      f = field('Odometer at month end', 'meMiles', { className: 'odo', inputMode: 'numeric', autocomplete: 'off', value: M.endMiles ?? '' });
+      box.append(f);
+    }
+    const go = el('button', { className: 'primary', type: 'button', textContent: 'Build and share' });
     go.onclick = async () => {
-      const v = num($('meMiles').value);
+      const v = f ? num($('meMiles').value) : null;
       if (v != null) { M.endMiles = v; }
       try { await exportMonth(k, true); M.sent = true; await saveMonth(k); toast(mLabel(k) + ' sheet saved'); renderMonthEnd(); if (k === viewM) renderMonth(); }
       catch (e) { toast('Could not build the sheet: ' + (e.message || e)); }
     };
-    skip.onclick = async () => { M.sent = true; await saveMonth(k); renderMonthEnd(); };
     box.append(el('div', { className: 'btns' }, [go, skip]));
   }
   // a dated copy of the log every week, keeping the last 8
