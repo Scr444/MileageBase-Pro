@@ -338,6 +338,7 @@ body.has-dock .toast { bottom: calc(var(--tab-h) + 92px + env(safe-area-inset-bo
       <button class="primary" type="button" id="restoreAdd" hidden>Add to my log</button>
       <button class="secondary danger" type="button" id="restoreGo" hidden>Replace everything instead</button>
     </div>
+    <div class="card" id="monthsBox"></div>
     <div class="card flat">
       <h2>Setup</h2>
       <p class="hint">Run through the car link, location and battery checks again.</p>
@@ -594,7 +595,13 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   async function fsWrite(path, data, base64) { const f = FS(); if (!f) throw new Error('no file access');
     const o = { path: DIR + '/' + path, data, directory: 'DOCUMENTS', recursive: true }; if (!base64) o.encoding = 'utf8'; return f.writeFile(o); }
   const fileText = () => JSON.stringify({ app: 'DrivR', version: 1, saved: new Date().toISOString(), ...DATA });
-  async function saveAll() {
+  let saveChain = Promise.resolve();
+  function saveAll() { // one save at a time, so two quick saves can't trip over each other's files
+    const run = () => saveNow();
+    saveChain = saveChain.then(run, run);
+    return saveChain;
+  }
+  async function saveNow() {
     const txt = fileText();
     if (!NATIVE) { try { localStorage.setItem(LS, txt); } catch (e) {} return; }
     await fsWrite(FILE + '.tmp', txt); // write a copy first so a dead battery can't wreck the log
@@ -1057,6 +1064,74 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       return j && j.result && j.result[0] ? j.result[0].postcode : null; } catch (e) { return null; }
   }
   const overnight = s => isoOf(s.start) !== isoOf(s.end) || new Date(s.start).getHours() >= 20 || new Date(s.end).getHours() < 6; // the hotel
+  async function places() { // home and office, with their positions
+    const out = []; for (const [kind, p] of [['home', S.home], ['office', S.office]]) { const ll = p && await postcodeLL(p); if (ll) out.push({ kind, pc: pc(p), ll }); } return out;
+  }
+  const placeAt = (ll, pl) => ll ? (pl.find(x => distM(x.ll, ll) < 400) || null) : null;
+  async function pcAt(ll, pl) { const p = placeAt(ll, pl); return p ? p.pc : ll ? (await reversePc(ll[0], ll[1])) || '' : ''; } // home/office snap to their own postcode
+  // Splits a drive at every stop at home or the office. Driving straight between home and the office is private;
+  // a stretch that takes in a site is business, from wherever it started. Anything else is left for you to say.
+  async function planSplit(pts, stops, endLL, totalM, t = {}) {
+    const pl = await places(), startLL = pts[0] || null;
+    const known = []; for (const s of siteList(t)) { const ll = await postcodeLL(s.pc); if (ll) known.push(ll); }
+    const cuts = [{ ll: startLL, m: 0, time: null, place: placeAt(startLL, pl) }];
+    stops.slice().sort((x, y) => x.start - y.start).forEach(s => {
+      const pp = placeAt([s.lat, s.lon], pl);
+      if (pp && s.m > 480 && s.m < totalM - 480) cuts.push({ ll: [s.lat, s.lon], m: s.m, time: s.start, endTime: s.end, place: pp });
+    });
+    cuts.push({ ll: endLL, m: totalM, time: null, place: placeAt(endLL, pl) });
+    const segs = [];
+    for (let i = 0; i < cuts.length - 1; i++) {
+      const a = cuts[i], b = cuts[i + 1];
+      const inside = stops.filter(s => s.m >= a.m && s.m <= b.m);
+      const sites = await findSites(inside, a.ll, pl.map(x => x.ll), known);
+      // private only when it was a straight run between home and the office; a long way round is left for you to say
+      const direct = a.place && b.place ? MI(distM(a.place.ll, b.place.ll)) : 0, segMi = MI(b.m - a.m);
+      let kind = sites.length ? 'bus' : (a.place && b.place && segMi <= direct * 1.6 + 2) ? 'priv' : 'unsorted';
+      if (!sites.length && cuts.length === 2 && t.type !== 'priv' && t.type !== 'unsorted' && t.sitePc) kind = 'bus'; // one stretch, your own business trip
+      segs.push({ from: a, to: b, sites, kind });
+    }
+    return segs.filter(s => s.to.m - s.from.m > 160); // drop crumbs under 0.1 mi
+  }
+  function cutRoute(pts, f0, f1) { // the part of the route between two fractions of the distance
+    if (pts.length < 2) return null;
+    const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + distM(pts[i - 1], pts[i]));
+    const tot = cum[cum.length - 1] || 1, i0 = cum.findIndex(c => c >= f0 * tot), i1 = cum.findIndex(c => c >= f1 * tot - 1);
+    const part = pts.slice(Math.max(0, i0), (i1 < 0 ? pts.length : i1) + 1);
+    return part.length > 1 ? encodeRoute(simplify(part, 12)) : null;
+  }
+  // turns a plan into trips: odometer readings shared out so the pieces add up exactly to the whole drive
+  async function tripsFromPlan(t, segs, finishMiles, finishDate, pts, extra) {
+    const total = segs[segs.length - 1].to.m || 1, span = finishMiles - t.startMiles;
+    const odo = m => t.startMiles + Math.round(span * m / total), day = (ms, dflt) => ms ? isoOf(ms) : dflt;
+    const pl = await places(), out = [];
+    const ownBus = segs.find(x => x.kind === 'bus');
+    for (let i = 0; i < segs.length; i++) {
+      const s = segs[i], first = i === 0, last = i === segs.length - 1;
+      const r = { id: first ? t.id : uid(), startMiles: first ? t.startMiles : odo(s.from.m), finishMiles: last ? finishMiles : odo(s.to.m),
+        startDate: first ? t.startDate : day(s.from.endTime, t.startDate), finishDate: last ? finishDate : day(s.to.time, finishDate),
+        route: cutRoute(pts, s.from.m / total, s.to.m / total), gpsMiles: Math.round(MI(s.to.m - s.from.m) * 10) / 10, ...extra };
+      if (first && t.privGap) r.privGap = true;
+      if (t.type === 'priv' || s.kind === 'priv') r.type = 'priv';
+      else if (s.kind === 'unsorted') r.type = 'unsorted';
+      if (r.type !== 'priv') {
+        r.startPc = first && t.startPc ? t.startPc : await pcAt(s.from.ll, pl);
+        const own = s === ownBus && t.sitePc; // the site you entered goes on the business piece
+        if (own) Object.assign(r, { sitePc: t.sitePc, job: t.job || '', desc: t.desc || '', legs: t.legs, expected: t.expected, expectedTotal: t.expectedTotal });
+        else if (s.sites.length) {
+          Object.assign(r, { sitePc: s.sites[0].pc, job: s.sites[0].job || '', desc: s.sites[0].desc || '', siteCheck: s.sites.some(c => !c.known) });
+          const legs = s.sites.slice(1).map((c, j) => ({ sitePc: c.pc, job: c.job || '', desc: c.desc || '', fromMiles: odo(s.sites[j].lastM), date: isoOf(c.first) }));
+          if (legs.length) r.legs = legs;
+        }
+        if (!r.legs) delete r.legs;
+      }
+      if (segs.length > 1) r.split = true;
+      out.push(r);
+    }
+    return out;
+  }
+  const segLabel = (s, pl) => { const nm = c => c.place ? (c.place.kind === 'home' ? 'Home' : 'Office') : 'elsewhere';
+    return `${s.kind === 'bus' ? 'Business' : s.kind === 'priv' ? 'Private' : 'Not sure'} · ${nm(s.from)} → ${s.sites.length ? s.sites.map(x => x.pc).join(' → ') + ' → ' : ''}${nm(s.to)}`; };
   async function homeLLs() { const out = []; for (const p of [S.home, S.office]) { const ll = p && await postcodeLL(p); if (ll) out.push(ll); } return out; }
   async function refreshHomes() { // home and office positions for the phone: parking there ends a trip
     const lls = await homeLLs(); if (!lls.length) return;
@@ -1068,10 +1143,11 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     return null;
   }
   // long daytime stops away from home, the office and where the trip began are the sites; overnight ones are the hotel
-  async function findSites(stops, startLL, homes) {
+  async function findSites(stops, startLL, homes, known = []) {
     const away = s => [startLL, ...homes].filter(Boolean).every(h => distM([s.lat, s.lon], h) > 3000);
+    const atKnown = s => known.some(k => distM(k, [s.lat, s.lon]) < 800); // the site you entered: any stop there counts
     const cl = [];
-    stops.filter(s => s.end - s.start >= 30 * 60000 && !overnight(s) && away(s)).forEach(s => {
+    stops.filter(s => atKnown(s) || (s.end - s.start >= 30 * 60000 && !overnight(s) && away(s))).forEach(s => {
       const c = cl.find(c => distM([c.lat, c.lon], [s.lat, s.lon]) < 800);
       if (c) { c.lastM = s.m; } else cl.push({ lat: s.lat, lon: s.lon, first: s.start, lastM: s.m });
     });
@@ -1092,27 +1168,20 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       if (t.startMiles == null) t.startMiles = suggestedStart() ?? 0;
       const pts = parsePts(e.points), stops = parseStops(e.stops), gpsMi = MI(e.meters);
       if (gpsMi < 1 && (!fromOpen || t.type === 'unsorted')) { if (fromOpen) S.openTrip = null; continue; } // the car connected but didn't go anywhere
-      const s = { ...t, finishMiles: t.startMiles + gpsToOdo(gpsMi), finishDate: isoOf(e.end), gpsMiles: Math.round(gpsMi * 10) / 10,
-                  route: pts.length > 1 ? encodeRoute(simplify(pts, 12)) : null, est: true, autoEnded: true };
-      if (s.type !== 'priv') {
-        if (!s.startPc && pts.length) s.startPc = (await reversePc(pts[0][0], pts[0][1])) || '';
-        if (!s.sitePc) {
-          const sites = await findSites(stops, pts[0], homes);
-          if (sites.length) {
-            Object.assign(s, { sitePc: sites[0].pc, job: s.job || sites[0].job || '', desc: s.desc || sites[0].desc || '', siteCheck: !sites[0].known });
-            const legs = sites.slice(1).map((c, i) => ({ sitePc: c.pc, job: c.job || '', desc: c.desc || '', fromMiles: s.startMiles + gpsToOdo(MI(sites[i].lastM)), date: isoOf(c.first) }));
-            if (legs.length) { s.legs = legs; s.siteCheck = sites.some(c => !c.known); }
-          }
-        }
-      }
+      const endLL = e.lat || e.lon ? [e.lat, e.lon] : pts[pts.length - 1];
+      const segs = t.type === 'priv' ? [] : await planSplit(pts, stops, endLL, e.meters, t);
+      const made = segs.length ? await tripsFromPlan(t, segs, t.startMiles + gpsToOdo(gpsMi), isoOf(e.end), pts, { est: true, autoEnded: true })
+        : [{ ...t, finishMiles: t.startMiles + gpsToOdo(gpsMi), finishDate: isoOf(e.end), gpsMiles: Math.round(gpsMi * 10) / 10, est: true, autoEnded: true, route: pts.length > 1 ? encodeRoute(simplify(pts, 12)) : null }];
+      for (const s of made) {
       const k = mKey(s.startDate); await loadMonth(k);
       if (!months[k].trips.some(x => x.id === s.id)) { months[k].trips.push(s); n++; lastMi = tripMiles(s); }
-      if (fromOpen) S.openTrip = null;
       await saveMonth(k);
+      }
+      if (fromOpen) S.openTrip = null;
     }
     await saveS(); await recalcLast(); try { await T.clearEnded(); } catch (e) {}
     renderTripCard(); renderMonth(); renderToday();
-    toast(n === 1 ? `Trip saved when you parked at home: ${lastMi} mi. Add the details when you're ready.` : `${n} trips saved from GPS. Add the details when you're ready.`);
+    toast(n === 1 ? `Trip saved when you parked at home: ${lastMi} mi. Add the details when you're ready.` : `Saved as ${n} trips, split at home and the office. Add the details when you're ready.`);
     return n;
   }
   function rememberSites(t) { // sites with a job go in the quick-pick list, and match by themselves next time
@@ -1305,6 +1374,23 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     form.append(row);
     form.append(el('p', { className: 'hint', textContent: gps != null ? 'Worked out from GPS. Check it against the dash and change it if it\'s out.' : 'Read it off the dash.' }));
     const err = el('p', { className: 'err', hidden: true }); form.append(err);
+    // where you stopped on the way: split at home or the office, and fill the site in if it's blank
+    let plan = null, planPts = [];
+    const splitBox = el('div', { className: 'banner', hidden: true }); form.append(splitBox);
+    const splitOn = el('input', { type: 'checkbox', id: 'cSplit', checked: true });
+    if (TR() && TR().stops) (async () => {
+      try {
+        const [st, rt, ss] = await Promise.all([TR().status(), TR().route(), TR().stops()]);
+        planPts = parsePts(rt.points); const segs = await planSplit(planPts, parseStops(ss.stops), planPts[planPts.length - 1], st.meters, t);
+        const pl = await places();
+        if (segs.length > 1) {
+          plan = segs; splitBox.hidden = false; splitBox.innerHTML = '';
+          splitBox.append(el('b', { textContent: 'Split at the office or home?' }),
+            el('ul', { style: 'margin:8px 0;padding-left:18px' }, segs.map(s => el('li', { textContent: `${segLabel(s, pl)} · about ${Math.round(MI(s.to.m - s.from.m))} mi` }))),
+            el('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:700' }, [splitOn, 'Save it split like this']));
+        } else if (segs.length === 1 && !curSite(t).pc && segs[0].sites.length && $('cMiles')) { t.sitePc = segs[0].sites[0].pc; t.siteCheck = true; }
+      } catch (e) { /* save as one trip */ }
+    })();
     form.append(el('button', { className: 'primary biz', type: 'submit', textContent: 'Save trip' }));
     form.onsubmit = async e => {
       e.preventDefault();
@@ -1323,6 +1409,15 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         err.hidden = false; form.dataset.big = String(miles); return; }
       const clash = overlapping(t.startMiles, miles, t.id);
       if (clash) { err.textContent = `That overlaps your ${tripName(clash)} (${clash.startMiles} to ${clash.finishMiles}). Check the reading.`; err.hidden = false; return; }
+      if (plan && splitOn.checked) { // saved as several trips, readings shared out so they add up to the dash
+        if (TR()) { try { await TR().stop(); } catch (e) {} }
+        const made = await tripsFromPlan(t, plan, miles, date, planPts, { odoTyped: !!$('cMiles').dataset.typed });
+        for (const s of made) { const mk = mKey(s.startDate); await loadMonth(mk); months[mk].trips.push(s); await saveMonth(mk); }
+        S.openTrip = null; await saveS(); await recalcLast(); closeSheet(); buzz(60);
+        viewM = mKey(t.startDate); await renderMonth(); renderTripCard(); renderToday();
+        toast(`Saved as ${made.length} trips: ` + made.map(s => `${tripMiles(s)} ${s.type === 'priv' ? 'private' : s.type === 'unsorted' ? 'to sort' : 'business'}`).join(', '));
+        return;
+      }
       let gpsMiles = null, route = null;
       if (TR()) { route = await takeRoute(); try { const st = await TR().stop(); gpsMiles = Math.round(MI(st.meters) * 10) / 10; } catch (e) {} }
       const k = mKey(t.startDate); await loadMonth(k);
@@ -1500,7 +1595,10 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (sorting) setTimeout(async () => { // where the automatic trip began, as a postcode
       try { const pts = parsePts((await TR().route()).points); if (!pts.length || !$('nFrom')) return;
         const j = await (await fetch(`https://api.postcodes.io/postcodes?lon=${pts[0][1]}&lat=${pts[0][0]}&limit=1&radius=2000&widesearch=true`)).json();
-        const code = j && j.result && j.result[0] && j.result[0].postcode; if (code && $('nFrom') && !$('nFrom').dataset.touched) $('nFrom').value = code; } catch (e) {}
+        const code = (await pcAt(pts[0], await places())) || (j && j.result && j.result[0] && j.result[0].postcode); if (code && $('nFrom') && !$('nFrom').dataset.touched) $('nFrom').value = code;
+        if (TR().stops && $('nSite') && !$('nSite').value) { const ss = parseStops((await TR().stops()).stops), pl = await places();
+          const found = await findSites(ss, pts[0], pl.map(x => x.ll));
+          if (found.length && $('nSite') && !$('nSite').value) { $('nSite').value = found[0].pc; if (found[0].job && !$('nJob').value) $('nJob').value = found[0].job; if (found[0].desc && $('nDesc') && !$('nDesc').value) $('nDesc').value = found[0].desc; } } } catch (e) {}
     }, 0);
     odo.append(el('p', { className: 'hint', textContent: sug != null
       ? `Carried on from your last trip. If you've driven since, change it. You'll be asked what the extra miles were.`
@@ -1753,7 +1851,6 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (t.gpsMiles != null) add('GPS logged', `${t.gpsMiles} mi`);
     const days = Math.max(1, Math.round((new Date((t.finishDate || t.startDate) + 'T12:00') - new Date(t.startDate + 'T12:00')) / 86400000) + 1);
     add('Days', String(days));
-    if (!P) add('Route', isRoundTrip(t) ? 'There and back' : 'One way');
     if (t.lagAdded) add('GPS lag added', `${t.lagAdded} mi`);
     if (!P && expRound(t) && tripMiles(t) > expRound(t)) add('Local driving', `${tripMiles(t) - expRound(t)} mi`);
     box.append(kv);
@@ -1937,7 +2034,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     toast('Trip deleted', async () => { M.trips.push(t); await saveMonth(k); await recalcLast(); renderMonth(); renderToday(); });
   }
   async function recalcLast() {
-    S.lastFinish = lastReading(); await saveS(); renderGlance();
+    S.lastFinish = lastReading(); await saveS(); renderGlance(); try { renderMonthsBox(); } catch (e) {}
   }
 
   // ---------- wiring ----------
@@ -2107,6 +2204,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   };
   function fillSettings() {
     $('sBackupEmail').value = S.backupEmail || '';
+    renderMonthsBox();
     $('sName').value = S.name; $('sDriver').value = S.driver; $('sReg').value = S.reg; $('sOffice').value = S.office; $('sHome').value = S.home;
     $('regBadge').hidden = !S.reg; $('regBadge').textContent = S.reg;
   }
@@ -2271,6 +2369,45 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (!lastSheet) return;
     try { await shareFile(lastSheet.name, lastSheet.data, true); } catch (e) { if (!/cancel/i.test(String(e && e.message || e))) toast('Could not share: ' + (e.message || e)); }
   };
+  // ---------- your months: delete test data, or old years you no longer need ----------
+  function renderMonthsBox() {
+    const box = $('monthsBox'); box.innerHTML = '';
+    box.append(el('h2', { textContent: 'Your months' }));
+    const keys = monthKeys().filter(k => { const M = DATA['m-' + k]; return M && ((M.trips || []).length || (M.fuel || []).length || M.endMiles != null); }).reverse();
+    if (!keys.length) { box.append(el('p', { className: 'hint', textContent: 'Nothing logged yet.' })); return; }
+    box.append(el('p', { className: 'hint', textContent: 'Delete a month or a whole year you no longer need. A backup is saved first, in Documents/DrivR/Backups.' }));
+    const years = [...new Set(keys.map(k => k.slice(0, 4)))];
+    years.forEach(y => {
+      const ks = keys.filter(k => k.startsWith(y));
+      const head = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-top:12px' }, [el('b', { textContent: y })]);
+      if (ks.length > 1) { const dy = el('button', { type: 'button', className: 'secondary danger', textContent: `Delete all of ${y}`, style: 'min-height:38px;padding:6px 12px' }); dy.onclick = () => confirmDelete(ks, `all of ${y}`); head.append(dy); }
+      box.append(head);
+      const list = el('div', { className: 'list', style: 'box-shadow:none;background:var(--raised);margin-top:6px' });
+      ks.forEach(k => {
+        const M = DATA['m-' + k], n = (M.trips || []).length, mi = (M.trips || []).reduce((s, t) => s + tripMiles(t), 0);
+        const row = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px' },
+          [el('span', {}, [el('b', { textContent: mLabel(k) }), el('span', { className: 'hint', style: 'display:block', textContent: `${n} trip${n === 1 ? '' : 's'} · ${mi.toLocaleString('en-GB')} mi` })])]);
+        const d = el('button', { type: 'button', className: 'secondary danger', textContent: 'Delete', style: 'min-height:38px;padding:6px 14px' });
+        d.onclick = () => confirmDelete([k], mLabel(k)); row.append(d); list.append(row);
+      });
+      box.append(list);
+    });
+  }
+  function confirmDelete(ks, what) {
+    const box = openSheet('Delete ' + what + '?');
+    const n = ks.reduce((s, k) => s + ((DATA['m-' + k].trips || []).length), 0);
+    box.append(el('p', { className: 'hint', textContent: `This removes ${n} trip${n === 1 ? '' : 's'}, the fuel and the readings for ${what}. A backup is saved first, so you can bring it back with Restore.` }));
+    const go = el('button', { type: 'button', className: 'primary', style: 'background:var(--warn)', textContent: 'Delete ' + what });
+    const no = el('button', { type: 'button', className: 'secondary', textContent: 'Keep it' }); no.onclick = closeSheet;
+    go.onclick = async () => {
+      const kept = {}; ks.forEach(k => { kept['m-' + k] = DATA['m-' + k]; });
+      try { if (NATIVE) await fsWrite(`Backups/mileage-log-before-delete-${today()}-${Date.now()}.json`, fileText()); } catch (e) {}
+      ks.forEach(k => { delete DATA['m-' + k]; delete months[k]; });
+      await saveAll(); await recalcLast(); closeSheet(); renderMonthsBox(); renderMonth(); renderToday();
+      toast(`Deleted ${what}`, async () => { Object.assign(DATA, kept); ks.forEach(k => { delete months[k]; }); await saveAll(); await recalcLast(); renderMonthsBox(); renderMonth(); renderToday(); });
+    };
+    box.append(el('div', { className: 'btns' }, [no, go]));
+  }
   async function emailBackup() { // opens the email app with the log attached and the address filled in
     const to = (S.backupEmail || '').trim();
     if (!to) { showTab('settings'); $('sBackupEmail').focus(); toast('Add the email address for backups first'); return; }
