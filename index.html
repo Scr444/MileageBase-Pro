@@ -1056,35 +1056,44 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const trips = [...M.trips].sort((a, b) => ((a.startMiles ?? 0) - (b.startMiles ?? 0)) || String(a.startDate).localeCompare(String(b.startDate)));
     let lastAny = monthStart(k);
     const rows = [], list = [], unsorted = [], needs = [];
-    let privAcc = 0, privTo = null, privDate = null; // private miles since the last business row, the reading they end at, and when
-    const privRow = () => { if (privAcc > 0) rows.push({ desc: 'Private', priv: privAcc, bus: 0, driver: S.driver, finishMiles: privTo, finishDate: privDate }); privAcc = 0; };
+    // Private miles: on the same day as a business trip they go on that trip's row (the Private column); on other days
+    // they get a Private row of their own, between the business trips, in order.
+    let parts = [], lastBus = null; // private driving waiting for a row: { date, miles, to }
+    const privRow = list => { const m = list.reduce((s, p) => s + p.miles, 0); if (m > 0) { const l = list[list.length - 1]; rows.push({ desc: 'Private', priv: m, bus: 0, driver: S.driver, finishMiles: l.to, finishDate: l.date }); lastBus = null; } };
+    const addPriv = (date, miles, to) => {
+      if (!(miles > 0)) return;
+      if (lastBus && !parts.length && date === lastBus.finishDate) { lastBus.priv += miles; lastBus.finishMiles = to; return; } // after a business trip, same day
+      parts.push({ date, miles, to });
+    };
     trips.forEach(t => {
       const run = Math.max(0, (t.finishMiles ?? 0) - (t.startMiles ?? 0));
       const gap = lastAny != null && t.startMiles != null ? Math.max(0, t.startMiles - lastAny) : 0;
       const gapPriv = gap && t.privGap ? gap : 0, gapOpen = gap && !t.privGap ? gap : 0;
-      if (gapPriv) { privAcc += gapPriv; privTo = t.startMiles; privDate = t.startDate; }
+      if (gapPriv) addPriv(t.startDate, gapPriv, t.startMiles);
       if (gapOpen) unsorted.push({ id: t.id, miles: gapOpen, from: lastAny, to: t.startMiles, date: t.startDate });
       const nd = needsOf(t); if (nd.length) needs.push({ id: t.id, what: nd, date: t.startDate });
       if (t.type === 'unsorted') { // not sorted yet: on no row until you say business or private
         list.push({ id: t.id, type: 'unsorted', miles: run, bus: 0, priv: 0, startPc: t.startPc, startDate: t.startDate, finishDate: t.finishDate, route: t.route, gapOpen, gapPriv, needs: nd, est: t.est });
       } else if (t.type === 'priv') {
-        privAcc += run; if (t.finishMiles != null) { privTo = t.finishMiles; privDate = t.finishDate || t.startDate; }
+        if (t.finishMiles != null) addPriv(t.finishDate || t.startDate, run, t.finishMiles);
         list.push({ id: t.id, type: 'priv', priv: run, bus: 0, startDate: t.startDate, finishDate: t.finishDate, route: t.route, gapOpen, gapPriv, lagAdded: t.lagAdded, est: t.est, fromName: t.fromName, toName: t.toName });
       } else {
         const sl = siteList(t);
         const row = { id: t.id, desc: t.desc, startPc: t.startPc, sitePc: t.sitePc, job: t.job, driver: S.driver, sites: sl, segs: sl.length > 1 ? legMiles(t) : null, expR: expRound(t),
-                      startDate: t.startDate, finishMiles: t.finishMiles, finishDate: t.finishDate, priv: 0, bus: run, privBefore: privAcc, needs: nd, est: t.est, gapOpen, gapPriv, lagAdded: t.lagAdded, route: t.route, expected: t.expected };
-        privRow(); // private driving since the last business trip gets its own row, in order, before this one
-        rows.push(row); list.push(row);
+                      startDate: t.startDate, finishMiles: t.finishMiles, finishDate: t.finishDate, priv: 0, bus: run, needs: nd, est: t.est, gapOpen, gapPriv, lagAdded: t.lagAdded, route: t.route, expected: t.expected };
+        // private driving earlier the same day joins this row; private on earlier days gets its own row before it
+        const same = parts.filter(x => x.date === t.startDate), earlier = parts.filter(x => x.date !== t.startDate);
+        privRow(earlier); row.priv = same.reduce((s, x) => s + x.miles, 0); parts = [];
+        rows.push(row); list.push(row); lastBus = row;
       }
       if (t.finishMiles != null) lastAny = Math.max(lastAny ?? 0, t.finishMiles);
     });
     if (M.endMiles != null && lastAny != null && M.endMiles > lastAny) {
       const g = M.endMiles - lastAny;
-      if (M.endPriv) { privAcc += g; privTo = M.endMiles; privDate = lastDay(k); } else unsorted.push({ id: 'end', miles: g, from: lastAny, to: M.endMiles, date: lastDay(k) });
+      if (M.endPriv) addPriv(lastDay(k), g, M.endMiles); else unsorted.push({ id: 'end', miles: g, from: lastAny, to: M.endMiles, date: lastDay(k) });
       list.push({ desc: 'Month-end reading', finishMiles: M.endMiles, finishDate: lastDay(k), priv: M.endPriv ? g : 0, bus: 0, gapOpen: M.endPriv ? 0 : g, endGap: true });
     }
-    privRow();
+    privRow(parts);
     return { rows, list, startMiles: monthStart(k), unsorted, needs };
   }
   // ---------- gaps: odometer miles that weren't logged ----------
@@ -1915,7 +1924,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       const d = r.startDate && r.startDate.length > 7 ? r.startDate : r.finishDate;
       if (d) { const w = weekOf(d); if (w !== wk) { wk = w;
         const inWk = shown.filter(x => { const dd = x.startDate && x.startDate.length > 7 ? x.startDate : x.finishDate; return dd && weekOf(dd) === w; });
-        const b = inWk.reduce((s, x) => s + (x.bus || 0), 0), p = inWk.reduce((s, x) => s + (x.priv || 0), 0), end = new Date(new Date(w + 'T12:00').getTime() + 6 * 86400000);
+        const b = inWk.reduce((s, x) => s + (x.type !== 'priv' && x.type !== 'unsorted' ? x.bus || 0 : 0), 0), p = inWk.reduce((s, x) => s + (x.type === 'priv' || !x.id ? x.priv || 0 : 0), 0), end = new Date(new Date(w + 'T12:00').getTime() + 6 * 86400000);
         list.append(el('div', { className: 'wkhead' }, [el('span', { textContent: `${fmtD(w).replace(/^\w+ /, '')} – ${fmtD(`${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`).replace(/^\w+ /, '')}` }),
           el('span', { textContent: `${b} bus · ${p} priv` })])); } }
       const it = tripItem(r); list.append(it);
