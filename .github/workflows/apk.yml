@@ -30,6 +30,7 @@ jobs:
         run: |
           mkdir -p www
           cp index.html www/
+          sed -i "s/__BUILD__/${{ github.run_number }}/" www/index.html
           cp icon-192.png icon-512.png www/ || true
           cp manifest.webmanifest www/ || true
           cp node_modules/leaflet/dist/leaflet.js node_modules/leaflet/dist/leaflet.css www/
@@ -56,6 +57,8 @@ jobs:
           # car Bluetooth, month-end reminders, restart handling and the home-screen widget
           sed -i 's#</manifest>#    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />\n    <uses-permission android:name="android.permission.VIBRATE" />\n    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />\n    <uses-permission android:name="android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND" />\n    <uses-permission android:name="android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND" />\n    <uses-feature android:name="android.software.companion_device_setup" android:required="false" />\n</manifest>#' $M
           sed -i 's#</application>#    <receiver android:name=".ReminderReceiver" android:exported="true"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /><action android:name="android.bluetooth.device.action.ACL_CONNECTED" /><action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" /><action android:name="android.app.action.ENTER_CAR_MODE" /><action android:name="android.app.action.EXIT_CAR_MODE" /></intent-filter></receiver>\n    <receiver android:name=".WidgetProvider" android:exported="true" android:label="DrivR"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/mbp_widget_info" /></receiver>\n    </application>#' $M
+          # its own folder at the top of internal storage (the user turns "All files access" on once)
+          sed -i 's#</manifest>#    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />\n</manifest>#' $M
           # Android 11+: let the app see which email apps can take the backup
           sed -i 's#</manifest>#    <queries><intent><action android:name="android.intent.action.SENDTO" /><data android:scheme="mailto" /></intent></queries>\n</manifest>#' $M
           cp -r native/res/* android/app/src/main/res/

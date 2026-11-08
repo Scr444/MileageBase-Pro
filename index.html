@@ -364,10 +364,16 @@ details.fold > summary .hint { font-weight: 500; font-size: 13.5px; }
       <p class="hint" id="emailHint">Every 3 days a reminder opens Gmail with the log attached. You just press Send.</p>
       <button class="primary" type="button" id="emailBtn">Email backup now</button>
     </div>
+    <div class="grp">Files</div>
+    <div class="card" id="folderBox">
+      <div class="h"><b>Your DrivR folder</b><span class="tag live" id="folderTag">–</span></div>
+      <p class="hint" id="folderHint"></p>
+      <button class="secondary" type="button" id="folderBtn" hidden>Give DrivR its own folder</button>
+    </div>
     <div class="grp">More</div>
     <details class="card fold"><summary>Your months<span class="hint">Delete old months or years</span></summary><div id="monthsBox"></div></details>
     <details class="card fold" id="restoreFold"><summary>Backups on the phone<span class="hint">Share the file, or restore one</span></summary>
-      <p class="hint" id="backupHint">Your whole log is one file on this phone, in Documents/DrivR. A dated copy is saved every week in Documents/DrivR/Backups.</p>
+      <p class="hint" id="backupHint">Your whole log is one file on this phone, in the DrivR folder. A dated copy is saved every week in its Backups folder.</p>
       <div class="btns">
         <button class="secondary" type="button" id="backupBtn">Share backup</button>
         <button class="secondary" type="button" id="restoreBtn">Restore</button>
@@ -380,6 +386,7 @@ details.fold > summary .hint { font-weight: 500; font-size: 13.5px; }
     <details class="card fold"><summary>Setup<span class="hint">Car link, location and battery checks</span></summary>
       <button class="secondary" type="button" id="rerunSetup">Run setup again</button>
     </details>
+    <p class="hint" id="appVersion" style="text-align:center;margin:6px 0 10px"></p>
   </section>
 </main>
 
@@ -627,9 +634,13 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     return null; }
   const FS = () => plug('Filesystem');
   const DIR = 'DrivR', OLD_DIRS = ['Odo', 'MileageBase Pro'], FILE = 'mileage-log.json', LS = 'mbp:log';
+  const APP_VERSION = 'v2.3', APP_BUILD = '__BUILD__';
+  // where the DrivR folder lives: its own folder at the top of internal storage once "All files access" is on, otherwise Documents
+  let BASE = 'DOCUMENTS';
+  const whereText = () => BASE === 'EXTERNAL_STORAGE' ? 'Internal storage › DrivR' : 'Documents › DrivR';
   let DATA = {}, migrated = false;
   async function fsWrite(path, data, base64) { const f = FS(); if (!f) throw new Error('no file access');
-    const o = { path: DIR + '/' + path, data, directory: 'DOCUMENTS', recursive: true }; if (!base64) o.encoding = 'utf8'; return f.writeFile(o); }
+    const o = { path: DIR + '/' + path, data, directory: BASE, recursive: true }; if (!base64) o.encoding = 'utf8'; return f.writeFile(o); }
   const fileText = () => JSON.stringify({ app: 'DrivR', version: 1, saved: new Date().toISOString(), ...DATA });
   let saveChain = Promise.resolve();
   function saveAll() { // one save at a time, so two quick saves can't trip over each other's files
@@ -641,21 +652,48 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const txt = fileText();
     if (!NATIVE) { try { localStorage.setItem(LS, txt); } catch (e) {} return; }
     await fsWrite(FILE + '.tmp', txt); // write a copy first so a dead battery can't wreck the log
-    try { await FS().deleteFile({ path: DIR + '/' + FILE, directory: 'DOCUMENTS' }); } catch (e) {}
-    try { await FS().rename({ from: DIR + '/' + FILE + '.tmp', to: DIR + '/' + FILE, directory: 'DOCUMENTS', toDirectory: 'DOCUMENTS' }); }
+    try { await FS().deleteFile({ path: DIR + '/' + FILE, directory: BASE }); } catch (e) {}
+    try { await FS().rename({ from: DIR + '/' + FILE + '.tmp', to: DIR + '/' + FILE, directory: BASE, toDirectory: BASE }); }
     catch (e) { await fsWrite(FILE, txt); }
   }
   const strip = o => { const d = { ...o }; delete d.app; delete d.version; delete d.saved; return d; };
   const store = {
     async get(k) { return DATA[k] ?? null; },
     async set(k, v) { DATA[k] = v; try { await saveAll(); } catch (e) { toast('Could not save: ' + (e.message || e)); } } };
+  async function allFilesOn() { const T = TR(); if (!T || !T.storage) return false; try { return !!(await T.storage()).allFiles; } catch (e) { return false; } }
+  async function exists(path, dir) { try { await FS().stat({ path, directory: dir }); return true; } catch (e) { return false; } }
+  // copies everything in Documents › DrivR to Internal storage › DrivR, checks the log came across whole, and leaves the old folder in place
+  async function moveToRoot() {
+    const f = FS(); let copied = 0;
+    const copyDir = async sub => {
+      let r; try { r = await f.readdir({ path: DIR + (sub ? '/' + sub : ''), directory: 'DOCUMENTS' }); } catch (e) { return; }
+      for (const x of r.files || []) {
+        const name = typeof x === 'string' ? x : x.name, isDir = typeof x === 'object' && x.type === 'directory';
+        const rel = (sub ? sub + '/' : '') + name;
+        if (isDir || (!sub && /^(Sheets|Backups|Receipts)$/.test(name))) { await copyDir(rel); continue; }
+        try { const d = await f.readFile({ path: DIR + '/' + rel, directory: 'DOCUMENTS' }); // base64: any file type copies exactly
+          await f.writeFile({ path: DIR + '/' + rel, data: d.data, directory: 'EXTERNAL_STORAGE', recursive: true }); copied++; } catch (e) {}
+      }
+    };
+    await copyDir('');
+    try { // the log must read back exactly as it was
+      const a1 = await f.readFile({ path: DIR + '/' + FILE, directory: 'DOCUMENTS', encoding: 'utf8' }), b1 = await f.readFile({ path: DIR + '/' + FILE, directory: 'EXTERNAL_STORAGE', encoding: 'utf8' });
+      if (a1.data !== b1.data) return false;
+      movedNote = copied; return true;
+    } catch (e) { return false; }
+  }
+  let movedNote = 0;
   async function initStore() {
     if (NATIVE) {
       const f = FS();
       try { if (f.requestPermissions) await f.requestPermissions(); } catch (e) {}
-      try { await f.mkdir({ path: DIR, directory: 'DOCUMENTS', recursive: true }); } catch (e) {}
+      if (await allFilesOn()) { // its own folder: move across from Documents the first time
+        BASE = 'EXTERNAL_STORAGE';
+        if (!(await exists(DIR + '/' + FILE, BASE)) && await exists(DIR + '/' + FILE, 'DOCUMENTS')) { if (!(await moveToRoot())) BASE = 'DOCUMENTS'; }
+      }
+      try { await f.mkdir({ path: DIR, directory: BASE, recursive: true }); } catch (e) {}
       for (const name of [FILE, FILE + '.tmp']) {
-        try { const r = await f.readFile({ path: DIR + '/' + name, directory: 'DOCUMENTS', encoding: 'utf8' }); DATA = strip(JSON.parse(r.data)); return; } catch (e) {}
+        try { const r = await f.readFile({ path: DIR + '/' + name, directory: BASE, encoding: 'utf8' }); DATA = strip(JSON.parse(r.data)); return; } catch (e) {}
       }
       // first run as DrivR: bring the log and receipt photos across from the Odo or MileageBase Pro folder
       for (const OLD_DIR of OLD_DIRS) for (const name of [FILE, FILE + '.tmp']) {
@@ -2391,6 +2429,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   }
   async function closeWizard() { $('wizard').hidden = true; wizStep = -1; S.setupDone = true; await saveS(); renderCar(); }
   $('rerunSetup').onclick = () => openWizard(2);
+  $('folderBtn').onclick = () => askAllFiles();
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && wizStep === 2 && !$('wizard').hidden) openWizard(2); });
   // ---------- tabs ----------
   const TITLES = { today: 'Today', trips: 'Trips', month: 'Month', settings: 'Settings' };
@@ -2446,7 +2485,36 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     endBusy = key;
     try { if (v == null) toast('Month-end reading cleared'); await setMonthEnd(viewM, v); } finally { endBusy = null; }
     renderMonth(); renderToday(); };
+  function renderFolder() {
+    const own = BASE === 'EXTERNAL_STORAGE';
+    $('folderTag').textContent = own ? 'Own folder' : 'In Documents'; $('folderTag').className = 'tag ' + (own ? 'live' : 'sort');
+    $('folderHint').textContent = own ? 'Everything is in Internal storage › DrivR: Sheets, Backups and your log. Browse it in Files, or from Excel: Open › This device › DrivR.'
+      : NATIVE ? 'Everything is in Documents › DrivR. Turn on "All files access" for DrivR and it moves to its own folder at the top of internal storage, checked as it goes.' : 'In the installed app, your files live in a DrivR folder on the phone.';
+    $('folderBtn').hidden = own || !NATIVE;
+    $('appVersion').textContent = `DrivR ${APP_VERSION} · build ${/^\d+$/.test(APP_BUILD) ? APP_BUILD : 'dev'}`;
+  }
+  async function askAllFiles() { const T = TR(); if (!T || !T.openAllFiles) return; folderPending = true; try { await T.openAllFiles(); } catch (e) { toast('Open Settings › Apps › DrivR › Permissions › Files to turn it on'); } }
+  let folderPending = false;
+  async function folderCheck() { // back from Android's settings: if it's on now, move everything across
+    if (BASE === 'EXTERNAL_STORAGE' || !(await allFilesOn())) { folderPending = false; return; }
+    folderPending = false;
+    const ok = (await exists(DIR + '/' + FILE, 'EXTERNAL_STORAGE')) || await moveToRoot();
+    if (!ok) { toast('Could not copy everything across, so your files stay in Documents › DrivR for now'); return; }
+    BASE = 'EXTERNAL_STORAGE'; await saveAll();
+    renderFolder(); toast('Done: everything is now in Internal storage › DrivR');
+  }
+  function offerFolder() { // once: explain, then open Android's switch
+    if (!NATIVE || BASE === 'EXTERNAL_STORAGE' || S.askedFolder) return;
+    const box = openSheet('Give DrivR its own folder');
+    box.append(el('p', { className: 'hint', textContent: 'At the moment your log, sheets and backups are in Documents › DrivR, mixed in with everything else in Documents. DrivR can have its own folder at the top of internal storage instead: Internal storage › DrivR.' }),
+      el('p', { className: 'hint', textContent: 'Android needs you to turn on "All files access" for DrivR on the next screen. Your files are then copied across and checked; nothing is deleted.' }));
+    const go = el('button', { type: 'button', className: 'primary', textContent: 'Set it up' }), no = el('button', { type: 'button', className: 'secondary', textContent: 'Not now' });
+    go.onclick = async () => { S.askedFolder = true; await saveS(); closeSheet(); askAllFiles(); };
+    no.onclick = async () => { S.askedFolder = true; await saveS(); closeSheet(); toast('You can do it any time in Settings › Files'); };
+    box.append(el('div', { className: 'btns' }, [go, no]));
+  }
   function fillSettings() {
+    renderFolder();
     $('sBackupEmail').value = S.backupEmail || '';
     $('emailHint').textContent = 'Every 3 days a reminder opens Gmail with the log attached. You just press Send.' + (S.lastEmail ? ` Last sent ${fmtD(isoOf(S.lastEmail))}.` : '');
     renderMonthsBox();
@@ -2454,17 +2522,20 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     $('regBadge').hidden = !S.reg; $('regBadge').textContent = S.reg;
   }
   let lastSheet = null;
-  // a sheet you've opened and changed in Excel (fuel, a quick fix) is never written over: building again makes "(2)"
-  async function sheetName(k, base) {
-    const M = months[k], made = M.sheetFiles || (M.sheetFiles = {});
-    const stem = base.replace(/\.xlsx$/, '');
-    for (let n = 1; n < 50; n++) {
-      const name = n === 1 ? base : `${stem} (${n}).xlsx`;
-      let st = null; try { st = await FS().stat({ path: DIR + '/Sheets/' + name, directory: 'DOCUMENTS' }); } catch (e) { return { name, edited: n > 1 }; } // not there yet: use it
-      const mine = made[name], mt = Number(st && (st.mtime ?? st.mtimeMs)) || 0;
-      if (mine && mt && mt <= mine + 5000) return { name, edited: n > 1 }; // ours, untouched since: replace it
+  // Every build is its own file, named with when it was made, so Excel can never show you an old copy it remembers.
+  // Older copies you haven't touched are tidied away; any you've changed in Excel (fuel, a quick fix) are kept.
+  const MON3 = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function stampNow() { const d = new Date(); return `${d.getDate()} ${MON3[d.getMonth()]} ${pad(d.getHours())}.${pad(d.getMinutes())}`; }
+  async function tidySheets(k, keepName) {
+    const made = months[k].sheetFiles || {}; let kept = 0;
+    for (const name of Object.keys(made)) {
+      if (name === keepName) continue;
+      let st = null; try { st = await FS().stat({ path: DIR + '/Sheets/' + name, directory: BASE }); } catch (e) { delete made[name]; continue; } // gone already
+      const mt = Number(st && (st.mtime ?? st.mtimeMs)) || 0;
+      if (mt && mt <= made[name] + 5000) { try { await FS().deleteFile({ path: DIR + '/Sheets/' + name, directory: BASE }); } catch (e) {} delete made[name]; }
+      else kept++; // you've changed it: never touched
     }
-    return { name: `${stem} (${Date.now()}).xlsx`, edited: true };
+    return kept;
   }
   async function exportMonth(k, share, open) {
     await loadMonth(k);
@@ -2478,16 +2549,19 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       rows, fuel: [] }); // fuel goes through your expenses app: the fuel columns are left blank
     const base = safeName(`Mileage ${mLabel(k)}${S.name ? ' - ' + S.name : ''}.xlsx`);
     if (!NATIVE) { download(base, new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); return { name: base, note: 'Downloaded ' + base + '.' }; }
-    const { name, edited } = await sheetName(k, base);
+    let name = base.replace(/\.xlsx$/, '') + ` (${stampNow()}).xlsx`; // a name Excel hasn't seen before
+    if (await exists(DIR + '/Sheets/' + name, BASE)) name = name.replace(/\)\.xlsx$/, `.${pad(new Date().getSeconds())})` + '.xlsx');
     const data = b64(bytes);
     await fsWrite('Sheets/' + name, data, true);
-    try { const st = await FS().stat({ path: DIR + '/Sheets/' + name, directory: 'DOCUMENTS' }); months[k].sheetFiles[name] = Number(st.mtime ?? st.mtimeMs) || Date.now(); }
+    months[k].sheetFiles = months[k].sheetFiles || {};
+    try { const st = await FS().stat({ path: DIR + '/Sheets/' + name, directory: BASE }); months[k].sheetFiles[name] = Number(st.mtime ?? st.mtimeMs) || Date.now(); }
     catch (e) { months[k].sheetFiles[name] = Date.now(); }
+    const edited = await tidySheets(k, name);
     await saveMonth(k);
     lastSheet = { name, data };
-    if (share) { try { await shareFile(name, data, true); } catch (e) { if (!/cancel/i.test(String(e && e.message || e))) toast('Could not share: ' + (e.message || e)); } }
-    if (open) { try { await TR().openFile({ path: `${DIR}/Sheets/${name}` }); } catch (e) { toast('Could not open it: ' + (e.message || e)); } }
-    return { name, note: `Saved ${name} in Documents/${DIR}/Sheets.` + (edited ? ' Your edited copy was kept as it was.' : '') };
+    if (share) { try { await shareFile(base, data, true); } catch (e) { if (!/cancel/i.test(String(e && e.message || e))) toast('Could not share: ' + (e.message || e)); } }
+    if (open) { try { await TR().openFile({ path: `${DIR}/Sheets/${name}`, base: BASE === 'EXTERNAL_STORAGE' ? 'root' : 'documents' }); } catch (e) { toast('Could not open it: ' + (e.message || e)); } }
+    return { name, edited, note: `Opened ${name}, just built, from ${whereText()} › Sheets.` + (edited ? ` ${edited} copy you changed in Excel ${edited === 1 ? 'is' : 'are'} kept as ${edited === 1 ? 'it was' : 'they were'}.` : '') };
   }
   $('exportBtn').onclick = async () => {
     const v = num($('endMiles').value), M = months[viewM];
@@ -2512,7 +2586,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   }
   async function shareMonth(k, share) {
     const note = $('exportNote');
-    try { const r = await exportMonth(k, share, !share && NATIVE); note.textContent = r.note; if (share) { months[k].sent = true; await saveMonth(k); renderToday(); } if (NATIVE && !share) toast(/kept/.test(r.note) ? 'Saved as a new copy, your edited one is kept' : 'Sheet saved'); }
+    try { const r = await exportMonth(k, share, !share && NATIVE); note.textContent = r.note; if (share) { months[k].sent = true; await saveMonth(k); renderToday(); } if (NATIVE && !share) toast(r.edited ? 'Opened the sheet just built. Your edited copy is kept.' : 'Opened the sheet just built'); }
     catch (e) { note.textContent = 'Could not build the sheet: ' + (e.message || e); toast('Could not build the sheet'); }
   }
   // a dated copy of the log every week, keeping the last 8
@@ -2522,9 +2596,9 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (last && (Date.now() - last) / 86400000 < 7) return;
     try {
       await fsWrite(`Backups/mileage-log-${today()}.json`, fileText());
-      const r = await FS().readdir({ path: DIR + '/Backups', directory: 'DOCUMENTS' });
+      const r = await FS().readdir({ path: DIR + '/Backups', directory: BASE });
       const names = (r.files || []).map(x => typeof x === 'string' ? x : x.name).filter(n => /^mileage-log-\d{4}-\d{2}-\d{2}\.json$/.test(n)).sort();
-      for (const n of names.slice(0, Math.max(0, names.length - 8))) { try { await FS().deleteFile({ path: DIR + '/Backups/' + n, directory: 'DOCUMENTS' }); } catch (e) {} }
+      for (const n of names.slice(0, Math.max(0, names.length - 8))) { try { await FS().deleteFile({ path: DIR + '/Backups/' + n, directory: BASE }); } catch (e) {} }
       S.lastBackup = today(); await saveS();
     } catch (e) {}
   }
@@ -2568,7 +2642,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     } catch (e) {}
     checking = false;
   }
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { checkNative(); renderMonthEnd(); setTimeout(askEmailSent, 400); } });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { checkNative(); renderMonthEnd(); setTimeout(askEmailSent, 400); if (folderPending || BASE !== 'EXTERNAL_STORAGE') folderCheck(); } });
   // car link in Your details
   // ---------- the car: spotted automatically, or picked from the phone's paired devices ----------
   async function openCarPicker(after) {
@@ -2637,7 +2711,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     box.append(el('h2', { textContent: 'Your months' }));
     const keys = monthKeys().filter(k => { const M = DATA['m-' + k]; return M && ((M.trips || []).length || M.endMiles != null); }).reverse();
     if (!keys.length) { box.append(el('p', { className: 'hint', textContent: 'Nothing logged yet.' })); return; }
-    box.append(el('p', { className: 'hint', textContent: 'Delete a month or a whole year you no longer need. A backup is saved first, in Documents/DrivR/Backups.' }));
+    box.append(el('p', { className: 'hint', textContent: 'Delete a month or a whole year you no longer need. A backup is saved first, in the DrivR Backups folder.' }));
     const years = [...new Set(keys.map(k => k.slice(0, 4)))];
     years.forEach(y => {
       const ks = keys.filter(k => k.startsWith(y));
@@ -2763,6 +2837,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     fillSettings(); renderTripCard(); await renderMonth();
     { const h = pc(S.home), o = pc(S.office); if (h !== (S.home || '') || o !== (S.office || '')) { S.home = h; S.office = o; await saveS(); } }
     await checkNative(); syncNative(); renderMonthEnd(); renderCar(); autoBackup(); renderGlance();
+    if (movedNote) toast(`Moved to Internal storage › DrivR: ${movedNote} file${movedNote === 1 ? '' : 's'} copied and checked`);
+    setTimeout(offerFolder, 1200);
     if (migrated) toast('Your trips are now in DrivR');
     if (!S.setupDone) openWizard(0);
   })();

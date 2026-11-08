@@ -329,12 +329,39 @@ public class TrackerPlugin extends Plugin {
         call.resolve();
     }
 
-    /** Opens a saved sheet (Documents/...) in Excel, or whatever opens spreadsheets, with permission to edit it. */
+    /** Whether DrivR may use its own folder at the top of internal storage ("All files access"). */
+    @PluginMethod
+    public void storage(PluginCall call) {
+        JSObject r = new JSObject();
+        boolean ok = Build.VERSION.SDK_INT >= 30 ? android.os.Environment.isExternalStorageManager()
+                : ContextCompat.checkSelfPermission(getContext(), "android.permission.WRITE_EXTERNAL_STORAGE") == PackageManager.PERMISSION_GRANTED;
+        r.put("allFiles", ok);
+        call.resolve(r);
+    }
+
+    /** Android's switch for "All files access", on DrivR's own page. */
+    @PluginMethod
+    public void openAllFiles(PluginCall call) {
+        Context c = getContext();
+        try {
+            Intent i = Build.VERSION.SDK_INT >= 30 ? new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + c.getPackageName()))
+                    : new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + c.getPackageName()));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); c.startActivity(i);
+        } catch (Exception e) {
+            try { Intent i = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + c.getPackageName())); i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); c.startActivity(i); }
+            catch (Exception e2) { call.reject("Could not open settings", "no_settings"); return; }
+        }
+        call.resolve();
+    }
+
+    /** Opens a saved sheet in Excel, or whatever opens spreadsheets, with permission to edit it. */
     @PluginMethod
     public void openFile(PluginCall call) {
         Context c = getContext();
         String mime = call.getString("mime", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-        java.io.File f = new java.io.File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOCUMENTS), call.getString("path", ""));
+        java.io.File baseDir = "root".equals(call.getString("base", "documents")) ? android.os.Environment.getExternalStorageDirectory()
+                : android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOCUMENTS);
+        java.io.File f = new java.io.File(baseDir, call.getString("path", ""));
         if (!f.exists()) { call.reject("Sheet not found", "no_file"); return; }
         Uri uri = null;
         try { uri = androidx.core.content.FileProvider.getUriForFile(c, c.getPackageName() + ".fileprovider", f); }
