@@ -329,6 +329,37 @@ public class TrackerPlugin extends Plugin {
         call.resolve();
     }
 
+    /** Opens a saved sheet (Documents/...) in Excel, or whatever opens spreadsheets, with permission to edit it. */
+    @PluginMethod
+    public void openFile(PluginCall call) {
+        Context c = getContext();
+        String mime = call.getString("mime", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        java.io.File f = new java.io.File(android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOCUMENTS), call.getString("path", ""));
+        if (!f.exists()) { call.reject("Sheet not found", "no_file"); return; }
+        Uri uri = null;
+        try { uri = androidx.core.content.FileProvider.getUriForFile(c, c.getPackageName() + ".fileprovider", f); }
+        catch (Exception e) { // not reachable that way: open a copy instead (Excel may then show it read-only)
+            try {
+                java.io.File d = new java.io.File(c.getCacheDir(), "share"); d.mkdirs();
+                java.io.File cp = new java.io.File(d, f.getName());
+                try (java.io.FileInputStream in = new java.io.FileInputStream(f); java.io.FileOutputStream out = new java.io.FileOutputStream(cp)) {
+                    byte[] b = new byte[8192]; int n; while ((n = in.read(b)) > 0) out.write(b, 0, n); }
+                uri = androidx.core.content.FileProvider.getUriForFile(c, c.getPackageName() + ".fileprovider", cp);
+            } catch (Exception e2) { call.reject("Could not open the sheet: " + e2.getMessage(), "no_uri"); return; }
+        }
+        Intent v = new Intent(Intent.ACTION_VIEW).setDataAndType(uri, mime)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_ACTIVITY_NEW_TASK);
+        PackageManager pm = c.getPackageManager();
+        v.setPackage("com.microsoft.office.excel");
+        if (v.resolveActivity(pm) == null) v.setPackage(null);
+        try { c.startActivity(v); }
+        catch (Exception e) {
+            try { c.startActivity(Intent.createChooser(v.setPackage(null), "Open the sheet").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); }
+            catch (Exception e2) { call.reject("No app on the phone opens spreadsheets", "no_app"); return; }
+        }
+        call.resolve();
+    }
+
     /** A backup file the user opened with DrivR, if any (handed over once). */
     @PluginMethod
     public void takeIncoming(PluginCall call) {

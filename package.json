@@ -11,6 +11,7 @@
     "@capacitor/share": "^6.0.0",
     "leaflet": "1.9.4",
     "@fontsource/jetbrains-mono": "5.0.20",
-    "@fontsource/plus-jakarta-sans": "5.0.20"
+    "@fontsource/plus-jakarta-sans": "5.0.20",
+    "@capacitor/app": "^6.0.0"
   }
 }

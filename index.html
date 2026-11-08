@@ -174,7 +174,7 @@ body.has-dock .toast { bottom: calc(var(--tab-h) + 92px + env(safe-area-inset-bo
 .dock button { width: 100%; max-width: 568px; display: block; margin: 0 auto; }
 
 .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: color-mix(in srgb, var(--panel) 95%, transparent); backdrop-filter: blur(12px);
-  box-shadow: 0 -1px 0 var(--line), 0 -8px 24px rgba(19,23,38,.05); display: grid; grid-template-columns: repeat(5, minmax(0,1fr));
+  box-shadow: 0 -1px 0 var(--line), 0 -8px 24px rgba(19,23,38,.05); display: grid; grid-template-columns: repeat(4, minmax(0,1fr));
   padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
 .tabbar button { height: var(--tab-h); background: none; border: 0; color: var(--faint); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font: 700 11.5px var(--body); cursor: pointer; position: relative; }
 .tabbar svg { width: 25px; height: 25px; }
@@ -335,9 +335,9 @@ details.fold > summary .hint { font-weight: 500; font-size: 13.5px; }
       <p class="hint" id="addsUp"></p>
       <div id="sheetPreview"></div>
       <button class="primary" type="button" id="exportBtn">Build and share</button>
-      <button class="secondary" type="button" id="dlBtn">Download only</button>
+      <button class="secondary" type="button" id="dlBtn">Save and open in Excel</button>
       <button class="secondary" type="button" id="shareBtn" hidden>Share the sheet</button>
-      <p class="hint" id="exportNote">Your paper Mileage Record Sheet, filled in.</p>
+      <p class="hint" id="exportNote">Your paper Mileage Record Sheet, filled in. Open it in Excel to check it or add your fuel; building again never writes over a copy you've changed.</p>
     </div>
     </div>
   </section>
@@ -592,7 +592,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   const lastDay = k => { const y = +k.slice(0, 4), m = +k.slice(5); return `${k}-${pad(new Date(y, m, 0).getDate())}`; };
   const fmtD = d => d ? new Date(d + 'T12:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) : '';
   const num = v => { const n = parseFloat(String(v ?? '').replace(/[, ]/g, '')); return isFinite(n) ? n : null; };
-  const pc = v => String(v || '').toUpperCase().replace(/\s+/g, ' ').trim();
+  const pc = v => { const s = String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); // HD92RQ -> HD9 2RQ
+    return /^[A-Z]{1,2}[0-9][0-9A-Z]?[0-9][A-Z]{2}$/.test(s) ? s.slice(0, -3) + ' ' + s.slice(-3) : String(v || '').toUpperCase().replace(/\s+/g, ' ').trim(); };
   const uid = () => Math.random().toString(36).slice(2, 10);
   const el = (tag, props = {}, kids = []) => { const e = document.createElement(tag); Object.assign(e, props); kids.forEach(k => e.append(k)); return e; };
   let toastT;
@@ -889,7 +890,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const title = el('div', { className: 'fm-title', textContent: opts.title || 'Map' });
     const key = el('div', { className: 'fm-key' }), step = el('div', { className: 'fm-step' });
     wrap.append(box, el('div', { className: 'fm-top' }, [title, close]), el('div', { className: 'fm-bottom' }, [key, step]));
-    document.body.append(wrap); history.pushState({ fullMap: 1 }, '');
+    document.body.append(wrap);
     const st = await drawMap(box, trips, { counts: true });
     if (!st) return;
     st.groups.forEach(g => key.append(el('div', { className: 'fm-row' }, [el('i', { style: `background:${g.colour}` }),
@@ -1518,17 +1519,17 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     buzz(); toast('Private journey started.' + gpsMsg);
   }
   function privStart(form) { // only shown the very first time, when there's no odometer reading yet
-    form.append(el('p', { className: 'hint', textContent: 'First trip: read the odometer once. After this, every trip carries on from the last one.' }));
-    form.append(field('Odometer now', 'nMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }));
+    form.append(el('p', { className: 'hint', textContent: 'First trip: read the dash once. After this, every trip carries on from the last one.' }));
+    form.append(field('Dash reading now', 'nMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }));
     const err = el('p', { className: 'err', hidden: true }); form.append(err);
     form.append(el('button', { className: 'primary priv', type: 'submit', textContent: 'Start private journey' }));
     form.onsubmit = async e => {
       e.preventDefault();
       const miles = num($('nMiles').value);
-      if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
+      if (miles == null) { err.textContent = 'Enter the dash reading.'; err.hidden = false; return; }
       await fixEstimate(miles);
       const lastR = lastReading();
-      if (lastR != null && miles < lastR) { err.textContent = `That's lower than your last reading (${lastR}). Check the odometer.`; err.hidden = false; return; }
+      if (lastR != null && miles < lastR) { err.textContent = `That's lower than your last reading (${lastR}). Check the dash.`; err.hidden = false; return; }
       const settled = await settleGap(miles, err); if (!settled) return;
       await startPrivate(miles, settled.privGap);
     };
@@ -1786,10 +1787,10 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     form.onsubmit = async e => {
       e.preventDefault();
       const miles = num($('nMiles').value);
-      if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
+      if (miles == null) { err.textContent = 'Enter the dash reading.'; err.hidden = false; return; }
       await fixEstimate(miles);
       const lastR = lastReading();
-      if (lastR != null && miles < lastR) { err.textContent = `That's lower than your last reading (${lastR}). Check the odometer.`; err.hidden = false; return; }
+      if (lastR != null && miles < lastR) { err.textContent = `That's lower than your last reading (${lastR}). Check the dash.`; err.hidden = false; return; }
       const settled = sug == null ? { privGap: false } : await settleGap(miles, err); if (!settled) return;
       const val = id => $(id) ? $(id).value.trim() : '';
       const t = { id: sorting ? sorting.id : uid(), startPc: pc(val('nFrom')), sitePc: pc(val('nSite')), job: val('nJob'),
@@ -1929,8 +1930,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const end = M.endMiles ?? (rows.length ? Math.max(...rows.map(r => r.finishMiles ?? 0)) : null);
     const ok = start != null && end != null && bus + priv === end - start;
     $('addsUp').className = ok ? 'hint ok' : 'hint';
-    $('addsUp').textContent = !rows.length ? '' : ok ? `✓ Adds up: ${bus} business + ${priv} private = ${bus + priv}, the same as the odometer (${start} to ${end}).`
-      : start != null && end != null ? `${bus} business + ${priv} private = ${bus + priv}; the odometer went ${start} to ${end}.` : '';
+    $('addsUp').textContent = !rows.length ? '' : ok ? `✓ Adds up: ${bus} business + ${priv} private = ${bus + priv}, the same as the dash readings (${start} to ${end}).`
+      : start != null && end != null ? `${bus} business + ${priv} private = ${bus + priv}; the dash readings went ${start} to ${end}.` : '';
     if (!rows.length) return;
     const t = el('table', { className: 'xl' });
     t.append(el('tr', {}, ['', 'START', 'SITE', 'Job', 'START', 'FINISH MILES', 'FINISH', 'PRIV', 'BUS'].map(h => el('th', { textContent: h }))));
@@ -2124,7 +2125,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const kv = el('div', { className: 'kv' });
     const add = (l, v) => kv.append(el('div', {}, [el('span', { className: 'lbl', textContent: l }), el('b', { textContent: v })]));
     add(U ? 'Miles' : P ? 'Private miles' : 'Business miles', String(tripMiles(t)));
-    add('Odometer', `${t.startMiles} → ${t.finishMiles}` + (t.est && !t.trued ? ' (GPS, lined up at month end)' : ''));
+    add('Dash reading', `${t.startMiles} → ${t.finishMiles}` + (t.est && !t.trued ? ' (GPS, lined up at month end)' : ''));
     if (expRound(t)) add('Expected', `${expRound(t)} mi`);
     if (t.gpsMiles != null) add('GPS logged', `${t.gpsMiles} mi`);
     const days = Math.max(1, Math.round((new Date((t.finishDate || t.startDate) + 'T12:00') - new Date(t.startDate + 'T12:00')) / 86400000) + 1);
@@ -2198,7 +2199,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     r = el('div', { className: 'row' });
     r.append(field('Start date', 'eSD', { type: 'date', value: t.startDate }), field('Finish date', 'eFD', { type: 'date', value: t.finishDate })); add(r);
     r = el('div', { className: 'row' });
-    r.append(field('Start miles', 'eSM', { className: 'odo', inputMode: 'numeric', value: t.startMiles }), field('Finish miles', 'eFM', { className: 'odo', inputMode: 'numeric', value: t.finishMiles })); add(r);
+    r.append(field('Start dash reading', 'eSM', { className: 'odo', inputMode: 'numeric', value: t.startMiles }), field('Finish dash reading', 'eFM', { className: 'odo', inputMode: 'numeric', value: t.finishMiles })); add(r);
     r = el('div', { className: 'row' });
     if (t.type !== 'priv') { r.append(field('Job number', 'eJob', { value: t.job || '' }), field('Site name', 'eDesc', { value: t.desc || '' })); add(r); }
     const ty = el('div', { className: 'field' });
@@ -2212,7 +2213,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     f.onsubmit = async e => {
       e.preventDefault();
       const sm = num($('eSM').value), fm = num($('eFM').value);
-      if (sm == null || fm == null || fm < sm) { err.textContent = 'Finish miles must be at or above start miles.'; err.hidden = false; return; }
+      if (sm == null || fm == null || fm < sm) { err.textContent = 'The finish dash reading must be at or above the start.'; err.hidden = false; return; }
       const clash = overlapping(sm, fm, t.id);
       if (clash) { err.textContent = `Those readings overlap your ${tripName(clash)} (${clash.startMiles} to ${clash.finishMiles}).`; err.hidden = false; return; }
       if ($('eFD').value && $('eSD').value && $('eFD').value < $('eSD').value) { err.textContent = 'Finish date is before the start date.'; err.hidden = false; return; }
@@ -2266,7 +2267,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const r0 = el('div', { className: 'row' }); r0.append(field('Job number', 'aJob', { inputMode: 'numeric', autocomplete: 'off' }), field('Site name', 'aDesc', { autocomplete: 'off' })); bizBits.append(r0);
     form.append(bizBits);
     const r1 = el('div', { className: 'row' }); r1.append(field('Start date', 'aSD', { type: 'date', value: today(), required: true }), field('Finish date', 'aFD', { type: 'date', value: today(), required: true })); form.append(r1);
-    const r2 = el('div', { className: 'row' }); r2.append(field('Start odometer', 'aSM', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }), field('Finish odometer', 'aFM', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' })); form.append(r2);
+    const r2 = el('div', { className: 'row' }); r2.append(field('Start dash reading', 'aSM', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' }), field('Finish dash reading', 'aFM', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' })); form.append(r2);
     form.append(el('p', { className: 'hint', textContent: 'Readings must fit between your other trips. DrivR checks them against everything already logged.' }));
     const err = el('p', { className: 'err', hidden: true }); form.append(err);
     const save = el('button', { className: 'primary biz', type: 'submit', textContent: 'Add trip' }); form.append(save);
@@ -2275,7 +2276,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     form.onsubmit = async e => {
       e.preventDefault(); err.hidden = true;
       const sm = num($('aSM').value), fm = num($('aFM').value), sd = $('aSD').value, fd = $('aFD').value || sd;
-      if (sm == null || fm == null) { err.textContent = 'Enter both odometer readings.'; err.hidden = false; return; }
+      if (sm == null || fm == null) { err.textContent = 'Enter both dash readings.'; err.hidden = false; return; }
       if (fm < sm) { err.textContent = 'The finish reading is lower than the start.'; err.hidden = false; return; }
       if (fd < sd) { err.textContent = 'Finish date is before the start date.'; err.hidden = false; return; }
       if (type === 'bus' && !pc($('aSite').value)) { err.textContent = 'Enter the site postcode.'; err.hidden = false; return; }
@@ -2300,7 +2301,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const info = sheetRows(k).unsorted.find(u => u.id === id); if (!info) return;
     const box = openSheet('Sort unlogged miles');
     const p = tripBefore(info.from);
-    box.append(el('p', { className: 'hint', textContent: `The odometer went from ${info.from} to ${info.to}, ${info.miles} miles, with no trip logged.` + (p && info.miles <= 3 * lagLimit(p.t.finishMiles - p.t.startMiles) ? ` That size of gap is usually GPS falling short on the trip before.` : ` Were they part of the trip before, or private driving?`) }));
+    box.append(el('p', { className: 'hint', textContent: `The dash reading went from ${info.from} to ${info.to}, ${info.miles} miles, with no trip logged.` + (p && info.miles <= 3 * lagLimit(p.t.finishMiles - p.t.startMiles) ? ` That size of gap is usually GPS falling short on the trip before.` : ` Were they part of the trip before, or private driving?`) }));
     const btns = el('div', { style: 'display:flex;flex-direction:column;gap:10px' });
     if (p && p.t.finishMiles === info.from && (p.k === k || DATA['m-' + p.k].endMiles == null)) {
       const b = el('button', { type: 'button', className: 'primary ' + (p.t.type === 'priv' ? 'priv' : 'biz'), textContent: `Add to ${prevName(p).replace('your ', 'my ')}` });
@@ -2395,6 +2396,20 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (name === 'settings') renderCar();
   }
   document.querySelectorAll('.tabbar button').forEach(b => { b.onclick = () => showTab(b.dataset.tab); });
+  // ---------- Android's back button: one step back at a time, never straight out of the app ----------
+  function goBack() {
+    if ($('fullMap')) { closeFullMap(); return true; }
+    if ($('sheet')) { closeSheet(); return true; }
+    if (!$('wizard').hidden) return true; // setup stays until it's finished
+    if (newType || sortMode) { newType = null; sortMode = null; renderTripCard(); return true; }
+    if (currentTab !== 'today') { showTab('today'); return true; }
+    return false;
+  }
+  if (NATIVE) { const A = plug('App');
+    if (A && A.addListener) { try { A.addListener('backButton', () => { if (!goBack()) { try { A.minimizeApp(); } catch (e) {} } }); } catch (e) {} } }
+  // postcodes in the standard format as you type: HD92RQ becomes HD9 2RQ
+  document.addEventListener('change', e => { const t = e.target; if (t && t.matches && t.matches('input.pc')) t.value = pc(t.value); }, true);
+  document.addEventListener('blur', e => { const t = e.target; if (t && t.matches && t.matches('input.pc')) t.value = pc(t.value); }, true);
   // ---------- search every month ----------
   $('tripSearch').addEventListener('input', () => {
     const q = $('tripSearch').value.trim().toLowerCase();
@@ -2430,7 +2445,19 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     $('regBadge').hidden = !S.reg; $('regBadge').textContent = S.reg;
   }
   let lastSheet = null;
-  async function exportMonth(k, share) {
+  // a sheet you've opened and changed in Excel (fuel, a quick fix) is never written over: building again makes "(2)"
+  async function sheetName(k, base) {
+    const M = months[k], made = M.sheetFiles || (M.sheetFiles = {});
+    const stem = base.replace(/\.xlsx$/, '');
+    for (let n = 1; n < 50; n++) {
+      const name = n === 1 ? base : `${stem} (${n}).xlsx`;
+      let st = null; try { st = await FS().stat({ path: DIR + '/Sheets/' + name, directory: 'DOCUMENTS' }); } catch (e) { return { name, edited: n > 1 }; } // not there yet: use it
+      const mine = made[name], mt = Number(st && (st.mtime ?? st.mtimeMs)) || 0;
+      if (mine && mt && mt <= mine + 5000) return { name, edited: n > 1 }; // ours, untouched since: replace it
+    }
+    return { name: `${stem} (${Date.now()}).xlsx`, edited: true };
+  }
+  async function exportMonth(k, share, open) {
     await loadMonth(k);
     const { rows: rows0, startMiles, unsorted, needs } = sheetRows(k);
     if (S.openTrip && S.openTrip.startDate && S.openTrip.startDate <= lastDay(k) && mKey(S.openTrip.startDate) === k)
@@ -2440,13 +2467,18 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const rows = rows0.map(r => r.sites && r.sites.length > 1 ? { ...r, sitePc: r.sites.map(s => s.pc).join('\n'), job: r.sites.map(s => s.job || '–').join('\n'), desc: r.sites.map(s => s.desc || s.pc).join(' / '), tall: r.sites.length } : r);
     const bytes = buildMileageXlsx({ name: S.name, reg: S.reg, monthLabel: mLabel(k), startMiles, office: S.office,
       rows, fuel: [] }); // fuel goes through your expenses app: the fuel columns are left blank
-    const name = safeName(`Mileage ${mLabel(k)}${S.name ? ' - ' + S.name : ''}.xlsx`);
-    if (!NATIVE) { download(name, new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); return { name, note: 'Downloaded ' + name + '.' }; }
+    const base = safeName(`Mileage ${mLabel(k)}${S.name ? ' - ' + S.name : ''}.xlsx`);
+    if (!NATIVE) { download(base, new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); return { name: base, note: 'Downloaded ' + base + '.' }; }
+    const { name, edited } = await sheetName(k, base);
     const data = b64(bytes);
     await fsWrite('Sheets/' + name, data, true);
+    try { const st = await FS().stat({ path: DIR + '/Sheets/' + name, directory: 'DOCUMENTS' }); months[k].sheetFiles[name] = Number(st.mtime ?? st.mtimeMs) || Date.now(); }
+    catch (e) { months[k].sheetFiles[name] = Date.now(); }
+    await saveMonth(k);
     lastSheet = { name, data };
     if (share) { try { await shareFile(name, data, true); } catch (e) { if (!/cancel/i.test(String(e && e.message || e))) toast('Could not share: ' + (e.message || e)); } }
-    return { name, note: `Saved ${name} in Documents/${DIR}/Sheets.` };
+    if (open) { try { await TR().openFile({ path: `${DIR}/Sheets/${name}` }); } catch (e) { toast('Could not open it: ' + (e.message || e)); } }
+    return { name, note: `Saved ${name} in Documents/${DIR}/Sheets.` + (edited ? ' Your edited copy was kept as it was.' : '') };
   }
   $('exportBtn').onclick = async () => {
     const v = num($('endMiles').value), M = months[viewM];
@@ -2471,7 +2503,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   }
   async function shareMonth(k, share) {
     const note = $('exportNote');
-    try { const r = await exportMonth(k, share); note.textContent = r.note; if (share) { months[k].sent = true; await saveMonth(k); renderToday(); } if (NATIVE && !share) toast('Sheet saved'); }
+    try { const r = await exportMonth(k, share, !share && NATIVE); note.textContent = r.note; if (share) { months[k].sent = true; await saveMonth(k); renderToday(); } if (NATIVE && !share) toast(/kept/.test(r.note) ? 'Saved as a new copy, your edited one is kept' : 'Sheet saved'); }
     catch (e) { note.textContent = 'Could not build the sheet: ' + (e.message || e); toast('Could not build the sheet'); }
   }
   // a dated copy of the log every week, keeping the last 8
@@ -2708,7 +2740,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     Object.keys(months).forEach(k => delete months[k]);
     await saveAll(); await saveS(); await recalcLast();
     $('restoreGo').hidden = true; $('restoreAdd').hidden = true;
-    $('restoreMsg').textContent = `Added ${added} trip${added === 1 ? '' : 's'}.` + (clashed ? ` ${clashed} trip${clashed === 1 ? ' was' : 's were'} left out because ${clashed === 1 ? 'it overlaps' : 'they overlap'} your own odometer readings.` : '');
+    $('restoreMsg').textContent = `Added ${added} trip${added === 1 ? '' : 's'}.` + (clashed ? ` ${clashed} trip${clashed === 1 ? ' was' : 's were'} left out because ${clashed === 1 ? 'it overlaps' : 'they overlap'} your own dash readings.` : '');
     await loadMonth(viewM); renderTripCard(); await renderMonth(); toast(`Added ${added} trips`);
   };
 
@@ -2720,6 +2752,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       if (fixed) { try { await saveAll(); } catch (e) {} } }
     await loadMonth(shiftM(viewM, -1));
     fillSettings(); renderTripCard(); await renderMonth();
+    { const h = pc(S.home), o = pc(S.office); if (h !== (S.home || '') || o !== (S.office || '')) { S.home = h; S.office = o; await saveS(); } }
     await checkNative(); syncNative(); renderMonthEnd(); renderCar(); autoBackup(); renderGlance();
     if (migrated) toast('Your trips are now in DrivR');
     if (!S.setupDone) openWizard(0);
