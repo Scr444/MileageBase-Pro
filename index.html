@@ -208,6 +208,64 @@ body.has-dock .toast { bottom: calc(var(--tab-h) + 92px + env(safe-area-inset-bo
 .check b { display: block; font-weight: 800; }
 .check span { color: var(--sub); font-size: 14px; }
 @media (max-width: 370px) { .row, .starts { grid-template-columns: minmax(0,1fr); } .drum { width: 29px; height: 44px; font-size: 25px; } }
+
+/* ---- round 4: plain figures, to-dos, filters, sheet preview, grouped settings, maps ---- */
+.bigmi { display: flex; align-items: baseline; gap: 8px; }
+.bigmi b { font: 800 56px/1 var(--display); letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.bigmi span { font: 700 16px var(--body); color: var(--sub); }
+.h { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.wkmi { font: 800 30px/1.1 var(--display); letter-spacing: -.02em; } .wkmi.b { color: var(--biz-deep); } .wkmi.p { color: var(--priv-deep); }
+.card.todo { box-shadow: var(--shadow), inset 0 0 0 2px var(--biz); gap: 6px; }
+.tag.sort { background: #fef3c7; color: #92400e; }
+.linkish { background: none; border: 0; color: var(--priv-deep); font: 700 14px var(--body); padding: 4px 0; text-align: left; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.splitcard { display: grid; grid-template-columns: 5px 1fr auto; gap: 10px; align-items: center; background: var(--raised); border-radius: 14px; padding: 10px 12px; }
+.splitcard > i { align-self: stretch; border-radius: 4px; background: var(--biz); min-height: 30px; }
+.splitcard.p > i { background: var(--priv); } .splitcard.u > i { background: #f59e0b; }
+.splitcard b.mi { font: 800 18px var(--mono); }
+.splitcard .hint { display: block; font-size: 13px; }
+.chip.on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.chip .cnt { font: 800 11px var(--mono); background: var(--biz); color: #fff; border-radius: 99px; padding: 1px 6px; margin-left: 6px; }
+#tripList .item { background: var(--panel); border-radius: 16px; box-shadow: var(--shadow); border-bottom: 0; }
+.wkhead { display: flex; justify-content: space-between; font: 800 11.5px var(--body); letter-spacing: .07em; text-transform: uppercase; color: var(--sub); margin: 10px 4px 0; }
+.readout { font: 800 22px var(--mono); padding: 10px 2px; }
+.hint.ok { color: var(--live); font-weight: 700; }
+.xlwrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 10px; }
+.xl { width: 100%; border-collapse: collapse; font: 600 11px var(--body); min-width: 420px; }
+.xl th { background: #f1f3f7; border: 1px solid #c9ced8; padding: 5px 3px; font-weight: 800; font-size: 9.5px; }
+.xl td { border: 1px solid #c9ced8; padding: 5px 3px; text-align: center; white-space: pre-line; }
+.xl td.l { text-align: left; }
+.xl tr.pv td { color: var(--priv-deep); } .xl tr.tot td { font-weight: 800; }
+.grp { font: 800 12px var(--body); text-transform: uppercase; letter-spacing: .08em; color: var(--sub); margin: 10px 4px -6px; }
+details.fold { gap: 12px; }
+details.fold > summary { list-style: none; cursor: pointer; font: 800 16px var(--body); display: flex; flex-direction: column; gap: 2px; }
+details.fold > summary::-webkit-details-marker { display: none; }
+details.fold > summary::after { content: "›"; position: absolute; right: 18px; font: 800 20px var(--body); color: var(--faint); transform: rotate(90deg); }
+details.fold { position: relative; } details.fold[open] > summary::after { transform: rotate(-90deg); }
+details.fold > summary .hint { font-weight: 500; font-size: 13.5px; }
+.sortcard { gap: 4px; } .sortcard.u { box-shadow: var(--shadow), inset 0 0 0 2px #f59e0b; }
+.map { position: relative; }
+.map.still .maphint { position: absolute; right: 10px; bottom: 10px; z-index: 500; background: rgba(19,23,38,.85); color: #fff; border: 0; border-radius: 99px; font: 700 12.5px var(--body); padding: 8px 13px; pointer-events: none; }
+.map.still { cursor: pointer; }
+.cntpin span { position: absolute; transform: translate(6px, -26px); color: #fff; font: 800 12px var(--body); padding: 3px 8px; border-radius: 99px; box-shadow: 0 2px 6px rgba(0,0,0,.25); white-space: nowrap; }
+.fullmap { position: fixed; inset: 0; z-index: 3000; background: var(--bg); isolation: isolate; }
+.fullmap .leaflet-top.leaflet-right { top: calc(env(safe-area-inset-top, 0px) + 64px); }
+.stats.three { grid-template-columns: repeat(3, minmax(0,1fr)); }
+.stats.three .stat b { font-size: 22px; }
+.idle .btns > * { min-height: 50px; }
+.fullmap .fm-map { position: absolute; inset: 0; }
+.fm-top { position: absolute; z-index: 600; top: calc(env(safe-area-inset-top, 0px) + 12px); left: 12px; right: 12px; display: flex; justify-content: space-between; align-items: center; pointer-events: none; }
+.fm-title { pointer-events: auto; background: #fff; border-radius: 99px; padding: 9px 15px; font: 800 14px var(--body); box-shadow: var(--shadow); }
+.fm-close { pointer-events: auto; width: 44px; height: 44px; border-radius: 99px; border: 0; background: var(--ink); color: #fff; font: 800 18px var(--body); box-shadow: var(--shadow); }
+.fm-bottom { position: absolute; z-index: 600; left: 10px; right: 10px; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); display: flex; flex-direction: column; gap: 8px; }
+.fm-key { background: #fff; border-radius: 16px; padding: 10px 12px; box-shadow: var(--shadow); display: grid; gap: 6px; max-height: 30vh; overflow: auto; }
+.fm-row { display: grid; grid-template-columns: 14px 1fr auto auto; gap: 8px; align-items: center; font-size: 13.5px; }
+.fm-row i { width: 12px; height: 12px; border-radius: 99px; }
+.fm-row .mono { font: 800 13.5px var(--mono); }
+.fm-step { background: #fff; border-radius: 16px; padding: 8px 10px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 10px; }
+.fm-arrow { width: 40px; height: 40px; border-radius: 99px; border: 0; background: var(--raised); font: 800 20px var(--body); color: var(--ink); flex: none; }
+.fm-arrow.dark { background: var(--ink); color: #fff; }
+.fm-mid { flex: 1; text-align: center; font-size: 14px; min-width: 0; }
 </style>
 </head><body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -235,8 +293,8 @@ body.has-dock .toast { bottom: calc(var(--tab-h) + 92px + env(safe-area-inset-bo
   <p class="banner" id="storeNote" hidden></p>
 
   <section class="view" data-view="today">
-    <section id="monthEnd" class="card live" hidden></section>
     <section id="tripCard" class="card"><p class="hint">Loading your log…</p></section>
+    <div id="todoBox" class="view"></div>
     <div id="todayMore" class="view"></div>
   </section>
 
@@ -246,45 +304,17 @@ body.has-dock .toast { bottom: calc(var(--tab-h) + 92px + env(safe-area-inset-bo
     <div id="searchBox" hidden><div class="list" id="searchResults"></div></div>
     <div id="monthTrips" class="view">
       <div class="monthbar"><button type="button" class="mprev" aria-label="Previous month"><svg><use href="#i-left"/></svg></button><h2 class="mtitle" id="monthTitle">—</h2><button type="button" class="mnext" aria-label="Next month"><svg><use href="#i-right"/></svg></button></div>
-      <div class="list" id="tripList"></div>
-      <button class="secondary" type="button" id="monthMapBtn" hidden>Show this month on a map</button>
-      <div id="monthMapWrap"></div>
+      <div class="chips" id="tripFilter"></div>
+      <div id="tripList" class="view" style="gap:8px"></div>
     </div>
-  </section>
-
-  <section class="view" data-view="fuel" hidden>
-    <form id="fuelForm" class="card">
-      <h2>Add fuel</h2>
-      <button class="tile-btn" type="button" id="fPhoto"><svg><use href="#i-camera"/></svg> Photo of receipt</button>
-      <input type="file" id="fFile" accept="image/*" capture="environment" hidden>
-      <div id="fPreview" style="display:flex;gap:12px;align-items:center" hidden>
-        <img id="fThumb" alt="Receipt" style="width:64px;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--line)">
-        <p class="hint" id="fRead" style="margin:0"></p>
-      </div>
-      <div class="row">
-        <div class="field"><label class="lbl" for="fDate">Date</label><input id="fDate" type="date" required></div>
-        <div class="field"><label class="lbl" for="fLitres">Litres</label><input id="fLitres" class="odo" inputmode="decimal" required></div>
-      </div>
-      <div class="row">
-        <div class="field"><label class="lbl" for="fCost">Cost £</label><input id="fCost" inputmode="decimal" autocomplete="off" placeholder="Only for you"></div>
-        <div class="field"><label class="lbl" for="fType">For</label><select id="fType"><option value="bus">Business</option><option value="priv">Private</option></select></div>
-      </div>
-      <div class="field"><label class="lbl" for="fPaid">Paid by</label><input id="fPaid" placeholder="Fuel card"></div>
-      <button class="primary" type="submit">Add fuel</button>
-    </form>
-    <div class="monthbar"><button type="button" class="mprev" aria-label="Previous month"><svg><use href="#i-left"/></svg></button><h2 class="mtitle">—</h2><button type="button" class="mnext" aria-label="Next month"><svg><use href="#i-right"/></svg></button></div>
-    <div class="list" id="fuelList"></div>
   </section>
 
   <section class="view" data-view="month" hidden>
     <div id="monthView" class="view">
     <div class="monthbar"><button type="button" class="mprev" aria-label="Previous month"><svg><use href="#i-left"/></svg></button><h2 class="mtitle">—</h2><button type="button" class="mnext" aria-label="Next month"><svg><use href="#i-right"/></svg></button></div>
-    <div class="stats">
+    <div class="stats three">
       <div class="stat biz"><span class="lbl">Business</span><b id="tBus">0</b></div>
-      <div class="stat"><span class="lbl">Private</span><b id="tPriv">0</b></div>
-      <div class="stat"><span class="lbl">Fuel</span><b id="tFuel">0</b></div>
-      <div class="stat"><span class="lbl">Economy</span><b id="tMpg">–</b></div>
-      <div class="stat"><span class="lbl">Fuel cost</span><b id="tCost">–</b></div>
+      <div class="stat priv"><span class="lbl">Private</span><b id="tPriv">0</b></div>
       <div class="stat"><span class="lbl">Trips</span><b id="tCount">0</b></div>
     </div>
     <div class="banner warn" id="needsNote" hidden></div>
@@ -292,43 +322,52 @@ body.has-dock .toast { bottom: calc(var(--tab-h) + 92px + env(safe-area-inset-bo
     <div class="split" id="tSplit" title="Business and private share"></div>
     <div class="card"><div style="display:flex;justify-content:space-between;align-items:baseline"><span class="lbl">Miles by week</span>
       <span class="legend"><span><i style="background:var(--biz)"></i>Business</span><span><i style="background:var(--priv)"></i>Private</span></span></div><div id="weekChart"></div></div>
+    <div id="monthMapBox"></div>
     <div class="section-lbl">Business miles by job</div>
     <div class="list" id="byJob"></div>
     <div class="section-lbl">Mileage sheet</div>
-    <div class="card">
+    <div class="card" id="sheetCard">
       <div class="row">
-        <div class="field"><label class="lbl" for="startMiles">Odometer on the 1st</label><input id="startMiles" class="odo" inputmode="numeric" autocomplete="off"></div>
-        <div class="field"><label class="lbl" for="endMiles">At month end</label><input id="endMiles" class="odo" inputmode="numeric" autocomplete="off"></div>
+        <div class="field"><span class="lbl">Start of month</span><div class="readout" id="startShow">–</div></div>
+        <div class="field"><label class="lbl" for="endMiles">Dash reading at month end</label><input id="endMiles" class="odo" inputmode="numeric" autocomplete="off"></div>
       </div>
       <p class="hint" id="startHint"></p>
-      <button class="primary" type="button" id="exportBtn">Build sheet</button>
+      <p class="hint" id="addsUp"></p>
+      <div id="sheetPreview"></div>
+      <button class="primary" type="button" id="exportBtn">Build and share</button>
+      <button class="secondary" type="button" id="dlBtn">Download only</button>
       <button class="secondary" type="button" id="shareBtn" hidden>Share the sheet</button>
-      <p class="hint" id="exportNote">Your paper Mileage Record Sheet, filled in. Miles after your last trip go on it as private.</p>
+      <p class="hint" id="exportNote">Your paper Mileage Record Sheet, filled in.</p>
     </div>
     </div>
   </section>
 
   <section class="view" data-view="settings" hidden id="settingsBox">
-    <form id="settingsForm" class="card">
-      <h2>Your details</h2>
+    <div class="grp">You</div>
+    <form id="settingsForm" class="card setcard">
       <div class="row">
         <div class="field"><label class="lbl" for="sName">Name</label><input id="sName" autocomplete="name"></div>
         <div class="field"><label class="lbl" for="sDriver">Initials</label><input id="sDriver" maxlength="4" class="pc"></div>
       </div>
-      <div class="field"><label class="lbl" for="sReg">Vehicle registration</label><input id="sReg" class="pc"></div>
       <div class="row">
-        <div class="field"><label class="lbl" for="sOffice">Office postcode</label><input id="sOffice" class="pc"></div>
         <div class="field"><label class="lbl" for="sHome">Home postcode</label><input id="sHome" class="pc"></div>
+        <div class="field"><label class="lbl" for="sOffice">Office postcode</label><input id="sOffice" class="pc"></div>
       </div>
+      <div class="field"><label class="lbl" for="sReg">Vehicle registration</label><input id="sReg" class="pc"></div>
       <button class="primary" type="submit">Save details</button>
     </form>
+    <div class="grp">Car</div>
     <div id="carBox" class="card"></div>
+    <div class="grp">Backup</div>
     <div class="card">
-      <h2>Backup</h2>
-      <p class="hint" id="backupHint">Your whole log is one file on this phone, in Documents/DrivR. A dated copy is saved every week in Documents/DrivR/Backups.</p>
       <div class="field"><label class="lbl" for="sBackupEmail">Email backups to</label><input id="sBackupEmail" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com"></div>
-      <p class="hint" id="emailHint">Every 3 days a reminder opens your email with the log attached. You just press Send.</p>
+      <p class="hint" id="emailHint">Every 3 days a reminder opens Gmail with the log attached. You just press Send.</p>
       <button class="primary" type="button" id="emailBtn">Email backup now</button>
+    </div>
+    <div class="grp">More</div>
+    <details class="card fold"><summary>Your months<span class="hint">Delete old months or years</span></summary><div id="monthsBox"></div></details>
+    <details class="card fold" id="restoreFold"><summary>Backups on the phone<span class="hint">Share the file, or restore one</span></summary>
+      <p class="hint" id="backupHint">Your whole log is one file on this phone, in Documents/DrivR. A dated copy is saved every week in Documents/DrivR/Backups.</p>
       <div class="btns">
         <button class="secondary" type="button" id="backupBtn">Share backup</button>
         <button class="secondary" type="button" id="restoreBtn">Restore</button>
@@ -337,20 +376,16 @@ body.has-dock .toast { bottom: calc(var(--tab-h) + 92px + env(safe-area-inset-bo
       <p class="hint" id="restoreMsg" hidden></p>
       <button class="primary" type="button" id="restoreAdd" hidden>Add to my log</button>
       <button class="secondary danger" type="button" id="restoreGo" hidden>Replace everything instead</button>
-    </div>
-    <div class="card" id="monthsBox"></div>
-    <div class="card flat">
-      <h2>Setup</h2>
-      <p class="hint">Run through the car link, location and battery checks again.</p>
+    </details>
+    <details class="card fold"><summary>Setup<span class="hint">Car link, location and battery checks</span></summary>
       <button class="secondary" type="button" id="rerunSetup">Run setup again</button>
-    </div>
+    </details>
   </section>
 </main>
 
 <nav class="tabbar" aria-label="Sections">
   <button type="button" data-tab="today" aria-current="page"><svg><use href="#i-today"/></svg>Today<i class="dot" id="liveDot" hidden></i></button>
   <button type="button" data-tab="trips"><svg><use href="#i-trips"/></svg>Trips</button>
-  <button type="button" data-tab="fuel"><svg><use href="#i-fuel"/></svg>Fuel</button>
   <button type="button" data-tab="month"><svg><use href="#i-month"/></svg>Month</button>
   <button type="button" data-tab="settings"><svg><use href="#i-settings"/></svg>Settings</button>
 </nav>
@@ -704,7 +739,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   async function initLiveMap(box, t) {
     live = null;
     try {
-      const m = await makeMap(box); if (!m) return;
+      const m = await makeMap(box, true); if (!m) return;
       const { L, map } = m;
       const priv = t.type === 'priv';
       const st = { map, L, box, m, priv, fitted: false, here: null, ahead: null, start: null, site: null, line: null };
@@ -764,11 +799,14 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   }
   const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
   const COL = { bus: '#ff6a1a', priv: '#2563eb', start: '#16a34a', end: '#131726' };
-  // a map made after layout, re-fitted whenever its box changes size
-  async function makeMap(box) {
+  // a map made after layout, re-fitted whenever its box changes size. A still map (in a page you scroll) can't be dragged:
+  // your finger always scrolls the page, and a tap opens it full screen.
+  async function makeMap(box, still) {
     const L = await loadLeaflet(); await frame();
     if (!box.isConnected) return null;
-    const map = L.map(box, { zoomControl: true, attributionControl: true }).setView([53.6, -1.7], 9); // a view first, so routes have something to draw on
+    const off = still ? { dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, tap: false } : {};
+    const map = L.map(box, { attributionControl: true, zoomControl: false, ...off }).setView([53.6, -1.7], 9); // a view first, so routes have something to draw on
+    if (!still) L.control.zoom({ position: 'topright' }).addTo(map);
     addTiles(L, map);
     let fitB = null;
     const refit = () => { if (!box.isConnected || !box.clientWidth) return; map.invalidateSize(); if (fitB) map.fitBounds(fitB, { padding: [28, 28], maxZoom: 16 }); };
@@ -776,44 +814,106 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     setTimeout(refit, 350);
     return { L, map, fit: b => { fitB = b; refit(); } };
   }
+  function stillOverlay(box, open) { // "Tap to open map" over a still map
+    box.classList.add('still');
+    const h = el('button', { type: 'button', className: 'maphint', textContent: '⤢ Tap to open map' });
+    box.append(h);
+    box.addEventListener('click', e => { e.stopPropagation(); open(); });
+  }
   // a route nobody could mistake for a road or railway: thick colour with a white edge
-  function routeLine(L, pts, priv) {
+  function routeLine(L, pts, priv, colour, opacity = 1, w = 6) {
     const g = L.layerGroup();
-    L.polyline(pts, { color: '#ffffff', weight: 11, opacity: 1, lineCap: 'round', lineJoin: 'round' }).addTo(g);
-    L.polyline(pts, { color: priv ? COL.priv : COL.bus, weight: 6, opacity: 1, lineCap: 'round', lineJoin: 'round' }).addTo(g);
+    L.polyline(pts, { color: '#ffffff', weight: w + 5, opacity, lineCap: 'round', lineJoin: 'round' }).addTo(g);
+    L.polyline(pts, { color: colour || (priv ? COL.priv : COL.bus), weight: w, opacity, lineCap: 'round', lineJoin: 'round' }).addTo(g);
     return g;
   }
   const pin = (L, ll, fill, r = 8) => L.circleMarker(ll, { radius: r, color: '#fff', weight: 3, fillColor: fill, fillOpacity: 1 });
-  async function drawMap(box, trips) { // trips: [{route, type}]
-    try {
-      const m = await makeMap(box); if (!m) return;
-      const { L, map } = m;
-      let bounds = null;
-      const many = trips.length > 1;
-      trips.forEach(t => {
-        const pts = decodeRoute(t.route); if (pts.length < 2) return;
-        const priv = t.type === 'priv', miles = priv ? (t.priv ?? tripMiles(t)) : (t.bus ?? tripMiles(t));
-        const when = fmtD(t.startDate) + (t.finishDate && t.finishDate !== t.startDate ? ' – ' + fmtD(t.finishDate) : '');
-        const sl = t.sites || (t.sitePc ? [{ pc: t.sitePc, desc: t.desc }] : []);
-        const label = `<b>${priv ? 'Private journey' : escH(sl.map(s => s.desc || s.pc).join(' → '))}</b><br>${escH(when)} · ${miles} mi${isRoundTrip(t) ? ' there and back' : ''}`;
-        const line = routeLine(L, pts, priv).addTo(map);
-        line.eachLayer(l => l.bindPopup(label));
-        // the furthest point out: where the trip went
-        const o = map.latLngToLayerPoint(pts[0]); let far = pts[0], fd = 0;
-        pts.forEach(q => { const d = (q[0] - pts[0][0]) ** 2 + ((q[1] - pts[0][1]) * Math.cos(q[0] * Math.PI / 180)) ** 2; if (d > fd) { fd = d; far = q; } });
-        const back = (pts[0][0] - pts[pts.length - 1][0]) ** 2 + (pts[0][1] - pts[pts.length - 1][1]) ** 2 < 1e-5;
-        L.circleMarker(far, { radius: 9, color: priv ? COL.priv : COL.bus, weight: 4, fillColor: '#fff', fillOpacity: 1 }).addTo(map)
-          .bindPopup(label).bindTooltip(priv ? 'Private' : (t.desc || t.sitePc || 'Site'), { direction: 'top', offset: [0, -8] });
-        if (!many || !back) {
-          pin(L, pts[0], COL.start).addTo(map).bindTooltip('Start');
-          if (!back) pin(L, pts[pts.length - 1], COL.end).addTo(map).bindTooltip('Finish');
-        }
-        const b = L.latLngBounds(pts); bounds = bounds ? bounds.extend(b) : b;
-      });
-      if (many) { const home = trips.map(t => decodeRoute(t.route)[0]).filter(Boolean)[0]; if (home) pin(L, home, COL.start, 9).addTo(map).bindTooltip('Home and office'); }
-      if (bounds) m.fit(bounds); else map.setView([53.6, -1.7], 9);
-    } catch (e) { box.textContent = 'The map shows in the installed app.'; box.style.display = 'grid'; box.style.placeItems = 'center'; box.style.color = 'var(--sub)'; }
+  const SITE_COLS = ['#ff6a1a', '#dc2626', '#d97706', '#9333ea', '#0d9488', '#db2777', '#65a30d'];
+  // trips grouped by site: one colour, one ring and a visit count for each site; private stays blue
+  function groupSites(trips) {
+    const groups = [], priv = { key: 'priv', label: 'Private', colour: COL.priv, trips: [], miles: 0 };
+    trips.forEach(t => {
+      const pts = decodeRoute(t.route); if (pts.length < 2) return;
+      if (t.type === 'priv') { priv.trips.push({ t, pts }); priv.miles += t.priv ?? tripMiles(t); return; }
+      let far = pts[0], fd = 0; pts.forEach(q => { const d = distM(pts[0], q); if (d > fd) { fd = d; far = q; } });
+      const sl = t.sites || siteList(t), key = sl.length ? sl.map(s => s.pc).join('+') : `${far[0].toFixed(2)},${far[1].toFixed(2)}`;
+      let g = groups.find(x => x.key === key);
+      if (!g) { g = { key, label: sl.length ? sl.map(s => s.pc).join(' · ') : 'Not sorted', job: sl.map(s => s.job).filter(Boolean).join(', '), desc: sl.map(s => s.desc).filter(Boolean).join(' / '), far, trips: [], miles: 0 }; groups.push(g); }
+      g.trips.push({ t, pts }); g.miles += t.bus ?? t.miles ?? tripMiles(t);
+    });
+    groups.sort((x, y) => y.trips.length - x.trips.length || y.miles - x.miles).forEach((g, i) => { g.colour = SITE_COLS[i % SITE_COLS.length]; });
+    return priv.trips.length ? [...groups, priv] : groups;
   }
+  async function drawMap(box, trips, opts = {}) { // trips: sheet-list rows or saved trips with a route
+    try {
+      const m = await makeMap(box, !!opts.still); if (!m) return null;
+      const { L, map } = m;
+      const groups = groupSites(trips), layers = [];
+      let bounds = null;
+      groups.forEach(g => g.trips.forEach(({ t, pts }) => {
+        const priv = g.key === 'priv', miles = priv ? (t.priv ?? tripMiles(t)) : (t.bus ?? tripMiles(t));
+        const when = fmtD(t.startDate) + (t.finishDate && t.finishDate !== t.startDate ? ' – ' + fmtD(t.finishDate) : '');
+        const label = `<b>${priv ? 'Private' : escH(g.desc || g.label)}</b><br>${escH(when)} · ${miles} mi${g.job ? ' · Job ' + escH(g.job) : ''}`;
+        const line = routeLine(L, pts, priv, g.colour).addTo(map);
+        line.eachLayer(l => l.bindPopup(label));
+        layers.push({ t, line, g });
+        const b = L.latLngBounds(pts); bounds = bounds ? bounds.extend(b) : b;
+      }));
+      const rings = [];
+      groups.filter(g => g.key !== 'priv').forEach(g => { // the site ring, with how many visits
+        const visits = g.trips.map(({ t }) => `${fmtD(t.startDate)} · ${t.bus ?? tripMiles(t)} mi`).join('<br>');
+        const ring = L.circleMarker(g.far, { radius: 9, color: g.colour, weight: 4, fillColor: '#fff', fillOpacity: 1 }).addTo(map)
+          .bindPopup(`<b>${escH(g.label)}</b>${g.desc ? '<br>' + escH(g.desc) : ''}${g.job ? '<br>Job ' + escH(g.job) : ''}<br>${g.trips.length} visit${g.trips.length === 1 ? '' : 's'} · ${g.miles} mi<br><br>${visits}`);
+        rings.push({ g, ring });
+        if (g.trips.length > 1 || opts.counts) L.marker(g.far, { interactive: false, icon: L.divIcon({ className: 'cntpin', html: `<span style="background:${g.colour}">×${g.trips.length}</span>`, iconSize: [0, 0] }) }).addTo(map);
+      });
+      const starts = trips.map(t => decodeRoute(t.route)[0]).filter(Boolean);
+      if (starts.length) pin(L, starts[0], COL.end, 7).addTo(map).bindTooltip(trips.length > 1 ? 'Home and office' : 'Start');
+      if (bounds) m.fit(bounds); else map.setView([53.6, -1.7], 9);
+      // focus one trip: that one bold, the rest faded
+      const focus = id => layers.forEach(({ t, line }) => line.eachLayer((l, i) => l.setStyle({ opacity: !id || t.id === id ? 1 : 0.18 })));
+      return { map, L, m, groups, layers, focus, fitTrip: id => { const x = layers.find(l => l.t.id === id); if (x) m.fit(L.latLngBounds(decodeRoute(x.t.route))); else if (bounds) m.fit(bounds); } };
+    } catch (e) { box.textContent = 'The map shows in the installed app.'; box.style.display = 'grid'; box.style.placeItems = 'center'; box.style.color = 'var(--sub)'; return null; }
+  }
+  // a map in the page: still, and full screen when tapped
+  async function staticMap(box, trips, opts = {}) {
+    stillOverlay(box, () => openFullMap(trips, opts));
+    const st = await drawMap(box, trips, { still: true });
+    box._st = st; return st;
+  }
+  // the full-screen map: drag and pinch freely; a key of sites with visits and miles; arrows to step through one trip at a time
+  async function openFullMap(trips, opts = {}) {
+    closeFullMap();
+    const wrap = el('div', { className: 'fullmap', id: 'fullMap' }), box = el('div', { className: 'fm-map' });
+    const close = el('button', { type: 'button', className: 'fm-close', textContent: '✕' }); close.setAttribute('aria-label', 'Close map'); close.onclick = closeFullMap;
+    const title = el('div', { className: 'fm-title', textContent: opts.title || 'Map' });
+    const key = el('div', { className: 'fm-key' }), step = el('div', { className: 'fm-step' });
+    wrap.append(box, el('div', { className: 'fm-top' }, [title, close]), el('div', { className: 'fm-bottom' }, [key, step]));
+    document.body.append(wrap); history.pushState({ fullMap: 1 }, '');
+    const st = await drawMap(box, trips, { counts: true });
+    if (!st) return;
+    st.groups.forEach(g => key.append(el('div', { className: 'fm-row' }, [el('i', { style: `background:${g.colour}` }),
+      el('span', {}, [el('b', { textContent: g.label }), g.job ? el('span', { className: 'hint', textContent: ' ' + g.job }) : '']),
+      el('span', { className: 'hint', textContent: '×' + g.trips.length }), el('b', { className: 'mono', textContent: g.miles.toLocaleString('en-GB') })])));
+    const order = st.layers.map(l => l.t).sort((x, y) => String(x.startDate).localeCompare(String(y.startDate)) || (x.startMiles ?? 0) - (y.startMiles ?? 0));
+    let i = -1;
+    const prev = el('button', { type: 'button', className: 'fm-arrow', textContent: '‹' }), next = el('button', { type: 'button', className: 'fm-arrow dark', textContent: '›' }), mid = el('div', { className: 'fm-mid' });
+    const show = () => {
+      const t = order[i];
+      st.focus(t ? t.id : null); st.fitTrip(t ? t.id : null);
+      mid.innerHTML = '';
+      if (!t) mid.append(el('b', { textContent: `All ${order.length} trip${order.length === 1 ? '' : 's'}` }), el('div', { className: 'hint', textContent: 'Step through one at a time' }));
+      else { const g = st.layers.find(l => l.t.id === t.id).g, P = g.key === 'priv';
+        mid.append(el('b', { textContent: `${fmtD(t.startDate)} · ${P ? 'Private' : g.desc || g.label}` }), el('div', { className: 'hint', textContent: `${P ? (t.priv ?? tripMiles(t)) + ' mi private' : (t.bus ?? tripMiles(t)) + ' mi business'} · trip ${i + 1} of ${order.length}` })); }
+    };
+    prev.onclick = () => { i = i <= -1 ? order.length - 1 : i - 1; show(); };
+    next.onclick = () => { i = i >= order.length - 1 ? -1 : i + 1; show(); };
+    step.append(prev, mid, next);
+    if (opts.focus) i = order.findIndex(t => t.id === opts.focus);
+    show();
+  }
+  function closeFullMap() { const f = $('fullMap'); if (f) f.remove(); }
+  window.addEventListener('popstate', () => { if ($('fullMap')) closeFullMap(); });
   async function gpsPostcode() { // where the phone is now, as a postcode
     const T = TR(); if (!T) throw new Error('GPS works in the installed app');
     const p = await T.permissions(); if (!p.location) throw new Error('location permission is off');
@@ -891,6 +991,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   async function refreshGps() { // live miles on the open trip
     const T = TR(); if (!T || !S.openTrip) return;
     try { gpsLive = await T.status(); } catch (e) { return; }
+    if (!gpsLive.active && gpsLive.mode === 'stopped') { await processEnded(); return; } // it ended by itself while the app was open
     const mi = MI(gpsLive.meters);
     setDrums(mi);
     const pill = $('livePill');
@@ -967,7 +1068,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         list.push({ id: t.id, type: 'unsorted', miles: run, bus: 0, priv: 0, startPc: t.startPc, startDate: t.startDate, finishDate: t.finishDate, route: t.route, gapOpen, gapPriv, needs: nd, est: t.est });
       } else if (t.type === 'priv') {
         privAcc += run; if (t.finishMiles != null) { privTo = t.finishMiles; privDate = t.finishDate || t.startDate; }
-        list.push({ id: t.id, type: 'priv', priv: run, bus: 0, startDate: t.startDate, finishDate: t.finishDate, route: t.route, gapOpen, gapPriv, lagAdded: t.lagAdded, est: t.est });
+        list.push({ id: t.id, type: 'priv', priv: run, bus: 0, startDate: t.startDate, finishDate: t.finishDate, route: t.route, gapOpen, gapPriv, lagAdded: t.lagAdded, est: t.est, fromName: t.fromName, toName: t.toName });
       } else {
         const sl = siteList(t);
         const row = { id: t.id, desc: t.desc, startPc: t.startPc, sitePc: t.sitePc, job: t.job, driver: S.driver, sites: sl, segs: sl.length > 1 ? legMiles(t) : null, expR: expRound(t),
@@ -1036,6 +1137,9 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   }
   // ---------- learn how far GPS runs short in this car: dash miles / GPS miles on trips where you typed the dash ----------
   function gpsFactor() {
+    // best: what your month-end dash readings showed (each lined-up month stores how far GPS ran short)
+    const cal = monthKeys().map(k => DATA['m-' + k].calib).filter(x => x > 0.9 && x < 1.2).slice(-3).sort((x, y) => x - y);
+    if (cal.length) return Math.min(1.08, Math.max(0.97, cal[Math.floor(cal.length / 2)]));
     const r = [];
     monthKeys().forEach(k => (DATA['m-' + k].trips || []).forEach(t => { if (t.odoTyped && t.gpsMiles > 15) r.push((t.finishMiles - t.startMiles - (t.lagAdded || 0)) / t.gpsMiles); }));
     const last = r.slice(-10).filter(x => x > 0.9 && x < 1.2).sort((x, y) => x - y);
@@ -1044,6 +1148,63 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     return Math.min(1.08, Math.max(1, med));
   }
   const gpsToOdo = mi => Math.round(mi * gpsFactor());
+  // ---------- month end: one dash reading lines the whole month up ----------
+  // Readings worked out from GPS (est) since the last real dash reading are stretched or squeezed to land exactly on it.
+  function trueUpInfo(k, reading) {
+    const M = months[k] || DATA['m-' + k] || blankMonth();
+    const trips = (M.trips || []).filter(t => t.finishMiles != null && t.startMiles != null);
+    if (trips.some(t => t.finishDate > lastDay(k))) return { kind: 'over' };
+    const start = monthStart(k);
+    const last = trips.length ? Math.max(...trips.map(t => t.finishMiles)) : start;
+    if (last == null) return { kind: 'none' };
+    let anchor = start ?? Math.min(...trips.map(t => t.startMiles));
+    trips.forEach(t => { if (!t.est) anchor = Math.max(anchor, t.finishMiles); }); // a real reading stays put
+    const est = trips.filter(t => t.est && t.startMiles >= anchor);
+    const diff = reading - last, span = last - anchor, limit = Math.max(2, Math.round(span * 0.03));
+    let kind = 'exact';
+    if (reading < anchor) kind = 'low';
+    else if (diff !== 0) kind = est.length && span > 0 ? (Math.abs(diff) <= limit ? 'spread' : 'ask') : diff < 0 ? 'low' : 'gap';
+    return { kind, diff, anchor, last, est, span, limit };
+  }
+  function applySpread(k, reading, info) {
+    const M = months[k], scale = (reading - info.anchor) / info.span, map = r => info.anchor + Math.round((r - info.anchor) * scale);
+    info.est.forEach(t => { t.startMiles = map(t.startMiles); t.finishMiles = map(t.finishMiles);
+      (t.legs || []).forEach(l => { if (l.fromMiles != null && l.fromMiles >= info.anchor) l.fromMiles = map(l.fromMiles); }); t.trued = true; });
+    const raw = info.est.reduce((s, t) => s + (t.gpsMiles || 0), 0);
+    if (raw > 30 && Math.abs(info.diff) <= info.limit) M.calib = Math.round(info.est.reduce((s, t) => s + tripMiles(t), 0) / raw * 1000) / 1000; // learn the car
+  }
+  function askTrueUp(info, reading) {
+    return new Promise(res => {
+      const box = openSheet(info.diff > 0 ? `${info.diff} miles not accounted for` : `${-info.diff} miles fewer than GPS logged`);
+      box.append(el('p', { className: 'hint', textContent: info.diff > 0
+        ? `The dash says ${reading}, but the trips logged this month end at ${info.last}. That's more than GPS usually runs short (${info.limit} mi), so something may not have been logged: the phone off, or a drive in another car.`
+        : `The dash says ${reading}, but the trips logged this month end at ${info.last}. Check the reading. If it's right, the trips are squeezed to fit.` }));
+      const b = (t, cls, v) => { const x = el('button', { type: 'button', className: cls, textContent: t }); x.onclick = () => { closeSheet(); res(v); }; return x; };
+      box.append(b(info.diff > 0 ? 'Spread it across this month\'s trips' : 'Squeeze the trips to fit', 'primary biz', 'spread'));
+      if (info.diff > 0) box.append(b('It was private driving', 'primary priv', 'priv'), b('I\'ll add the missing trip', 'secondary', 'add'));
+      box.append(b('Fix the reading', 'secondary', null));
+    });
+  }
+  async function setMonthEnd(k, v) { // true when the month is lined up with the dash
+    await loadMonth(k); const M = months[k];
+    if (v == null) { delete M.endMiles; delete M.endPriv; await saveMonth(k); await recalcLast(); return false; }
+    const info = trueUpInfo(k, v);
+    if (info.kind === 'low') { toast(`${v} is lower than this month's start (${info.anchor}). Check the dash.`); return false; }
+    let choice = info.kind === 'spread' ? 'spread' : info.kind === 'ask' ? await askTrueUp(info, v) : 'set';
+    if (!choice) return false;
+    if (choice === 'add') { openAddPast(); return false; }
+    const was = M.endMiles != null && M.endMiles >= info.last ? M.endMiles : info.last; // where next month's trips carried on from
+    if (choice === 'spread') applySpread(k, v, info);
+    M.endMiles = v; if (choice === 'priv') M.endPriv = true; else delete M.endPriv;
+    // trips already logged after the month end carried on from the old figure: move them to the dash
+    if (was != null && v !== was) for (const k2 of monthKeys().filter(x => x > k)) { const N = await loadMonth(k2); let moved = false;
+      N.trips.forEach(t => { if (t.est && t.startMiles >= was) { t.startMiles += v - was; t.finishMiles += v - was; (t.legs || []).forEach(l => { if (l.fromMiles != null) l.fromMiles += v - was; }); moved = true; } });
+      if (moved) await saveMonth(k2); }
+    await saveMonth(k); await recalcLast();
+    toast(choice === 'spread' ? (info.diff > 0 ? `Lined up with the dash: GPS was ${info.diff} mi short, shared across ${info.est.length} trip${info.est.length === 1 ? '' : 's'}` : `Lined up with the dash: ${-info.diff} mi taken off across ${info.est.length} trip${info.est.length === 1 ? '' : 's'}`)
+      : choice === 'priv' ? `${info.diff} mi added as private` : 'Month-end reading saved');
+    return true;
+  }
   // a trip whose finish was worked out from GPS: a dash reading that comes in lower corrects it (the dash wins)
   async function fixEstimate(reading) {
     const last = lastReading(); if (last == null || reading >= last) return false;
@@ -1112,6 +1273,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         startDate: first ? t.startDate : day(s.from.endTime, t.startDate), finishDate: last ? finishDate : day(s.to.time, finishDate),
         route: cutRoute(pts, s.from.m / total, s.to.m / total), gpsMiles: Math.round(MI(s.to.m - s.from.m) * 10) / 10, ...extra };
       if (first && t.privGap) r.privGap = true;
+      const nm = c => c.place ? (c.place.kind === 'home' ? 'Home' : 'Office') : '';
+      if (nm(s.from)) r.fromName = nm(s.from); if (nm(s.to)) r.toName = nm(s.to);
       if (t.type === 'priv' || s.kind === 'priv') r.type = 'priv';
       else if (s.kind === 'unsorted') r.type = 'unsorted';
       if (r.type !== 'priv') {
@@ -1164,7 +1327,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     for (const e of list) {
       let t = S.openTrip && S.openTrip.startDate <= isoOf(e.since) ? S.openTrip : null;
       const fromOpen = !!t;
-      if (!t) { const d = new Date(e.since); t = { id: uid(), type: d.getDay() === 0 || d.getDay() === 6 ? 'priv' : 'unsorted', startDate: isoOf(e.since), startMiles: suggestedStart() ?? 0 }; }
+      if (!t) t = { id: uid(), type: 'unsorted', startDate: isoOf(e.since), startMiles: suggestedStart() ?? 0 }; // weekdays and weekends alike: the rules decide
       if (t.startMiles == null) t.startMiles = suggestedStart() ?? 0;
       const pts = parsePts(e.points), stops = parseStops(e.stops), gpsMi = MI(e.meters);
       if (gpsMi < 1 && (!fromOpen || t.type === 'unsorted')) { if (fromOpen) S.openTrip = null; continue; } // the car connected but didn't go anywhere
@@ -1172,17 +1335,46 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       const segs = t.type === 'priv' ? [] : await planSplit(pts, stops, endLL, e.meters, t);
       const made = segs.length ? await tripsFromPlan(t, segs, t.startMiles + gpsToOdo(gpsMi), isoOf(e.end), pts, { est: true, autoEnded: true })
         : [{ ...t, finishMiles: t.startMiles + gpsToOdo(gpsMi), finishDate: isoOf(e.end), gpsMiles: Math.round(gpsMi * 10) / 10, est: true, autoEnded: true, route: pts.length > 1 ? encodeRoute(simplify(pts, 12)) : null }];
+      applyAnswer(made, e.sort, e.job); // Business / Private / job number tapped on the "Trip done" notification
       for (const s of made) {
-      const k = mKey(s.startDate); await loadMonth(k);
-      if (!months[k].trips.some(x => x.id === s.id)) { months[k].trips.push(s); n++; lastMi = tripMiles(s); }
-      await saveMonth(k);
+        const k = mKey(s.startDate); await loadMonth(k);
+        if (!months[k].trips.some(x => x.id === s.id)) { months[k].trips.push(s); n++; lastMi = tripMiles(s); }
+        await saveMonth(k);
       }
       if (fromOpen) S.openTrip = null;
     }
-    await saveS(); await recalcLast(); try { await T.clearEnded(); } catch (e) {}
+    await saveS(); await recalcLast(); try { await T.clearEnded({ tags: list.map(e => String(e.tag)) }); } catch (e) {}
     renderTripCard(); renderMonth(); renderToday();
     toast(n === 1 ? `Trip saved when you parked at home: ${lastMi} mi. Add the details when you're ready.` : `Saved as ${n} trips, split at home and the office. Add the details when you're ready.`);
     return n;
+  }
+  // your answer on the notification: Private makes the whole drive private; Business sorts the pieces the rules weren't sure of
+  function applyAnswer(made, sort, job) {
+    if (sort === 'priv') made.forEach(s => { Object.assign(s, { type: 'priv', startPc: '', sitePc: '', job: '', desc: '', siteCheck: false }); delete s.legs; });
+    if (sort === 'bus') made.forEach(s => { if (s.type === 'unsorted') delete s.type; });
+    if (job) made.filter(s => !s.type && !s.job).forEach(s => { s.job = job; });
+    made.filter(s => !s.type).forEach(rememberSites);
+  }
+  // end a trip from the app with no reading: GPS miles, split at home and the office like a trip that ends itself
+  async function finishFromGps(t) {
+    const T = TR(); if (!T) return;
+    let st, rt, ss;
+    try { [st, rt, ss] = await Promise.all([T.status(), T.route(), T.stops ? T.stops() : { stops: '' }]); } catch (e) { toast('Could not read the trip from the phone'); return; }
+    const pts = parsePts(rt.points), stops = parseStops(ss.stops), gpsMi = MI(st.meters);
+    try { await T.stop(); } catch (e) {}
+    const was = S.openTrip;
+    if (gpsMi < 0.3) { S.openTrip = null; await saveS(); renderTripCard(); toast('Nothing logged, so the trip was dropped'); return; }
+    if (t.startMiles == null) t.startMiles = suggestedStart() ?? 0;
+    const fin = t.startMiles + gpsToOdo(gpsMi);
+    const segs = t.type === 'priv' ? [] : await planSplit(pts, stops, pts[pts.length - 1], st.meters, t);
+    const made = segs.length ? await tripsFromPlan(t, segs, fin, today(), pts, { est: true })
+      : [{ ...t, finishMiles: fin, finishDate: today(), gpsMiles: Math.round(gpsMi * 10) / 10, est: true, route: pts.length > 1 ? encodeRoute(simplify(pts, 12)) : null }];
+    for (const s of made) { const k = mKey(s.startDate); await loadMonth(k); months[k].trips.push(s); await saveMonth(k); }
+    S.openTrip = null; await saveS(); await recalcLast(); buzz(60);
+    renderTripCard(); renderMonth(); renderToday();
+    toast(made.length > 1 ? `Saved as ${made.length} trips. Sort them when you're ready.` : `Saved: ${tripMiles(made[0])} mi. Sort it when you're ready.`, async () => {
+      for (const s of made) { const k = mKey(s.startDate); months[k].trips = months[k].trips.filter(x => x.id !== s.id); await saveMonth(k); }
+      S.openTrip = was; await saveS(); try { await T.start({ reset: false }); } catch (e) {} await recalcLast(); renderTripCard(); renderMonth(); });
   }
   function rememberSites(t) { // sites with a job go in the quick-pick list, and match by themselves next time
     siteList(t).filter(s => s.pc && s.job).forEach(s => { S.sites = [{ pc: s.pc, job: s.job, desc: s.desc }, ...(S.sites || []).filter(x => x.pc !== s.pc)].slice(0, 12); });
@@ -1258,21 +1450,14 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   const svg = (id, cls) => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); if (cls) s.setAttribute('class', cls);
     const u = document.createElementNS('http://www.w3.org/2000/svg', 'use'); u.setAttribute('href', '#' + id); s.append(u); return s; };
   // ---- the rolling odometer: five whole miles and the tenth in amber ----
-  function odometer(unit) {
-    const wrap = el('div', { className: 'odometer' });
-    const d = el('div', { className: 'drums', id: 'drums', role: 'img' });
-    for (let i = 0; i < 6; i++) d.append(el('div', { className: 'drum' + (i === 5 ? ' tenth' : '') }, [el('span', { textContent: '0' })]));
-    wrap.append(d, el('span', { className: 'unit', textContent: unit }));
+  function odometer(unit) { // miles so far, in plain figures: 61.9 mi
+    const wrap = el('div', { className: 'bigmi' });
+    wrap.append(el('b', { id: 'drums', textContent: '0.0' }), el('span', { textContent: unit }));
     return wrap;
   }
   function setDrums(mi) {
     const d = $('drums'); if (!d) return;
-    const digits = String(Math.round(Math.max(0, mi) * 10)).padStart(6, '0').slice(-6);
-    d.setAttribute('aria-label', (Math.round(mi * 10) / 10).toFixed(1) + ' miles');
-    [...d.children].forEach((drum, i) => {
-      const s = drum.firstChild, v = digits[i];
-      if (s.textContent !== v) { s.style.transform = 'translateY(-60%)'; s.textContent = v; requestAnimationFrame(() => requestAnimationFrame(() => { s.style.transform = ''; })); }
-    });
+    d.textContent = (Math.round(Math.max(0, mi) * gpsFactor() * 10) / 10).toFixed(1); // GPS, corrected for how far it runs short in your car
   }
   function headRow(c, tag, cls) {
     const r = el('div', { style: 'display:flex;justify-content:space-between;align-items:center;gap:10px' });
@@ -1291,7 +1476,9 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     };
     c.append(cancel);
   }
-  function liveMap(c, t) { if (TR()) { const box = el('div', { className: 'map' }); c.append(box); initLiveMap(box, t); } }
+  function liveMap(c, t) { if (TR()) { const box = el('div', { className: 'map' }); c.append(box); initLiveMap(box, t);
+    stillOverlay(box, async () => { let pts = []; try { pts = parsePts((await TR().route()).points); } catch (e) {}
+      if (pts.length > 1) openFullMap([{ ...t, id: t.id, route: encodeRoute(simplify(pts, 12)), bus: Math.round(MI(gpsLive ? gpsLive.meters : 0)), priv: Math.round(MI(gpsLive ? gpsLive.meters : 0)) }], { title: 'This trip so far' }); else toast('No route yet'); }); } }
 
   function renderPrivCard(c, t) { // a private journey: miles only
     headRow(c, 'Private journey', 'priv');
@@ -1302,10 +1489,10 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (!TR()) c.append(field('Miles driven', 'pDone', { className: 'odo', inputMode: 'numeric', autocomplete: 'off' }));
     setDock('Finish journey', 'priv', async () => {
       let miles, route = null;
-      if (TR()) { route = await takeRoute(); try { const st = await TR().stop(); miles = Math.round(MI(st.meters)); } catch (er) { miles = 0; } }
+      if (TR()) { route = await takeRoute(); try { const st = await TR().stop(); miles = gpsToOdo(MI(st.meters)); } catch (er) { miles = 0; } }
       else { miles = num($('pDone') && $('pDone').value); if (miles == null || miles < 0) { toast('Enter the miles driven'); return; } miles = Math.round(miles); }
       const k = mKey(t.startDate); await loadMonth(k);
-      months[k].trips.push({ id: t.id, type: 'priv', startDate: t.startDate, finishDate: today(), startMiles: t.startMiles, finishMiles: t.startMiles + miles, route });
+      months[k].trips.push({ id: t.id, type: 'priv', startDate: t.startDate, finishDate: today(), startMiles: t.startMiles, finishMiles: t.startMiles + miles, route, est: !!TR() });
       S.openTrip = null;
       await saveMonth(k); await saveS(); buzz(60);
       viewM = k; await renderMonth(); renderTripCard();
@@ -1359,25 +1546,31 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     starts.append(b1, b2); c.append(starts);
     liveMap(c, t);
     batteryBanner(c);
+    if (TR()) setDock('Finish now, sort later', '', () => finishFromGps(t));
     discardBtn(c, 'Not a trip, discard');
     setTimeout(refreshGps, 0);
   }
-  function openFinish(t) { // bottom sheet: finish date and the dash reading
+  function openFinish(t) { // bottom sheet: the readings come from GPS; a dash reading is optional
     const box = openSheet('Finish trip');
-    const gps = gpsLive && gpsLive.meters > 0 ? gpsToOdo(MI(gpsLive.meters)) : null;
-    box.append(el('p', { className: 'hint', textContent: `${t.startPc} → ${curSite(t).pc} · started at ${t.startMiles}` + (gps != null ? ` · GPS ${gps} mi` : '') }));
+    const gpsMi = gpsLive && gpsLive.meters > 0 ? MI(gpsLive.meters) : null;
+    const est = gpsMi != null ? t.startMiles + gpsToOdo(gpsMi) : null;
+    box.append(el('p', { className: 'hint', textContent: `${t.startPc || '?'} → ${siteList(t).map(s => s.pc).join(' → ') || '?'} → back` + (gpsMi != null ? ` · ${est - t.startMiles} mi logged` : '') }));
     const form = el('form', { style: 'display:flex;flex-direction:column;gap:12px' });
-    const row = el('div', { className: 'row' });
-    row.append(field('Finish date', 'cDate', { type: 'date', value: today(), required: true }),
-               field('Odometer now', 'cMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off', value: gps != null ? t.startMiles + gps : '' }));
-    row.querySelector('#cMiles').addEventListener('input', e => { e.target.dataset.typed = '1'; });
-    form.append(row);
-    form.append(el('p', { className: 'hint', textContent: gps != null ? 'Worked out from GPS. Check it against the dash and change it if it\'s out.' : 'Read it off the dash.' }));
+    form.append(field('Finish date', 'cDate', { type: 'date', value: today(), required: true }));
+    // the dash reading is optional: the month-end reading lines everything up anyway
+    const odoWrap = el('div', { hidden: est != null });
+    odoWrap.append(field('Dash reading' + (est != null ? ' (optional)' : ''), 'cMiles', { className: 'odo', inputMode: 'numeric', autocomplete: 'off', placeholder: est != null ? String(est) : '' }));
+    odoWrap.append(el('p', { className: 'hint', textContent: est != null ? `GPS makes it ${est}. A real reading helps the app learn your car, but you don't need one.` : 'Read it off the dash.' }));
+    if (est != null) { const more = el('button', { type: 'button', className: 'linkish', textContent: 'Add a dash reading (optional)' }); more.onclick = () => { odoWrap.hidden = false; more.remove(); $('cMiles').focus(); }; form.append(more); }
+    form.append(odoWrap);
     const err = el('p', { className: 'err', hidden: true }); form.append(err);
     // where you stopped on the way: split at home or the office, and fill the site in if it's blank
     let plan = null, planPts = [];
-    const splitBox = el('div', { className: 'banner', hidden: true }); form.append(splitBox);
-    const splitOn = el('input', { type: 'checkbox', id: 'cSplit', checked: true });
+    const splitBox = el('div', { hidden: true, style: 'display:flex;flex-direction:column;gap:8px' }); form.append(splitBox);
+    const save = el('button', { className: 'primary biz', type: 'submit', textContent: 'Save trip' });
+    const one = el('button', { className: 'secondary', type: 'button', textContent: 'Keep as one trip', hidden: true });
+    form.append(save, one);
+    let asOne = false; one.onclick = () => { asOne = true; form.requestSubmit(); };
     if (TR() && TR().stops) (async () => {
       try {
         const [st, rt, ss] = await Promise.all([TR().status(), TR().route(), TR().stops()]);
@@ -1385,33 +1578,35 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         const pl = await places();
         if (segs.length > 1) {
           plan = segs; splitBox.hidden = false; splitBox.innerHTML = '';
-          splitBox.append(el('b', { textContent: 'Split at the office or home?' }),
-            el('ul', { style: 'margin:8px 0;padding-left:18px' }, segs.map(s => el('li', { textContent: `${segLabel(s, pl)} · about ${Math.round(MI(s.to.m - s.from.m))} mi` }))),
-            el('label', { style: 'display:flex;gap:8px;align-items:center;font-weight:700' }, [splitOn, 'Save it split like this']));
-        } else if (segs.length === 1 && !curSite(t).pc && segs[0].sites.length && $('cMiles')) { t.sitePc = segs[0].sites[0].pc; t.siteCheck = true; }
+          splitBox.append(el('span', { className: 'lbl', textContent: 'You stopped at ' + (segs.some(s => s.from.place && s.from.place.kind === 'office') ? 'the office' : 'home') + ' on the way' }));
+          const total = segs[segs.length - 1].to.m || 1, span = (est ?? t.startMiles) - t.startMiles;
+          let used = 0;
+          segs.forEach((s, i) => { const mi = i === segs.length - 1 ? span - used : Math.round(span * (s.to.m - s.from.m) / total); used += mi;
+            splitBox.append(el('div', { className: 'splitcard ' + (s.kind === 'priv' ? 'p' : s.kind === 'bus' ? 'b' : 'u') }, [el('i'),
+              el('div', {}, [el('b', { textContent: s.kind === 'bus' ? 'Business' : s.kind === 'priv' ? 'Private' : 'Not sure yet' }), el('span', { className: 'hint', textContent: segLabel(s, pl).split(' · ')[1] })]),
+              el('b', { className: 'mi', textContent: String(mi) })])); });
+          splitBox.append(el('p', { className: 'hint', style: 'text-align:right;margin:0', textContent: `${span} mi altogether` }));
+          save.textContent = `Save as ${segs.length} trips`; one.hidden = false;
+        } else if (segs.length === 1 && !curSite(t).pc && segs[0].sites.length) { t.sitePc = segs[0].sites[0].pc; t.siteCheck = true; }
       } catch (e) { /* save as one trip */ }
     })();
-    form.append(el('button', { className: 'primary biz', type: 'submit', textContent: 'Save trip' }));
     form.onsubmit = async e => {
       e.preventDefault();
-      const miles = num($('cMiles').value), date = $('cDate').value;
-      if (miles == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
-      if (miles < t.startMiles) { err.textContent = `That's lower than the start reading (${t.startMiles}). Check the odometer.`; err.hidden = false; return; }
+      const typed = num($('cMiles').value), date = $('cDate').value;
+      const miles = typed ?? est;
+      if (miles == null) { err.textContent = 'Enter the dash reading.'; err.hidden = false; return; }
+      if (miles < t.startMiles) { err.textContent = `That's lower than the start reading (${t.startMiles}). Check the dash.`; err.hidden = false; return; }
       const done = miles - t.startMiles;
-      const er = expRound(t);
-      if (er && done < er * 0.95 && form.dataset.checked !== String(miles)) {
-        err.textContent = `Logged ${done} mi, but the ${(t.legs || []).length ? 'whole run' : 'round trip'} alone is about ${er} mi. Check the odometer, or tap Save trip again to keep it.`;
-        err.hidden = false; form.dataset.checked = String(miles); return;
-      }
       if (date < t.startDate) { err.textContent = 'Finish date is before the start date.'; err.hidden = false; return; }
-      if (gps != null && gps > 5 && done > gps * 1.5 + 25 && form.dataset.big !== String(miles)) {
-        err.textContent = `That's ${done} mi on the odometer but GPS logged ${gps} mi. Check the reading, or tap Save trip again if it's right.`;
+      if (typed != null && est != null && est - t.startMiles > 5 && done > (est - t.startMiles) * 1.5 + 25 && form.dataset.big !== String(miles)) {
+        err.textContent = `That's ${done} mi on the dash but GPS logged ${est - t.startMiles} mi. Check the reading, or tap Save again if it's right.`;
         err.hidden = false; form.dataset.big = String(miles); return; }
       const clash = overlapping(t.startMiles, miles, t.id);
       if (clash) { err.textContent = `That overlaps your ${tripName(clash)} (${clash.startMiles} to ${clash.finishMiles}). Check the reading.`; err.hidden = false; return; }
-      if (plan && splitOn.checked) { // saved as several trips, readings shared out so they add up to the dash
+      const flags = typed != null ? { odoTyped: true } : { est: true };
+      if (plan && !asOne) { // saved as several trips, readings shared out so they add up
         if (TR()) { try { await TR().stop(); } catch (e) {} }
-        const made = await tripsFromPlan(t, plan, miles, date, planPts, { odoTyped: !!$('cMiles').dataset.typed });
+        const made = await tripsFromPlan(t, plan, miles, date, planPts, flags);
         for (const s of made) { const mk = mKey(s.startDate); await loadMonth(mk); months[mk].trips.push(s); await saveMonth(mk); }
         S.openTrip = null; await saveS(); await recalcLast(); closeSheet(); buzz(60);
         viewM = mKey(t.startDate); await renderMonth(); renderTripCard(); renderToday();
@@ -1421,13 +1616,12 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       let gpsMiles = null, route = null;
       if (TR()) { route = await takeRoute(); try { const st = await TR().stop(); gpsMiles = Math.round(MI(st.meters) * 10) / 10; } catch (e) {} }
       const k = mKey(t.startDate); await loadMonth(k);
-      const saved = { ...t, finishMiles: miles, finishDate: date, gpsMiles, route, odoTyped: !!$('cMiles').dataset.typed };
+      const saved = { ...t, finishMiles: miles, finishDate: date, gpsMiles, route, ...flags };
       months[k].trips.push(saved);
       S.openTrip = null;
-      await saveMonth(k); await saveS(); closeSheet(); buzz(60);
+      await saveMonth(k); await saveS(); await recalcLast(); closeSheet(); buzz(60);
       viewM = k; await renderMonth(); renderTripCard();
-      const extra = er ? done - er : 0;
-      toast(`Saved: ${done} business mi` + (extra > 0 ? ` (+${extra} local)` : ''), async () => { // undo: reopen the trip
+      toast(`Saved: ${done} business mi`, async () => { // undo: reopen the trip
         months[k].trips = months[k].trips.filter(x => x.id !== t.id); S.openTrip = t;
         await saveMonth(k); await saveS(); if (TR()) { try { await TR().start({ reset: false }); } catch (e) {} } renderMonth(); renderTripCard(); });
     };
@@ -1448,16 +1642,14 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (TR()) sc.append(gpsChip('xSite', false));
     site.append(sc); form.append(site);
     const r = el('div', { className: 'row' }); r.append(field('Job number', 'xJob', { inputMode: 'numeric', autocomplete: 'off' }), field('Site name', 'xDesc', { autocomplete: 'off' })); form.append(r);
-    const odo = field('Odometer now', 'xMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off', value: gps != null ? t.startMiles + gps : '' });
-    odo.append(el('p', { className: 'hint', textContent: gps != null ? 'Worked out from GPS. Change it if the dash says otherwise.' : 'Read it off the dash.' }));
-    form.append(odo);
+    if (gps == null) { const odo = field('Dash reading', 'xMiles', { className: 'odo', inputMode: 'numeric', autocomplete: 'off' }); form.append(odo); }
     const err = el('p', { className: 'err', hidden: true }); form.append(err);
     form.append(el('button', { className: 'primary biz', type: 'submit', textContent: 'Move to this site' }));
     form.onsubmit = async e => {
       e.preventDefault();
-      const pcv = pc($('xSite').value), m = num($('xMiles').value);
+      const pcv = pc($('xSite').value), m = gps != null ? t.startMiles + gps : num($('xMiles') && $('xMiles').value);
       if (!pcv) { err.textContent = 'Enter the next site\'s postcode.'; err.hidden = false; return; }
-      if (m == null) { err.textContent = 'Enter the odometer reading.'; err.hidden = false; return; }
+      if (m == null) { err.textContent = 'Enter the dash reading.'; err.hidden = false; return; }
       if (m < boundary) { err.textContent = `That's lower than the last reading on this trip (${boundary}).`; err.hidden = false; return; }
       const leg = { sitePc: pcv, job: $('xJob').value.trim(), desc: $('xDesc').value.trim(), fromMiles: m, date: today() };
       S.openTrip.legs = [...(S.openTrip.legs || []), leg];
@@ -1495,9 +1687,6 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       nav.onclick = () => TR().openNav({ q: cs.pc }).catch(e => toast(e.message || 'No satnav app found'));
       tiles.append(nav);
     }
-    const fuel = el('button', { className: 'tile-btn', type: 'button' }, [svg('i-fuel'), 'Add fuel']);
-    fuel.onclick = () => showTab('fuel');
-    tiles.append(fuel);
     if (TR()) {
       const fix = el('button', { className: 'tile-btn', type: 'button' }, [svg('i-pin'), 'Site is here']);
       fix.onclick = async () => {
@@ -1536,27 +1725,17 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     }
     const sorting = S.openTrip && S.openTrip.type === 'unsorted' ? S.openTrip : null;
     // ---- nothing open: two giant buttons, and your saved sites one tap away ----
-    if (!sorting && newType !== 'bus' && newType !== 'priv') {
-      c.append(el('h2', { textContent: 'Start a trip' }));
-      const starts = el('div', { className: 'starts' });
-      const b1 = el('button', { className: 'big biz', type: 'button' }, [svg('i-brief'), el('b', {}, ['Business', el('small', { textContent: 'To a site or job' })])]);
-      const b2 = el('button', { className: 'big', type: 'button' }, [svg('i-home'), el('b', {}, ['Private', el('small', { textContent: 'One tap, miles only' })])]);
+    if (!sorting && newType !== 'bus' && newType !== 'priv') { // nothing open: trips start by themselves, so this stays small
+      c.classList.add('idle');
+      const linked = !!(S.carSeen || TR());
+      c.append(el('div', { className: 'h' }, [el('b', { style: 'font-size:17px', textContent: 'Nothing logging' }),
+        TR() ? el('span', { className: 'tag live', textContent: 'Car linked' }) : el('span')]),
+        el('p', { className: 'hint', textContent: TR() ? 'Logging starts by itself when the phone connects to the car.' : 'Start a trip when you set off.' }));
+      const b1 = el('button', { className: 'secondary', type: 'button', textContent: '+ Business trip' });
+      const b2 = el('button', { className: 'secondary', type: 'button', textContent: '+ Private' });
       b1.onclick = () => { newType = 'bus'; renderTripCard(); };
       b2.onclick = async () => { const sug = suggestedStart(); if (sug != null) await startPrivate(sug); else { newType = 'priv'; renderTripCard(); } };
-      starts.append(b1, b2); c.append(starts);
-      if ((S.sites || []).length) {
-        c.append(el('span', { className: 'lbl', textContent: 'Saved sites' }));
-        const list = el('div', { className: 'list', style: 'background:var(--raised)' });
-        S.sites.slice(0, 5).forEach(s => {
-          const b = el('button', { type: 'button', className: 'item-head', style: 'padding:13px 14px;border-bottom:1px solid var(--line)' });
-          b.append(el('span', { className: 'r', textContent: s.pc }), el('span', { className: 'd', textContent: [s.desc, s.job ? 'Job ' + s.job : ''].filter(Boolean).join(' · ') || 'Saved site' }),
-            el('span', { className: 'm', style: 'color:var(--amber)' }, [svg('i-right', 'chev')]));
-          b.querySelector('.chev').setAttribute('style', 'width:22px;height:22px');
-          b.onclick = () => { newType = 'bus'; pickSite = s; renderTripCard(); };
-          list.append(b);
-        });
-        c.append(list);
-      }
+      c.append(el('div', { className: 'btns' }, [b1, b2]));
       return;
     }
     if (!sorting && newType === 'priv') { // first ever trip, no odometer yet
@@ -1572,7 +1751,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     from.append(chipsFrom);
     from.querySelector('input').addEventListener('input', e => { e.target.dataset.touched = '1'; });
     form.append(from);
-    const site = field('Site postcode', 'nSite', { className: 'pc', required: true, autocapitalize: 'characters', autocomplete: 'off', placeholder: 'BS11 8AX' });
+    const site = field('Site postcode' + (sorting ? ' (blank if you don\'t know it yet)' : ''), 'nSite', { className: 'pc', required: !sorting, autocapitalize: 'characters', autocomplete: 'off', placeholder: 'BS11 8AX' });
     if ((S.sites || []).length) {
       const sc = el('div', { className: 'chips' });
       S.sites.slice(0, 8).forEach(s => {
@@ -1589,9 +1768,9 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     r1.append(field('Start date', 'nDate', { type: 'date', value: sorting ? sorting.startDate : today(), required: true }));
     form.append(r1);
     form.append(field('Site name (optional)', 'nDesc', { placeholder: 'Avonmouth DC', autocomplete: 'off' }));
-    const odo = field('Odometer now', 'nMiles', { className: 'odo', inputMode: 'numeric', required: true, autocomplete: 'off' });
     const sug = sorting && sorting.startMiles != null ? sorting.startMiles : suggestedStart();
-    odo.querySelector('input').value = sug ?? '';
+    const odo = field('Dash reading now', 'nMiles', { className: 'odo', inputMode: 'numeric', required: sug == null, autocomplete: 'off', value: sug ?? '' });
+    if (sug != null) odo.hidden = true; // carried on from your last trip: nothing to type
     if (sorting) setTimeout(async () => { // where the automatic trip began, as a postcode
       try { const pts = parsePts((await TR().route()).points); if (!pts.length || !$('nFrom')) return;
         const j = await (await fetch(`https://api.postcodes.io/postcodes?lon=${pts[0][1]}&lat=${pts[0][0]}&limit=1&radius=2000&widesearch=true`)).json();
@@ -1600,9 +1779,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
           const found = await findSites(ss, pts[0], pl.map(x => x.ll));
           if (found.length && $('nSite') && !$('nSite').value) { $('nSite').value = found[0].pc; if (found[0].job && !$('nJob').value) $('nJob').value = found[0].job; if (found[0].desc && $('nDesc') && !$('nDesc').value) $('nDesc').value = found[0].desc; } } } catch (e) {}
     }, 0);
-    odo.append(el('p', { className: 'hint', textContent: sug != null
-      ? `Carried on from your last trip. If you've driven since, change it. You'll be asked what the extra miles were.`
-      : 'Read it off the dash. After this, each trip carries on from the last one.' }));
+    odo.append(el('p', { className: 'hint', textContent: 'First trip only: read it off the dash. After this the app works the readings out.' }));
     form.append(odo);
     const err = el('p', { className: 'err', hidden: true }); form.append(err);
     form.append(el('button', { className: 'primary biz', type: 'submit', textContent: sorting ? 'Save trip details' : 'Start trip' }));
@@ -1613,7 +1790,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       await fixEstimate(miles);
       const lastR = lastReading();
       if (lastR != null && miles < lastR) { err.textContent = `That's lower than your last reading (${lastR}). Check the odometer.`; err.hidden = false; return; }
-      const settled = await settleGap(miles, err); if (!settled) return;
+      const settled = sug == null ? { privGap: false } : await settleGap(miles, err); if (!settled) return;
       const val = id => $(id) ? $(id).value.trim() : '';
       const t = { id: sorting ? sorting.id : uid(), startPc: pc(val('nFrom')), sitePc: pc(val('nSite')), job: val('nJob'),
                   startDate: $('nDate').value, desc: val('nDesc'), startMiles: miles, privGap: settled.privGap };
@@ -1648,31 +1825,30 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   }
 
   // ---------- month ----------
+  let tripFilter = 'all';
   async function renderMonth() {
     const M = await loadMonth(viewM);
     document.querySelectorAll('.mtitle').forEach(h => { h.textContent = mLabel(viewM); });
-    const ms = monthStart(viewM); $('startMiles').value = M.startSet ? (M.startMiles ?? '') : ''; $('startMiles').placeholder = ms != null ? String(ms) : '';
-    $('endMiles').value = M.endMiles ?? '';
-    const prevM = months[shiftM(viewM, -1)];
-    const sug = prevM?.endMiles ?? null;
+    const ms = monthStart(viewM);
+    $('startShow').textContent = ms != null ? String(ms) : '–';
+    if (document.activeElement !== $('endMiles')) $('endMiles').value = M.endMiles ?? '';
+    const SR = sheetRows(viewM), { rows, list: items } = SR;
     { const lastInMonth = Math.max(0, ...M.trips.map(t => t.finishMiles ?? 0));
       const bad = M.endMiles != null && M.endMiles < lastInMonth;
       $('startHint').className = bad ? 'err' : 'hint';
       $('startHint').textContent = bad ? `The month-end reading (${M.endMiles}) is lower than your last trip's finish (${lastInMonth}). Check it.`
-        : M.startSet ? 'You typed the reading on the 1st. Clear it to have it worked out from your trips.'
-        : ms != null ? `Worked out from your trips (${ms}). Type the dash reading on the 1st to override it.` : 'Worked out from your trips once you log one.'; }
-    const { rows, list: items } = sheetRows(viewM);
-    const list = $('tripList'); list.innerHTML = '';
+        : M.endMiles != null ? 'Every reading on the sheet is lined up with this dash reading.'
+        : `Start ${ms != null ? 'carried on from last month' : 'taken from your first trip'}. Add the dash reading on the last day or the 1st, and the month's GPS miles are lined up with it.`; }
     let bus = 0, priv = 0;
     rows.forEach(r => { bus += r.bus; priv += r.priv; });
     const statMi = (id, v, unit) => { const b = $(id); b.textContent = String(v); if (unit) b.append(el('small', { textContent: unit })); };
-    { const nd = sheetRows(viewM).needs, w = $('needsNote'), sig = viewM + JSON.stringify(nd);
+    { const nd = SR.needs, w = $('needsNote'), sig = viewM + JSON.stringify(nd);
       w.hidden = !nd.length;
       if (nd.length && w.dataset.sig !== sig) { w.dataset.sig = sig; w.innerHTML = '';
         w.append(el('b', { textContent: `${nd.length} trip${nd.length === 1 ? ' needs' : 's need'} details` }), el('span', { textContent: ' before the sheet can be built: ' + [...new Set(nd.flatMap(x => x.what))].join(', ') + '.' }));
-        const go = el('button', { type: 'button', className: 'secondary', textContent: 'Fill in the first one', style: 'margin-top:10px;width:100%' }); go.onclick = () => openTrip(nd[0].id, viewM); w.append(go); }
+        const go = el('button', { type: 'button', className: 'secondary', textContent: 'Sort them', style: 'margin-top:10px;width:100%' }); go.onclick = () => openToSort(); w.append(go); }
       if (!nd.length) w.dataset.sig = ''; }
-    { const un = sheetRows(viewM).unsorted, w = $('unsortedNote');
+    { const un = SR.unsorted, w = $('unsortedNote');
       w.hidden = !un.length;
       const sig = viewM + JSON.stringify(un); // don't rebuild an unchanged note: a tap on it may be under way
       if (un.length && w.dataset.sig !== sig) { w.dataset.sig = sig; w.innerHTML = ''; const tot = un.reduce((s, u) => s + u.miles, 0);
@@ -1685,13 +1861,12 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       const wc = $('weekChart'); wc.innerHTML = ''; wc.append(barChart(cols));
     }
     statMi('tBus', bus.toLocaleString('en-GB'), 'mi'); statMi('tPriv', priv.toLocaleString('en-GB'), 'mi');
-    $('tPriv').parentElement.classList.add('priv');
     $('tCount').textContent = items.filter(r => r.id).length;
     const sp = $('tSplit'); sp.innerHTML = '';
     if (bus + priv > 0) sp.append(el('i', { style: `width:${(bus / (bus + priv) * 100).toFixed(1)}%;background:var(--biz)` }), el('i', { style: `width:${(priv / (bus + priv) * 100).toFixed(1)}%;background:var(--priv)` }));
     // business miles by job
     const jobs = {};
-    items.filter(r => r.id && r.type !== 'priv').forEach(r => (r.segs || [{ pc: r.sitePc, job: r.job, desc: r.desc, miles: r.bus }]).forEach(s => {
+    items.filter(r => r.id && r.type !== 'priv' && r.type !== 'unsorted').forEach(r => (r.segs || [{ pc: r.sitePc, job: r.job, desc: r.desc, miles: r.bus }]).forEach(s => {
       const key = s.job ? 'Job ' + s.job : (s.desc || s.pc || 'No job number');
       const j = jobs[key] || (jobs[key] = { key, desc: s.job ? (s.desc || s.pc) : (s.desc ? s.pc : ''), miles: 0, trips: 0 }); j.miles += s.miles; j.trips++; }));
     const jl = Object.values(jobs).sort((x, y) => y.miles - x.miles), top = jl.length ? jl[0].miles || 1 : 1;
@@ -1700,53 +1875,76 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     jl.forEach(j => bj.append(el('div', { className: 'jobrow' }, [el('b', { textContent: j.key }), el('b', { textContent: j.miles.toLocaleString('en-GB') + ' mi' }),
       el('span', { textContent: [j.desc, j.trips + (j.trips === 1 ? ' trip' : ' trips')].filter(Boolean).join(' · ') }), el('span'),
       el('div', { className: 'bar' }, [el('i', { style: `width:${(j.miles / top * 100).toFixed(1)}%` })])])));
-    if (!items.length) list.append(el('p', { className: 'empty', textContent: 'No trips this month. Start one on Today.' }));
-    items.forEach(r => list.append(tripItem(r)));
-    const routed = items.filter(r => r.route);
-    $('monthMapBtn').hidden = !routed.length; $('monthMapWrap').innerHTML = ''; $('monthMapBtn').textContent = 'Show this month on a map';
-    $('monthMapBtn').onclick = () => {
-      const w = $('monthMapWrap');
-      if (w.firstChild) { w.innerHTML = ''; $('monthMapBtn').textContent = 'Show this month on a map'; return; }
-      const box = el('div', { className: 'map tall', style: 'margin-top:10px' }); w.append(box);
-      w.append(el('p', { className: 'hint', textContent: 'Orange: business. Blue: private. Ringed dots: where each trip went. Tap a route or ring for the trip.' }));
-      $('monthMapBtn').textContent = 'Hide map'; drawMap(box, routed);
-    };
-    const fl = $('fuelList'); fl.innerHTML = '';
-    let litres = 0;
-    if (!M.fuel.length) fl.append(el('p', { className: 'empty', textContent: 'No fuel logged this month.' }));
-    [...M.fuel].sort((a, b) => a.date.localeCompare(b.date)).forEach(f => {
-      litres += (f.litresBus || 0) + (f.litresPriv || 0);
-      const it = el('div', { className: 'item' });
-      const head = el('div', { className: 'item-head' });
-      head.append(el('span', { className: 'r', textContent: fmtD(f.date) }),
-        el('span', { className: 'd', textContent: (f.litresPriv ? 'Private' : 'Business') + (f.paidBy ? ' · ' + f.paidBy : '') + (f.cost != null ? ' · £' + Number(f.cost).toFixed(2) : '') }),
-        el('span', { className: 'm', textContent: (f.litresBus || f.litresPriv) + ' L' }));
-      const del = el('button', { type: 'button', className: 'secondary danger', textContent: 'Remove' });
-      let armed = false;
-      del.onclick = async () => {
-        if (!armed) { armed = true; del.textContent = 'Tap again to remove'; return; }
-        M.fuel = M.fuel.filter(x => x.id !== f.id); await saveMonth(viewM); renderMonth();
-      };
-      const row = [del];
-      if (f.receipt) {
-        const see = el('button', { type: 'button', className: 'secondary', textContent: 'Receipt' });
-        see.onclick = async () => {
-          if (it.querySelector('img')) { it.querySelector('img').remove(); return; }
-          let src = f.receipt;
-          if (!src.startsWith('data:')) { try { const r = await FS().readFile({ path: DIR + '/' + f.receipt, directory: 'DOCUMENTS' }); src = 'data:image/jpeg;base64,' + r.data; } catch (er) { toast('Receipt photo not found'); return; } }
-          it.append(el('img', { src, alt: 'Receipt', style: 'width:100%;border-radius:8px;border:1px solid var(--line)' }));
-        };
-        row.unshift(see);
-      }
-      it.append(head, el('div', { className: 'btns' }, row));
-      fl.append(it);
-    });
-    statMi('tFuel', (Math.round(litres * 10) / 10).toLocaleString('en-GB'), 'L');
-    const gallons = litres / 4.54609, cost = M.fuel.reduce((s, f) => s + (Number(f.cost) || 0), 0);
-    if (gallons > 0 && bus + priv > 0) statMi('tMpg', ((bus + priv) / gallons).toFixed(1), 'mpg'); else $('tMpg').textContent = '–';
-    if (cost > 0) statMi('tCost', '£' + cost.toFixed(0), bus + priv > 0 ? (cost / (bus + priv) * 100).toFixed(1) + 'p/mi' : ''); else $('tCost').textContent = '–';
+    // the month on a map: a still picture in the page, full screen when tapped
+    const routed = items.filter(r => r.id && r.route), mb = $('monthMapBox'), mkey = viewM + ':' + routed.map(r => r.id + r.route.length).join(',');
+    if (mb.dataset.k !== mkey) { mb.dataset.k = mkey; mb.innerHTML = '';
+      if (routed.length) { const box = el('div', { className: 'map tall' }); mb.append(box); staticMap(box, routed, { title: mLabel(viewM), mode: 'month' }); } }
+    { const st = sheetCardState(viewM);
+      $('endMiles').disabled = !!st.over || !!st.open;
+      if (st.over) { if (M.endMiles == null || M.endMiles < st.over.finishMiles) { M.endMiles = st.over.finishMiles; await saveMonth(viewM); $('endMiles').value = M.endMiles; }
+        $('startHint').className = 'hint'; $('startHint').textContent = `Your trip ${st.over.sitePc ? 'to ' + curSite(st.over).pc + ' ' : ''}ran into ${fmtD(st.over.finishDate)}, so ${mLabel(viewM)} closes at ${st.over.finishMiles}, where it finished. Miles after that go on next month's sheet.`; }
+      if (st.open) { $('startHint').className = 'hint'; $('startHint').textContent = `Your trip that started on ${fmtD(st.open.startDate)} is still going. It goes on this sheet in one piece, so the sheet is ready once it's finished.`; }
+      $('exportBtn').textContent = M.sent ? 'Build and share again' : `Build and share ${mLabel(viewM).split(' ')[0]}`; }
+    renderTripList(items);
+    renderSheetPreview(viewM, SR);
     renderGlance();
-    if (!$('fDate').value) $('fDate').value = today();
+  }
+  // ---- the Trips list: filters, week headers with totals ----
+  function weekOf(iso) { const d = new Date(iso + 'T12:00'), dow = (d.getDay() + 6) % 7, m = new Date(d - dow * 86400000); return `${m.getFullYear()}-${pad(m.getMonth() + 1)}-${pad(m.getDate())}`; }
+  function renderTripList(items) {
+    const list = $('tripList'); list.innerHTML = '';
+    const toSort = items.filter(r => r.id && r.needs && r.needs.length).length;
+    const fb = $('tripFilter'); fb.innerHTML = '';
+    [['all', 'All'], ['sort', 'To sort'], ['bus', 'Business'], ['priv', 'Private']].forEach(([k, label]) => {
+      const b = el('button', { type: 'button', className: 'chip' + (tripFilter === k ? ' on' : '') }, [label]);
+      if (k === 'sort' && toSort) b.append(el('span', { className: 'cnt', textContent: String(toSort) }));
+      b.onclick = () => { tripFilter = k; renderTripList(items); }; fb.append(b); });
+    const keep = r => !r.id ? tripFilter === 'all' : tripFilter === 'all' || (tripFilter === 'sort' ? r.needs && r.needs.length : tripFilter === 'priv' ? r.type === 'priv' : r.type !== 'priv' && r.type !== 'unsorted');
+    const shown = items.filter(keep);
+    if (!items.length) { list.append(el('p', { className: 'empty', textContent: 'No trips this month. They log themselves when the phone connects to the car.' })); return; }
+    if (!shown.length) { list.append(el('p', { className: 'empty', textContent: 'Nothing here this month.' })); return; }
+    // the month on a map above the list: tap a trip and it's picked out on the map
+    const routed = shown.filter(r => r.id && r.route);
+    let tm = null;
+    if (routed.length) { tm = el('div', { className: 'map' }); list.append(tm);
+      stillOverlay(tm, () => openFullMap(routed, { title: mLabel(viewM), focus: tm._focus }));
+      drawMap(tm, routed, { still: true }).then(st => { tm._st = st; if (st && tm._focus) { st.focus(tm._focus); st.fitTrip(tm._focus); } }); }
+    let wk = null;
+    shown.forEach(r => {
+      const d = r.startDate && r.startDate.length > 7 ? r.startDate : r.finishDate;
+      if (d) { const w = weekOf(d); if (w !== wk) { wk = w;
+        const inWk = shown.filter(x => { const dd = x.startDate && x.startDate.length > 7 ? x.startDate : x.finishDate; return dd && weekOf(dd) === w; });
+        const b = inWk.reduce((s, x) => s + (x.bus || 0), 0), p = inWk.reduce((s, x) => s + (x.priv || 0), 0), end = new Date(new Date(w + 'T12:00').getTime() + 6 * 86400000);
+        list.append(el('div', { className: 'wkhead' }, [el('span', { textContent: `${fmtD(w).replace(/^\w+ /, '')} – ${fmtD(`${end.getFullYear()}-${pad(end.getMonth() + 1)}-${pad(end.getDate())}`).replace(/^\w+ /, '')}` }),
+          el('span', { textContent: `${b} bus · ${p} priv` })])); } }
+      const it = tripItem(r); list.append(it);
+      if (tm && r.route) it.querySelector('.item-head').addEventListener('click', () => { tm._focus = r.id; if (tm._st) { tm._st.focus(r.id); tm._st.fitTrip(r.id); } });
+    });
+  }
+  // ---- the sheet exactly as it'll come out, and the check that it adds up ----
+  function renderSheetPreview(k, SR) {
+    const box = $('sheetPreview'); box.innerHTML = ''; const M = months[k];
+    const start = SR.startMiles, rows = SR.rows;
+    let bus = 0, priv = 0; rows.forEach(r => { bus += r.bus; priv += r.priv; });
+    const end = M.endMiles ?? (rows.length ? Math.max(...rows.map(r => r.finishMiles ?? 0)) : null);
+    const ok = start != null && end != null && bus + priv === end - start;
+    $('addsUp').className = ok ? 'hint ok' : 'hint';
+    $('addsUp').textContent = !rows.length ? '' : ok ? `✓ Adds up: ${bus} business + ${priv} private = ${bus + priv}, the same as the odometer (${start} to ${end}).`
+      : start != null && end != null ? `${bus} business + ${priv} private = ${bus + priv}; the odometer went ${start} to ${end}.` : '';
+    if (!rows.length) return;
+    const t = el('table', { className: 'xl' });
+    t.append(el('tr', {}, ['', 'START', 'SITE', 'Job', 'START', 'FINISH MILES', 'FINISH', 'PRIV', 'BUS'].map(h => el('th', { textContent: h }))));
+    const dd = d => d ? d.slice(8, 10) + '/' + d.slice(5, 7) : '';
+    rows.forEach(r => {
+      const multi = r.sites && r.sites.length > 1, P = r.desc === 'Private' && !r.id;
+      const tr = el('tr', { className: P ? 'pv' : '' }, [
+        el('td', { className: 'l', textContent: multi ? r.sites.map(s => s.desc || s.pc).join(' / ') : r.desc || '' }),
+        el('td', { textContent: r.startPc || '' }), el('td', { textContent: multi ? r.sites.map(s => s.pc).join('\n') : r.sitePc || '' }),
+        el('td', { textContent: multi ? r.sites.map(s => s.job || '–').join('\n') : r.job || '' }), el('td', { textContent: dd(r.startDate) }),
+        el('td', { textContent: r.finishMiles ?? '' }), el('td', { textContent: dd(r.finishDate) }), el('td', { textContent: r.priv || '' }), el('td', { textContent: r.bus || '' })]);
+      t.append(tr); });
+    t.append(el('tr', { className: 'tot' }, [el('td', { className: 'l', textContent: 'TOTAL' }), ...Array(6).fill(0).map(() => el('td')), el('td', { textContent: String(priv) }), el('td', { textContent: String(bus) })]));
+    box.append(el('span', { className: 'lbl', textContent: 'Sheet preview' }), el('div', { className: 'xlwrap' }, [t]));
   }
 
   function renderGlance() { renderToday(); }
@@ -1781,41 +1979,121 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     });
     return ch;
   }
-  function renderToday() {
-    const box = $('todayMore'); if (!box) return; box.innerHTML = '';
-    if (S.openTrip) return;
+  function renderToday() { renderTodayNow().catch(() => {}); }
+  async function needsAll() { // trips waiting for you, this month and last
+    const out = [];
+    for (const k of [shiftM(mKey(today()), -1), mKey(today())]) { if (!DATA['m-' + k]) continue; await loadMonth(k); sheetRows(k).needs.forEach(n => out.push({ ...n, k })); }
+    return out;
+  }
+  async function renderTodayNow() {
+    const todo = $('todoBox'), box = $('todayMore'); if (!todo) return;
+    const td = [];
+    const me = await monthEndState();
+    if (me) { // last month's sheet: one short card, the reading itself is on the Month screen
+      const name = mLabel(me.k).split(' ')[0], c = el('div', { className: 'card todo' });
+      c.append(el('div', { className: 'h' }, [el('b', { textContent: `${name} sheet` }), el('span', { className: 'tag bus', textContent: 'To do' })]),
+        el('p', { className: 'hint', style: 'margin:4px 0 10px', textContent: me.open ? `Waiting for the trip that started on ${fmtD(me.open.startDate)} to finish.` : 'Add the month-end dash reading, then build and send.' }));
+      const go = el('button', { type: 'button', className: 'primary', textContent: `Finish ${name}` });
+      go.onclick = async () => { viewM = me.k; showTab('month'); await renderMonth(); $('sheetCard').scrollIntoView({ block: 'start' }); if (!$('endMiles').disabled) $('endMiles').focus(); };
+      const sent = el('button', { type: 'button', className: 'secondary', textContent: 'Already sent' });
+      sent.onclick = async () => { me.M.sent = true; await saveMonth(me.k); renderToday(); };
+      c.append(el('div', { className: 'btns' }, [go, sent])); td.push(c);
+    }
+    const nd = await needsAll();
+    if (nd.length) {
+      const c = el('div', { className: 'card todo', style: 'flex-direction:row;justify-content:space-between;align-items:center;gap:10px' });
+      c.append(el('div', {}, [el('b', { textContent: `${nd.length} trip${nd.length === 1 ? '' : 's'} to sort` }),
+        el('div', { className: 'hint', textContent: [...new Set(nd.flatMap(x => x.what))].join(', ').replace(/^./, m => m.toUpperCase()) })]));
+      const b = el('button', { type: 'button', className: 'primary biz', style: 'width:auto;padding:10px 18px', textContent: 'Sort' }); b.onclick = openToSort; c.append(b); td.push(c);
+    }
+    const k = mKey(today());
+    if (months[k]) { const un = sheetRows(k).unsorted; if (un.length) { const w = el('button', { type: 'button', className: 'banner warn', style: 'border:0;text-align:left;cursor:pointer;font:inherit' },
+      [el('b', { textContent: `${un.reduce((s, u) => s + u.miles, 0)} mi not sorted` }), ' between trips this month. Tap to sort.']); w.onclick = () => openGapSort(un[0].id, k); td.push(w); } }
+    todo.replaceChildren(...td);
+    if (S.openTrip) { box.innerHTML = ''; return; }
+    // between trips: your week
     const now = new Date(today() + 'T12:00'), dow = (now.getDay() + 6) % 7;
-    const mon = new Date(now - dow * 86400000), monIso = `${mon.getFullYear()}-${pad(mon.getMonth() + 1)}-${pad(mon.getDate())}`;
+    const mon = new Date(now - dow * 86400000), monIso = `${mon.getFullYear()}-${pad(mon.getMonth() + 1)}-${pad(mon.getDate())}`, sun = new Date(mon.getTime() + 6 * 86400000);
     const days = milesByDay(monIso, 7);
     const wb = Math.round(days.reduce((s, d) => s + d.bus, 0)), wp = Math.round(days.reduce((s, d) => s + d.priv, 0));
     const wk = el('div', { className: 'card' });
-    wk.append(el('div', { style: 'display:flex;justify-content:space-between;align-items:baseline' }, [el('span', { className: 'lbl', textContent: 'This week' }),
-      el('span', { className: 'legend' }, [el('span', {}, [el('i', { style: 'background:var(--biz)' }), wb + ' business']), el('span', {}, [el('i', { style: 'background:var(--priv)' }), wp + ' private'])])]));
+    wk.append(el('div', { className: 'h' }, [el('b', { textContent: 'This week' }), el('span', { className: 'hint', textContent: `${fmtD(monIso)} – ${fmtD(`${sun.getFullYear()}-${pad(sun.getMonth() + 1)}-${pad(sun.getDate())}`)}` })]),
+      el('div', { className: 'two', style: 'margin-top:8px' }, [el('div', {}, [el('div', { className: 'wkmi b', textContent: String(wb) }), el('div', { className: 'hint', textContent: 'business mi' })]),
+        el('div', {}, [el('div', { className: 'wkmi p', textContent: String(wp) }), el('div', { className: 'hint', textContent: 'private mi' })])]));
     wk.append(barChart(days.map((d, i) => ({ label: 'MTWTFSS'[i], ...d }))));
-    box.append(wk);
+    const wkTrips = allTrips().filter(t => t.route && t.startDate >= monIso);
+    const mapKey = wkTrips.map(t => t.id + t.route.length).join(',');
+    let mapEl = box.querySelector('.map[data-k]');
+    if (!mapEl || mapEl.dataset.k !== mapKey) { mapEl = null; }
+    const keepMap = mapEl;
+    box.replaceChildren(wk);
+    if (wkTrips.length) { const m = keepMap || el('div', { className: 'map', 'data-k': mapKey }); m.dataset.k = mapKey; box.append(m); if (!keepMap) staticMap(m, wkTrips, { title: 'This week', mode: 'week' }); }
     const last = allTrips().filter(t => t.finishMiles != null).sort((x, y) => (y.finishMiles ?? 0) - (x.finishMiles ?? 0))[0];
     if (last) {
-      const P = last.type === 'priv';
-      const card = el('button', { type: 'button', className: 'card', style: 'border:0;text-align:left;cursor:pointer;color:inherit;font:inherit' });
-      card.append(el('div', { className: 'item-head', style: 'pointer-events:none' }, [
-        el('span', { className: 'r' }, [el('span', { className: 'lbl', style: 'display:block;margin-bottom:4px', textContent: 'Last trip' }), P ? 'Private journey' : `${last.startPc} → ${last.sitePc}`]),
-        el('span', { className: 'd', textContent: [fmtD(last.startDate) + (last.finishDate && last.finishDate !== last.startDate ? ' – ' + fmtD(last.finishDate) : ''), !P && last.desc].filter(Boolean).join(' · ') }),
-        el('span', { className: 'm ' + (P ? 'priv' : 'biz'), textContent: String(tripMiles(last)) })]));
-      card.onclick = () => openTrip(last.id, mKey(last.startDate));
-      box.append(card);
+      const lk = mKey(last.startDate); viewM = viewM || lk;
+      const r = sheetRows(lk).list.find(x => x.id === last.id);
+      if (r) { const it = tripItem(r); it.querySelector('.item-head').onclick = () => openTrip(last.id, lk);
+        box.append(el('div', { className: 'section-lbl', textContent: 'Last trip' }), it); }
     }
-    const k = mKey(today());
-    if (months[k]) { const nd = sheetRows(k).needs; if (nd.length) { const w = el('button', { type: 'button', className: 'banner warn', style: 'border:0;text-align:left;cursor:pointer;font:inherit' },
-      [el('b', { textContent: `${nd.length} trip${nd.length === 1 ? ' needs' : 's need'} details` }), '. Tap to add them.']); w.onclick = () => openTrip(nd[0].id, k); box.prepend(w); } }
-    if (months[k]) { const un = sheetRows(k).unsorted; if (un.length) { const w = el('button', { type: 'button', className: 'banner warn', style: 'border:0;text-align:left;cursor:pointer;font:inherit' },
-      [el('b', { textContent: `${un.reduce((s, u) => s + u.miles, 0)} mi not sorted` }), ' this month. Tap to sort.']); w.onclick = () => openGapSort(un[0].id, k); box.prepend(w); } }
-    if (months[k]) {
-      const { rows } = sheetRows(k); let bus = 0, priv = 0; rows.forEach(r => { bus += r.bus; priv += r.priv; });
-      const g = el('div', { className: 'stats' });
-      g.append(el('div', { className: 'stat' }, [el('span', { className: 'lbl', textContent: mLabel(k).split(' ')[0] + ' business' }), el('b', {}, [bus.toLocaleString('en-GB'), el('small', { textContent: 'mi' })])]),
-               el('div', { className: 'stat' }, [el('span', { className: 'lbl', textContent: mLabel(k).split(' ')[0] + ' private' }), el('b', {}, [priv.toLocaleString('en-GB'), el('small', { textContent: 'mi' })])]));
-      box.append(g);
+  }
+  // local driving: the miles driven within 3 miles of a site, measured along your route (not route choice on the way)
+  async function localDriving(t) {
+    const pts = decodeRoute(t.route); if (pts.length < 2) return null;
+    const lls = []; for (const s of siteList(t)) { const ll = await postcodeLL(s.pc); if (ll) lls.push(ll); }
+    if (!lls.length) return null;
+    const R = 4828, nearest = p => lls.reduce((b, ll) => Math.min(b, distM(ll, p)), Infinity);
+    // each time the route is inside the zone: the miles driven there, less the run in to the site and back out again
+    let m = 0, run = null;
+    const close = () => { if (run && run.n > 1) m += Math.max(0, run.d - 1.2 * (run.inD + run.outD)); run = null; };
+    for (let i = 0; i < pts.length; i++) {
+      const d = nearest(pts[i]);
+      if (d < R) { if (!run) run = { d: 0, inD: d, outD: d, n: 1 }; else { run.d += distM(pts[i - 1], pts[i]); run.outD = d; run.n++; } }
+      else close();
     }
+    close();
+    return Math.round(MI(m) * gpsFactor());
+  }
+  // ---- To sort: every trip waiting for something, each card asking only for what's missing ----
+  async function openToSort() {
+    const box = openSheet('To sort');
+    const intro = el('p', { className: 'hint', style: 'margin:0' }); box.append(intro);
+    const wrap = el('div', { style: 'display:flex;flex-direction:column;gap:10px' }); box.append(wrap);
+    const draw = async () => {
+      const nd = await needsAll(); wrap.innerHTML = '';
+      intro.textContent = nd.length ? `${nd.length} trip${nd.length === 1 ? ' needs' : 's need'} something before the sheet can be built.` : '';
+      if (!nd.length) { wrap.append(el('p', { className: 'empty', textContent: 'All sorted.' })); renderMonth(); renderToday(); return; }
+      for (const n of nd) wrap.append(sortCard(n, draw));
+      renderMonth(); renderToday();
+    };
+    await draw();
+  }
+  function sortCard(n, after) {
+    const M = months[n.k], t = M.trips.find(x => x.id === n.id); if (!t) return el('span');
+    const U = t.type === 'unsorted';
+    const c = el('div', { className: 'card sortcard' + (U ? ' u' : '') });
+    c.append(el('div', { className: 'h' }, [el('span', { className: 'tag ' + (U ? 'sort' : 'bus'), textContent: U ? 'Not sorted' : 'Business' }), el('span', { className: 'hint', textContent: fmtD(t.startDate) })]),
+      el('div', { className: 'route', style: 'font-size:15px;margin-top:6px' }, [t.startPc || 'Start', ...siteList(t).flatMap(s => [el('i', { textContent: '→' }), s.pc]), el('i', { textContent: '→' }), 'back']),
+      el('p', { className: 'hint', style: 'margin:2px 0 0', textContent: `${tripMiles(t)} mi` + (t.siteCheck ? ' · site postcode found from where you parked' : '') }));
+    const save = async msg => { await saveMonth(n.k); await saveS(); await recalcLast(); toast(msg); await after(); };
+    if (U) {
+      const b1 = el('button', { type: 'button', className: 'primary biz', textContent: 'Business' }), b2 = el('button', { type: 'button', className: 'primary priv', textContent: 'Private' });
+      b1.onclick = () => { delete t.type; save('Business'); };
+      b2.onclick = () => { Object.assign(t, { type: 'priv', sitePc: '', job: '', desc: '', startPc: '', siteCheck: false }); delete t.legs; save('Private'); };
+      c.append(el('div', { className: 'btns', style: 'margin-top:10px' }, [b1, b2]));
+    } else {
+      const f = el('div', { style: 'display:flex;flex-direction:column;gap:8px;margin-top:10px' });
+      const site = field('Site postcode', 'sc' + t.id + 's', { className: 'pc', value: t.sitePc || '', autocapitalize: 'characters', autocomplete: 'off' });
+      const job = field('Job number', 'sc' + t.id + 'j', { value: t.job || '', inputMode: 'numeric', autocomplete: 'off', placeholder: 'e.g. 24318' });
+      if (!t.startPc) f.append(field('Start postcode', 'sc' + t.id + 'f', { className: 'pc', value: '', autocapitalize: 'characters', autocomplete: 'off' }));
+      f.append(site, job);
+      const ok = el('button', { type: 'button', className: 'primary', textContent: 'Save' });
+      ok.onclick = () => { const v = id => (c.querySelector('#' + id) || {}).value || '';
+        if (!t.startPc && v('sc' + t.id + 'f')) t.startPc = pc(v('sc' + t.id + 'f'));
+        t.sitePc = pc(v('sc' + t.id + 's')) || t.sitePc; t.job = v('sc' + t.id + 'j').trim(); t.siteCheck = false; rememberSites(t); save('Saved'); };
+      f.append(ok); c.append(f);
+    }
+    const open = el('button', { type: 'button', className: 'linkish', textContent: 'Open the trip' }); open.onclick = () => openTrip(t.id, n.k); c.append(open);
+    return c;
   }
   // ---- trip detail: a full sheet with the map, the numbers, and edit ----
   async function openTrip(id, k) {
@@ -1842,18 +2120,27 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (multi) box.append(el('div', { className: 'route', style: 'font-size:16px' }, [t.startPc, ...siteList(t).flatMap(s => [el('i', { textContent: '→' }), s.pc]), el('i', { textContent: '→' }), 'back']));
     box.append(el('div', { className: 'meta' }, [el('span', { className: 'tag ' + (U ? 'live' : P ? 'priv' : 'bus'), textContent: U ? 'Not sorted' : P ? 'Private' : 'Business' }),
       el('span', { textContent: fmtD(t.startDate) + (t.finishDate && t.finishDate !== t.startDate ? ' – ' + fmtD(t.finishDate) : '') }), !P && !multi && t.desc ? el('span', { textContent: t.desc }) : '', !P && !multi && t.job ? el('span', { textContent: 'Job ' + t.job }) : ''].filter(Boolean)));
-    if (t.route) { const m = el('div', { className: 'map' }); box.append(m); drawMap(m, [t]); }
+    if (t.route) { const m = el('div', { className: 'map' }); box.append(m); staticMap(m, [sheetRows(k).list.find(r => r.id === t.id) || t], { title: fmtD(t.startDate) }); }
     const kv = el('div', { className: 'kv' });
     const add = (l, v) => kv.append(el('div', {}, [el('span', { className: 'lbl', textContent: l }), el('b', { textContent: v })]));
     add(U ? 'Miles' : P ? 'Private miles' : 'Business miles', String(tripMiles(t)));
-    add('Odometer', `${t.startMiles} → ${t.finishMiles}` + (t.est ? ' (GPS estimate)' : ''));
+    add('Odometer', `${t.startMiles} → ${t.finishMiles}` + (t.est && !t.trued ? ' (GPS, lined up at month end)' : ''));
     if (expRound(t)) add('Expected', `${expRound(t)} mi`);
     if (t.gpsMiles != null) add('GPS logged', `${t.gpsMiles} mi`);
     const days = Math.max(1, Math.round((new Date((t.finishDate || t.startDate) + 'T12:00') - new Date(t.startDate + 'T12:00')) / 86400000) + 1);
     add('Days', String(days));
     if (t.lagAdded) add('GPS lag added', `${t.lagAdded} mi`);
-    if (!P && expRound(t) && tripMiles(t) > expRound(t)) add('Local driving', `${tripMiles(t) - expRound(t)} mi`);
     box.append(kv);
+    if (!P && !U && t.route) localDriving(t).then(mi => { if (mi != null && mi >= 1) { add('Local driving', `${mi} mi`); } }).catch(() => {});
+    if (!P && !U) { // the exact row this trip makes on your sheet
+      const r = sheetRows(k).rows.find(x => x.id === t.id);
+      if (r) { const multi = r.sites && r.sites.length > 1, dd = d => d ? d.slice(8, 10) + '/' + d.slice(5, 7) : '';
+        const tb = el('table', { className: 'xl' });
+        tb.append(el('tr', {}, ['', 'START', 'SITE', 'Job', 'START', 'FINISH MILES', 'FINISH', 'PRIV', 'BUS'].map(h => el('th', { textContent: h }))),
+          el('tr', {}, [el('td', { className: 'l', textContent: multi ? r.sites.map(s => s.desc || s.pc).join(' / ') : r.desc || '' }), el('td', { textContent: r.startPc || '' }),
+            el('td', { textContent: multi ? r.sites.map(s => s.pc).join('\n') : r.sitePc || '' }), el('td', { textContent: multi ? r.sites.map(s => s.job || '–').join('\n') : r.job || '' }),
+            el('td', { textContent: dd(r.startDate) }), el('td', { textContent: r.finishMiles ?? '' }), el('td', { textContent: dd(r.finishDate) }), el('td', { textContent: r.priv || '' }), el('td', { textContent: r.bus || '' })]));
+        box.append(el('span', { className: 'lbl', textContent: 'On your sheet' }), el('div', { className: 'xlwrap' }, [tb])); } }
     if (!P && (t.legs || []).length) { // each site on the run
       box.append(el('span', { className: 'lbl', textContent: 'Sites on this trip' }));
       const ls = el('div', { className: 'list', style: 'box-shadow:none;background:var(--raised)' });
@@ -1875,12 +2162,12 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const when = r.startDate && r.startDate.length > 7 ? fmtD(r.startDate) + (r.finishDate && r.finishDate !== r.startDate ? ' – ' + fmtD(r.finishDate) : '') : '';
     const title = el('span', { className: 'r' });
     const U = r.type === 'unsorted';
-    if (r.id) title.append(el('span', { className: 'tag ' + (U ? 'live' : P ? 'priv' : 'bus'), textContent: U ? 'Not sorted' : P ? 'Private' : 'Business' }));
+    if (r.id) title.append(el('span', { className: 'tag ' + (U ? 'sort' : P ? 'priv' : 'bus'), textContent: U ? 'Not sorted' : P ? 'Private' : 'Business' }));
     const multi = !P && r.id && r.sites && r.sites.length > 1;
     if (multi) title.append(el('span', { className: 'tag multi', textContent: `${r.sites.length} sites` }));
-    title.append(U ? (r.startPc ? `From ${r.startPc}` : 'Trip') : P ? (isRoundTrip(r) ? 'Round trip' : 'Journey') : r.id ? `${r.startPc || '?'} → ` + (multi ? `${r.sites.length} sites` : (r.sitePc || '?')) + ' → back' : r.desc);
+    title.append(U ? (r.startPc ? `From ${r.startPc}` : 'Trip') : P ? (r.fromName && r.toName ? (r.fromName === r.toName ? `${r.fromName} → back` : `${r.fromName} → ${r.toName}`) : isRoundTrip(r) ? 'Round trip' : 'Journey') : r.id ? `${r.startPc || '?'} → ` + (multi ? `${r.sites.length} sites` : (r.sitePc || '?')) + ' → back' : r.desc);
     head.append(title,
-      el('span', { className: 'd', textContent: [when, r.est ? 'GPS estimate' : '', multi ? 'one week, one sheet row' : (!P && r.job ? 'Job ' + r.job : ''), !P && r.id && !multi ? r.desc : '', r.expR ? `expected ${r.expR}` : '', r.route ? 'route' : ''].filter(Boolean).join(' · ') || fmtD(r.finishDate) }),
+      el('span', { className: 'd', textContent: [when, multi ? 'one week, one sheet row' : (!P && r.job ? 'Job ' + r.job : ''), !P && r.id && !multi ? r.desc : '', r.expR ? `expected ${r.expR}` : '', r.route ? 'route' : ''].filter(Boolean).join(' · ') || fmtD(r.finishDate) }),
       el('span', { className: 'm' }));
     if (multi) { // every site on its own line: where, which job, when, and the miles that went with it
       const ol = el('ol', { className: 'sites' });
@@ -2096,7 +2383,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   $('rerunSetup').onclick = () => openWizard(2);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && wizStep === 2 && !$('wizard').hidden) openWizard(2); });
   // ---------- tabs ----------
-  const TITLES = { today: 'Today', trips: 'Trips', fuel: 'Fuel', month: 'Month', settings: 'Settings' };
+  const TITLES = { today: 'Today', trips: 'Trips', month: 'Month', settings: 'Settings' };
   let currentTab = 'today';
   function showTab(name) {
     currentTab = name; closeSheet();
@@ -2106,7 +2393,6 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     $('viewTitle').textContent = TITLES[name] || '';
     window.scrollTo(0, 0);
     if (name === 'settings') renderCar();
-    if (name === 'fuel' && !$('fDate').value) $('fDate').value = today();
   }
   document.querySelectorAll('.tabbar button').forEach(b => { b.onclick = () => showTab(b.dataset.tab); });
   // ---------- search every month ----------
@@ -2130,83 +2416,15 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     }); });
     if (!n) out.append(el('p', { className: 'empty', textContent: 'No trips match.' }));
   });
-  $('startMiles').onchange = async () => { const v = num($('startMiles').value), M = months[viewM];
-    if (v == null) { delete M.startMiles; delete M.startSet; } else { M.startMiles = v; M.startSet = true; }
-    await saveMonth(viewM); renderMonth(); toast(v == null ? 'Worked out from your trips' : 'Start reading saved'); };
-  $('endMiles').onchange = async () => { const v = num($('endMiles').value), M = months[viewM];
-    if (v != null) await fixEstimate(v);
-    if (v == null) { delete M.endMiles; delete M.endPriv; } else { M.endMiles = v; delete M.endPriv; }
-    await saveMonth(viewM);
-    let note = v == null ? 'Month-end reading cleared' : 'Month-end reading saved';
-    if (v != null) { const last = Math.max(0, ...M.trips.map(t => t.finishMiles ?? 0)), p = tripBefore(last);
-      if (p && v > last && p.t.finishMiles === last && v - last <= lagLimit(p.t.finishMiles - p.t.startMiles)) { await addToTrip(p, v - last, v); note = `${v - last} mi of GPS lag added to ${prevName(p)}`; } }
-    await recalcLast(); renderMonth(); toast(note); };
-  // ---------- fuel receipts: photo kept with the entry, litres and cost read off it on the phone ----------
-  let receiptB64 = null, ocrWorker = null;
-  function clearReceipt() { receiptB64 = null; $('fPreview').hidden = true; $('fThumb').removeAttribute('src'); $('fRead').textContent = ''; }
-  $('fPhoto').onclick = () => $('fFile').click();
-  $('fFile').onchange = async e => {
-    const file = e.target.files[0]; e.target.value = ''; if (!file) return;
-    try {
-      const img = await new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = bad; i.src = URL.createObjectURL(file); });
-      const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
-      const cv = document.createElement('canvas'); cv.width = Math.round(img.width * scale); cv.height = Math.round(img.height * scale);
-      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
-      const url = cv.toDataURL('image/jpeg', 0.75); receiptB64 = url.split(',')[1];
-      $('fThumb').src = url; $('fPreview').hidden = false; $('fRead').textContent = 'Reading the receipt…';
-      const got = await readReceipt(cv);
-      const bits = [];
-      if (got.litres != null) { if (!$('fLitres').value) $('fLitres').value = got.litres; bits.push(got.litres + ' L'); }
-      if (got.cost != null) { if (!$('fCost').value) $('fCost').value = got.cost.toFixed(2); bits.push('£' + got.cost.toFixed(2)); }
-      if (got.date && !$('fDate').dataset.touched) { $('fDate').value = got.date; bits.push(fmtD(got.date)); }
-      $('fRead').textContent = bits.length ? 'Read: ' + bits.join(', ') + '. Check them against the receipt.' : 'Photo saved. Could not read the numbers, type them in.';
-    } catch (er) { $('fRead').textContent = 'Photo saved. Could not read it, type the numbers in.'; }
-  };
-  $('fDate').addEventListener('input', e => { e.target.dataset.touched = '1'; });
-  function loadScript(src) { return new Promise((ok, bad) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => bad(new Error('not available')); document.head.append(s); }); }
-  async function readReceipt(canvas) {
-    if (!window.Tesseract) await loadScript('tess/tesseract.min.js');
-    if (!ocrWorker) {
-      const base = new URL('tess/', location.href).href;
-      ocrWorker = await Tesseract.createWorker('eng', 1, { workerPath: base + 'worker.min.js', corePath: base, langPath: base + 'lang', gzip: true });
-    }
-    const { data } = await ocrWorker.recognize(canvas);
-    return parseReceipt(data.text || '');
-  }
-  function parseReceipt(text) {
-    const t = text.replace(/[Oo](?=\d)|(?<=\d)[Oo]/g, '0').replace(/,(?=\d{2}\b)/g, '.');
-    const out = { litres: null, cost: null, date: null };
-    const lit = t.match(/(\d{1,3}\.\d{1,3})\s*(?:L|LTR|LTRS|LITRE|LITRES)\b/i) || t.match(/(?:LITRES?|LTRS?|VOLUME|QTY)\D{0,12}(\d{1,3}\.\d{1,3})/i);
-    if (lit) { const v = parseFloat(lit[1]); if (v > 1 && v < 200) out.litres = v; }
-    const tot = t.match(/(?:TOTAL|AMOUNT|SALE|PAID|CARD)[^\d£]{0,15}£?\s*(\d{1,4}\.\d{2})/i);
-    if (tot) out.cost = parseFloat(tot[1]);
-    else { const pounds = [...t.matchAll(/£\s*(\d{1,4}\.\d{2})/g)].map(m => parseFloat(m[1])).filter(v => v < 500); if (pounds.length) out.cost = Math.max(...pounds); }
-    const dm = t.match(/\b(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})\b/);
-    if (dm) { let [, d, m, y] = dm; y = y.length === 2 ? '20' + y : y; const iso = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      const dt = new Date(iso + 'T12:00'); if (!isNaN(dt) && +m <= 12 && +d <= 31 && Math.abs(Date.now() - dt) < 120 * 86400000) out.date = iso; }
-    return out;
-  }
-  window.__parseReceipt = parseReceipt;
-  $('fuelForm').onsubmit = async e => {
-    e.preventDefault();
-    const L = num($('fLitres').value); if (L == null || L <= 0) { toast('Enter the litres'); return; }
-    const d = $('fDate').value || today(); const k = mKey(d); await loadMonth(k);
-    const isPriv = $('fType').value === 'priv';
-    const id = uid(); let receipt = null;
-    if (receiptB64) {
-      if (NATIVE) { try { await fsWrite(`Receipts/${d}-${id}.jpg`, receiptB64, true); receipt = `Receipts/${d}-${id}.jpg`; } catch (er) { toast('Receipt photo not saved: ' + (er.message || er)); } }
-      else receipt = 'data:image/jpeg;base64,' + receiptB64;
-    }
-    months[k].fuel.push({ id, date: d, litresBus: isPriv ? 0 : L, litresPriv: isPriv ? L : 0, paidBy: $('fPaid').value.trim(), cost: num($('fCost').value), receipt });
-    await saveMonth(k); $('fLitres').value = ''; $('fCost').value = ''; clearReceipt(); viewM = k; renderMonth(); toast(`${L} L added`);
-  };
-  $('settingsForm').onsubmit = async e => {
-    e.preventDefault();
-    Object.assign(S, { name: $('sName').value.trim(), driver: pc($('sDriver').value), reg: pc($('sReg').value), office: pc($('sOffice').value) || 'HD8 0RW', home: pc($('sHome').value) }); refreshHomes().catch(() => {});
-    await saveS(); fillSettings(); renderTripCard(); renderMonth(); toast('Details saved');
-  };
+  let endBusy = null; // the reading being lined up: a second change event for the same number is ignored
+  $('endMiles').onchange = async () => { const v = num($('endMiles').value), key = viewM + ':' + v;
+    if (endBusy === key || (v != null && months[viewM] && months[viewM].endMiles === v)) return;
+    endBusy = key;
+    try { if (v == null) toast('Month-end reading cleared'); await setMonthEnd(viewM, v); } finally { endBusy = null; }
+    renderMonth(); renderToday(); };
   function fillSettings() {
     $('sBackupEmail').value = S.backupEmail || '';
+    $('emailHint').textContent = 'Every 3 days a reminder opens Gmail with the log attached. You just press Send.' + (S.lastEmail ? ` Last sent ${fmtD(isoOf(S.lastEmail))}.` : '');
     renderMonthsBox();
     $('sName').value = S.name; $('sDriver').value = S.driver; $('sReg').value = S.reg; $('sOffice').value = S.office; $('sHome').value = S.home;
     $('regBadge').hidden = !S.reg; $('regBadge').textContent = S.reg;
@@ -2221,7 +2439,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (unsorted.length) throw new Error(`${unsorted.reduce((s, u) => s + u.miles, 0)} mi between trips aren't sorted yet. Sort them first (they're flagged on Trips and Month).`);
     const rows = rows0.map(r => r.sites && r.sites.length > 1 ? { ...r, sitePc: r.sites.map(s => s.pc).join('\n'), job: r.sites.map(s => s.job || '–').join('\n'), desc: r.sites.map(s => s.desc || s.pc).join(' / '), tall: r.sites.length } : r);
     const bytes = buildMileageXlsx({ name: S.name, reg: S.reg, monthLabel: mLabel(k), startMiles, office: S.office,
-      rows, fuel: months[k].fuel.slice().sort((a, b) => a.date.localeCompare(b.date)) });
+      rows, fuel: [] }); // fuel goes through your expenses app: the fuel columns are left blank
     const name = safeName(`Mileage ${mLabel(k)}${S.name ? ' - ' + S.name : ''}.xlsx`);
     if (!NATIVE) { download(name, new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); return { name, note: 'Downloaded ' + name + '.' }; }
     const data = b64(bytes);
@@ -2231,43 +2449,30 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     return { name, note: `Saved ${name} in Documents/${DIR}/Sheets.` };
   }
   $('exportBtn').onclick = async () => {
-    const note = $('exportNote');
-    const open = S.openTrip && mKey(S.openTrip.startDate) === viewM ? ' Your current trip is not on it yet, finish it first.' : '';
-    try { const r = await exportMonth(viewM, false); note.textContent = r.note + open; if (NATIVE) { $('shareBtn').hidden = false; toast('Sheet saved'); } }
-    catch (e) { note.textContent = 'Could not save the sheet: ' + (e.message || e); }
+    const v = num($('endMiles').value), M = months[viewM];
+    if (endBusy) return; // still lining up the reading you just typed
+    if (v != null && v !== M.endMiles && !(await setMonthEnd(viewM, v))) return;
+    await shareMonth(viewM, true); renderMonth();
   };
-  // month end: from the 1st, a card asks for last month's closing odometer and sends the sheet
-  async function renderMonthEnd() {
-    const box = $('monthEnd'); box.innerHTML = ''; box.hidden = true;
+  $('dlBtn').onclick = () => shareMonth(viewM, false);
+  // month end: from the 1st, Today shows a short card for last month; the reading and the sheet live on the Month screen
+  async function monthEndState() {
     const k = shiftM(mKey(today()), -1); const M = await loadMonth(k);
     const open = S.openTrip && S.openTrip.startDate && S.openTrip.startDate <= lastDay(k) ? S.openTrip : null;
-    if (M.sent || (!M.trips.length && !M.fuel.length && !open)) return;
-    box.hidden = false;
-    box.append(el('h2', { textContent: mLabel(k) + ' sheet' }));
-    const skip = el('button', { className: 'secondary', type: 'button', textContent: 'Already sent' });
-    skip.onclick = async () => { M.sent = true; await saveMonth(k); renderMonthEnd(); };
-    if (open) { // a trip that runs into this month stays whole on the month it started: the sheet waits for it
-      box.append(el('p', { className: 'hint', textContent: `Your trip that started on ${fmtD(open.startDate)} is still going. It goes on the ${mLabel(k)} sheet in one piece, so the sheet will be ready as soon as you finish it.` }));
-      box.append(el('div', { className: 'btns' }, [skip])); return;
-    }
+    if (M.sent || (!M.trips.length && !open)) return null;
+    return { k, M, open };
+  }
+  async function renderMonthEnd() { renderToday(); }
+  function sheetCardState(k) { // a trip that ran into next month closes this one where it finished; an open one makes the sheet wait
+    const M = months[k];
+    const open = S.openTrip && S.openTrip.startDate && mKey(S.openTrip.startDate) === k ? S.openTrip : null;
     const over = M.trips.filter(t => t.finishMiles != null && t.finishDate > lastDay(k)).sort((x, y) => y.finishMiles - x.finishMiles)[0];
-    let f = null;
-    if (over) { // the month closes where that trip finished; miles after it go on next month's sheet
-      if (M.endMiles == null || M.endMiles < over.finishMiles) { M.endMiles = over.finishMiles; await saveMonth(k); }
-      box.append(el('p', { className: 'hint', textContent: `Your trip ${over.sitePc ? 'to ' + curSite(over).pc + ' ' : ''}ran into ${fmtD(over.finishDate)}, so ${mLabel(k)} closes at ${over.finishMiles}, where it finished. Miles after that go on next month's sheet.` }));
-    } else {
-      box.append(el('p', { className: 'hint', textContent: 'Enter the odometer reading at the end of the month, then build the sheet and send it.' }));
-      f = field('Odometer at month end', 'meMiles', { className: 'odo', inputMode: 'numeric', autocomplete: 'off', value: M.endMiles ?? '' });
-      box.append(f);
-    }
-    const go = el('button', { className: 'primary', type: 'button', textContent: 'Build and share' });
-    go.onclick = async () => {
-      const v = f ? num($('meMiles').value) : null;
-      if (v != null) { M.endMiles = v; }
-      try { await exportMonth(k, true); M.sent = true; await saveMonth(k); toast(mLabel(k) + ' sheet saved'); renderMonthEnd(); if (k === viewM) renderMonth(); }
-      catch (e) { toast('Could not build the sheet: ' + (e.message || e)); }
-    };
-    box.append(el('div', { className: 'btns' }, [go, skip]));
+    return { open, over };
+  }
+  async function shareMonth(k, share) {
+    const note = $('exportNote');
+    try { const r = await exportMonth(k, share); note.textContent = r.note; if (share) { months[k].sent = true; await saveMonth(k); renderToday(); } if (NATIVE && !share) toast('Sheet saved'); }
+    catch (e) { note.textContent = 'Could not build the sheet: ' + (e.message || e); toast('Could not build the sheet'); }
   }
   // a dated copy of the log every week, keeping the last 8
   async function autoBackup() {
@@ -2291,13 +2496,12 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       refreshHomes().catch(() => {});
       const st = await T.status();
       const act = await T.takeAction();
-      try { const inc = await T.takeIncoming(); if (inc && inc.text) { showTab('settings'); offerRestore('Opened file', inc.text); $('restoreMsg').scrollIntoView({ block: 'center' }); } } catch (e) {}
+      try { const inc = await T.takeIncoming(); if (inc && inc.text) { showTab('settings'); $('restoreFold').open = true; offerRestore('Opened file', inc.text); $('restoreMsg').scrollIntoView({ block: 'center' }); } } catch (e) {}
       if (st.active && !S.openTrip) {
         const d = act.since ? new Date(act.since) : new Date();
         const iso = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, weekend = d.getDay() === 0 || d.getDay() === 6;
-        S.openTrip = { id: uid(), type: weekend ? 'priv' : 'unsorted', startDate: iso, startMiles: suggestedStart() };
+        S.openTrip = { id: uid(), type: 'unsorted', startDate: iso, startMiles: suggestedStart() };
         await saveS(); renderTripCard();
-        if (weekend) toast('Weekend drive, logging as private');
       } else if (S.openTrip && !st.active) { // logging stopped (phone restarted): carry on
         try { await T.start({ reset: false }); } catch (e) {}
       }
@@ -2317,13 +2521,13 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       } else if (a === 'backup') {
         await emailBackup();
       } else if (a === 'monthend') {
-        await renderMonthEnd(); $('monthEnd').scrollIntoView({ block: 'start' });
+        const me = await monthEndState(); if (me) { viewM = me.k; showTab('month'); await renderMonth(); $('sheetCard').scrollIntoView({ block: 'start' }); }
       }
       await checkBattery();
     } catch (e) {}
     checking = false;
   }
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { checkNative(); renderMonthEnd(); } });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { checkNative(); renderMonthEnd(); setTimeout(askEmailSent, 400); } });
   // car link in Your details
   // ---------- the car: spotted automatically, or picked from the phone's paired devices ----------
   async function openCarPicker(after) {
@@ -2390,7 +2594,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   function renderMonthsBox() {
     const box = $('monthsBox'); box.innerHTML = '';
     box.append(el('h2', { textContent: 'Your months' }));
-    const keys = monthKeys().filter(k => { const M = DATA['m-' + k]; return M && ((M.trips || []).length || (M.fuel || []).length || M.endMiles != null); }).reverse();
+    const keys = monthKeys().filter(k => { const M = DATA['m-' + k]; return M && ((M.trips || []).length || M.endMiles != null); }).reverse();
     if (!keys.length) { box.append(el('p', { className: 'hint', textContent: 'Nothing logged yet.' })); return; }
     box.append(el('p', { className: 'hint', textContent: 'Delete a month or a whole year you no longer need. A backup is saved first, in Documents/DrivR/Backups.' }));
     const years = [...new Set(keys.map(k => k.slice(0, 4)))];
@@ -2413,7 +2617,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   function confirmDelete(ks, what) {
     const box = openSheet('Delete ' + what + '?');
     const n = ks.reduce((s, k) => s + ((DATA['m-' + k].trips || []).length), 0);
-    box.append(el('p', { className: 'hint', textContent: `This removes ${n} trip${n === 1 ? '' : 's'}, the fuel and the readings for ${what}. A backup is saved first, so you can bring it back with Restore.` }));
+    box.append(el('p', { className: 'hint', textContent: `This removes ${n} trip${n === 1 ? '' : 's'}, and the readings for ${what}. A backup is saved first, so you can bring it back with Restore.` }));
     const go = el('button', { type: 'button', className: 'primary', style: 'background:var(--warn)', textContent: 'Delete ' + what });
     const no = el('button', { type: 'button', className: 'secondary', textContent: 'Keep it' }); no.onclick = closeSheet;
     go.onclick = async () => {
@@ -2425,6 +2629,16 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     };
     box.append(el('div', { className: 'btns' }, [no, go]));
   }
+  let emailPending = false;
+  function askEmailSent() { // back from Gmail: did it go?
+    if (!emailPending) return; emailPending = false;
+    const box = openSheet('Did the backup send?');
+    box.append(el('p', { className: 'hint', textContent: 'The 3-day reminder only resets once a backup has gone.' }));
+    const y = el('button', { type: 'button', className: 'primary', textContent: 'Yes, it sent' }), n = el('button', { type: 'button', className: 'secondary', textContent: 'Not yet' });
+    y.onclick = async () => { S.lastEmail = Date.now(); await saveS(); closeSheet(); toast('Backup sent'); fillSettings(); };
+    n.onclick = closeSheet;
+    box.append(el('div', { className: 'btns' }, [y, n]));
+  }
   async function emailBackup() { // opens the email app with the log attached and the address filled in
     const to = (S.backupEmail || '').trim();
     if (!to) { showTab('settings'); $('sBackupEmail').focus(); toast('Add the email address for backups first'); return; }
@@ -2434,7 +2648,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       await FS().writeFile({ path: 'share/' + name, data: txt, directory: 'CACHE', recursive: true, encoding: 'utf8' });
       await TR().emailFile({ path: 'share/' + name, to, subject: `DrivR backup ${fmtD(today())}`,
         body: 'My DrivR mileage log. To restore it, open the attached file on the phone and choose DrivR.' });
-      S.lastEmail = Date.now(); await saveS();
+      emailPending = true; // counted once you say it sent
     } catch (e) { toast('Could not open email: ' + (e.message || e)); }
   }
   $('emailBtn').onclick = emailBackup;
@@ -2494,7 +2708,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     Object.keys(months).forEach(k => delete months[k]);
     await saveAll(); await saveS(); await recalcLast();
     $('restoreGo').hidden = true; $('restoreAdd').hidden = true;
-    $('restoreMsg').textContent = `Added ${added} trip${added === 1 ? '' : 's'} and ${fuel} fuel entr${fuel === 1 ? 'y' : 'ies'}.` + (clashed ? ` ${clashed} trip${clashed === 1 ? ' was' : 's were'} left out because ${clashed === 1 ? 'it overlaps' : 'they overlap'} your own odometer readings.` : '');
+    $('restoreMsg').textContent = `Added ${added} trip${added === 1 ? '' : 's'}.` + (clashed ? ` ${clashed} trip${clashed === 1 ? ' was' : 's were'} left out because ${clashed === 1 ? 'it overlaps' : 'they overlap'} your own odometer readings.` : '');
     await loadMonth(viewM); renderTripCard(); await renderMonth(); toast(`Added ${added} trips`);
   };
 

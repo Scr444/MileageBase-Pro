@@ -57,6 +57,8 @@ public class TrackerPlugin extends Plugin {
     @PluginMethod
     public void sync(PluginCall call) {
         boolean open = Boolean.TRUE.equals(call.getBoolean("tripOpen", false));
+        SharedPreferences sp = TrackingService.prefs(getContext());
+        if (open && !sp.getBoolean("active", false) && new java.io.File(getContext().getFilesDir(), "ended.txt").exists()) open = false; // ended by itself: not open
         SharedPreferences.Editor e = TrackingService.prefs(getContext()).edit()
                 .putBoolean("tripOpen", open).putString("label", call.getString("label", ""))
                 .putInt("expectedMi", call.getInt("expectedMi", 0)).putString("weekText", call.getString("weekText", ""));
@@ -187,7 +189,8 @@ public class TrackerPlugin extends Plugin {
         Context c = getContext();
         boolean reset = Boolean.TRUE.equals(call.getBoolean("reset", true));
         SharedPreferences.Editor e = TrackingService.prefs(c).edit().putBoolean("active", true).putString("mode", "starting");
-        if (reset) { e.putLong("meters", Double.doubleToLongBits(0)).putLong("since", System.currentTimeMillis()).putBoolean("auto", false).putLong("maxAway", 0L); TrackingService.routeFile(c).delete(); TrackingService.stopsFile(c).delete(); }
+        if (reset) { e.putLong("meters", Double.doubleToLongBits(0)).putLong("since", System.currentTimeMillis()).putBoolean("auto", false).putLong("maxAway", 0L)
+                .putLong("resetAt", System.currentTimeMillis()).remove("stopAt").remove("stopStart").remove("outAt"); TrackingService.routeFile(c).delete(); TrackingService.stopsFile(c).delete(); }
         e.apply();
         try {
             ContextCompat.startForegroundService(c, new Intent(c, TrackingService.class));
@@ -249,15 +252,19 @@ public class TrackerPlugin extends Plugin {
     public void takeEnded(PluginCall call) {
         java.io.File dir = getContext().getFilesDir(), list = new java.io.File(dir, "ended.txt");
         com.getcapacitor.JSArray out = new com.getcapacitor.JSArray();
+        SharedPreferences sp = TrackingService.prefs(getContext());
         for (String line : readText(list).split("\n")) {
             String[] x = line.trim().split(",");
             if (x.length < 7) continue;
-            JSObject t = new JSObject();
-            t.put("tag", x[0]); t.put("meters", Double.parseDouble(x[1])); t.put("since", Long.parseLong(x[2])); t.put("end", Long.parseLong(x[3]));
-            t.put("lat", Double.parseDouble(x[4])); t.put("lon", Double.parseDouble(x[5])); t.put("from", x[6]);
-            java.io.File rf = new java.io.File(dir, "route-" + x[0] + ".txt"), sf = new java.io.File(dir, "stops-" + x[0] + ".txt");
-            t.put("points", readText(rf)); t.put("stops", readText(sf));
-            out.put(t);
+            try { // a damaged line is skipped, it doesn't block the rest
+                JSObject t = new JSObject();
+                t.put("tag", x[0]); t.put("meters", Double.parseDouble(x[1])); t.put("since", Long.parseLong(x[2])); t.put("end", Long.parseLong(x[3]));
+                t.put("lat", Double.parseDouble(x[4])); t.put("lon", Double.parseDouble(x[5])); t.put("from", x[6]);
+                java.io.File rf = new java.io.File(dir, "route-" + x[0] + ".txt"), sf = new java.io.File(dir, "stops-" + x[0] + ".txt");
+                t.put("points", readText(rf)); t.put("stops", readText(sf));
+                t.put("sort", sp.getString("sort-" + x[0], "")); t.put("job", sp.getString("job-" + x[0], ""));
+                out.put(t);
+            } catch (Exception e) { /* skip */ }
         }
         JSObject r = new JSObject(); r.put("trips", out);
         call.resolve(r);
@@ -266,12 +273,22 @@ public class TrackerPlugin extends Plugin {
     /** The app has saved those trips: remove them. */
     @PluginMethod
     public void clearEnded(PluginCall call) {
-        java.io.File dir = getContext().getFilesDir();
-        for (String line : readText(new java.io.File(dir, "ended.txt")).split("\n")) {
-            String tag = line.split(",")[0].trim(); if (tag.isEmpty()) continue;
-            new java.io.File(dir, "route-" + tag + ".txt").delete(); new java.io.File(dir, "stops-" + tag + ".txt").delete();
+        java.io.File dir = getContext().getFilesDir(), list = new java.io.File(dir, "ended.txt");
+        java.util.Set<String> took = new java.util.HashSet<>();
+        try { com.getcapacitor.JSArray tags = call.getArray("tags"); if (tags != null) for (int i = 0; i < tags.length(); i++) took.add(String.valueOf(tags.get(i))); } catch (Exception e) { /* none */ }
+        StringBuilder keep = new StringBuilder();
+        SharedPreferences.Editor ed = TrackingService.prefs(getContext()).edit();
+        for (String line : readText(list).split("\n")) {
+            if (line.trim().isEmpty()) continue;
+            String tag = line.split(",")[0].trim();
+            if (took.contains(tag)) {
+                new java.io.File(dir, "route-" + tag + ".txt").delete(); new java.io.File(dir, "stops-" + tag + ".txt").delete();
+                ed.remove("sort-" + tag).remove("job-" + tag);
+            } else keep.append(line.trim()).append('\n'); // ended while the app was busy: kept for next time
         }
-        new java.io.File(dir, "ended.txt").delete();
+        ed.apply();
+        if (keep.length() == 0) list.delete();
+        else try (java.io.FileOutputStream o = new java.io.FileOutputStream(list, false)) { o.write(keep.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)); } catch (Exception e) { /* ignore */ }
         call.resolve();
     }
 
@@ -291,13 +308,22 @@ public class TrackerPlugin extends Plugin {
                 .putExtra(Intent.EXTRA_TEXT, call.getString("body", ""))
                 .putExtra(Intent.EXTRA_STREAM, uri)
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        Intent mailOnly = new Intent(send);
-        mailOnly.setSelector(new Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:"))); // email apps only
+        send.setClipData(android.content.ClipData.newRawUri("", uri));
+        PackageManager pm = c.getPackageManager();
+        String pkg = null;
         try {
-            Intent go = Intent.createChooser(mailOnly, "Send backup").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            if (getActivity() != null) getActivity().startActivity(Intent.createChooser(mailOnly, "Send backup")); else c.startActivity(go);
+            List<android.content.pm.ResolveInfo> mail = pm.queryIntentActivities(new Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:")), 0);
+            for (android.content.pm.ResolveInfo ri : mail) if ("com.google.android.gm".equals(ri.activityInfo.packageName)) pkg = "com.google.android.gm";
+            if (pkg == null && mail.size() == 1) pkg = mail.get(0).activityInfo.packageName;
+        } catch (Exception e) { /* fall back to the share sheet */ }
+        Intent go = send;
+        if (pkg != null) { send.setPackage(pkg); if (send.resolveActivity(pm) == null) { send.setPackage(null); pkg = null; } }
+        if (pkg == null) go = Intent.createChooser(send, "Send backup");
+        try {
+            if (getActivity() != null) getActivity().startActivity(go);
+            else c.startActivity(go.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         } catch (Exception e) {
-            try { Intent go = Intent.createChooser(send, "Send backup").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK); c.startActivity(go); }
+            try { c.startActivity(Intent.createChooser(send.setPackage(null), "Send backup").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); }
             catch (Exception e2) { call.reject("No email app found", "no_app"); return; }
         }
         call.resolve();

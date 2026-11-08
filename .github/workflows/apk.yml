@@ -39,11 +39,6 @@ jobs:
             cp node_modules/@fontsource/$n/files/$n-latin-$w-normal.woff2 www/fonts/$n-$w.woff2 || echo "missing $n $w"
           done
           echo "::warning title=Fonts::$(ls www/fonts | tr '\n' ' ')"
-          mkdir -p www/tess/lang
-          cp node_modules/tesseract.js/dist/tesseract.min.js node_modules/tesseract.js/dist/worker.min.js www/tess/
-          cp node_modules/tesseract.js-core/tesseract-core*.wasm.js www/tess/
-          cp node_modules/@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz www/tess/lang/ || cp $(find node_modules/@tesseract.js-data/eng -name 'eng.traineddata.gz' | head -1) www/tess/lang/
-          echo "::warning title=Receipt reading files::$(ls -la www/tess www/tess/lang | awk '{print $5, $9}' | tr '\n' ' ')"
           cp node_modules/@capacitor/core/dist/capacitor.js www/ || echo 'no capacitor.js - app uses the native bridge directly'
 
       - name: Create the Android project
@@ -61,6 +56,8 @@ jobs:
           # car Bluetooth, month-end reminders, restart handling and the home-screen widget
           sed -i 's#</manifest>#    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />\n    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />\n    <uses-permission android:name="android.permission.VIBRATE" />\n    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />\n    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />\n    <uses-permission android:name="android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND" />\n    <uses-permission android:name="android.permission.REQUEST_COMPANION_RUN_IN_BACKGROUND" />\n    <uses-feature android:name="android.software.companion_device_setup" android:required="false" />\n</manifest>#' $M
           sed -i 's#</application>#    <receiver android:name=".ReminderReceiver" android:exported="true"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED" /><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /><action android:name="android.bluetooth.device.action.ACL_CONNECTED" /><action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" /><action android:name="android.app.action.ENTER_CAR_MODE" /><action android:name="android.app.action.EXIT_CAR_MODE" /></intent-filter></receiver>\n    <receiver android:name=".WidgetProvider" android:exported="true" android:label="DrivR"><intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter><meta-data android:name="android.appwidget.provider" android:resource="@xml/mbp_widget_info" /></receiver>\n    </application>#' $M
+          # Android 11+: let the app see which email apps can take the backup
+          sed -i 's#</manifest>#    <queries><intent><action android:name="android.intent.action.SENDTO" /><data android:scheme="mailto" /></intent></queries>\n</manifest>#' $M
           cp -r native/res/* android/app/src/main/res/
           # DrivR backup files (.json) tapped in Downloads open in the app
           python3 - "$M" <<'PY'

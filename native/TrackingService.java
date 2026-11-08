@@ -52,12 +52,14 @@ public class TrackingService extends Service {
     static final float HOME_M = 400f;            // this close to home or the office counts as being there
     static final float MOVED_M = 200f;           // parked: this far from where you stopped = you've driven off
     static final double ROAD_FACTOR = 1.2;       // a late wake-up: straight-line gap x 1.2, roughly the road distance
-    static final String ACTION_WAKE = "uk.mileagebase.app.WAKE", ACTION_PARK = "uk.mileagebase.app.PARK";
+    static final String ACTION_WAKE = "uk.mileagebase.app.WAKE", ACTION_PARK = "uk.mileagebase.app.PARK", ACTION_HOME = "uk.mileagebase.app.HOMECHECK";
+    static final long CAR_IN_MAX_MS = 12 * 3_600_000L; // a car "connected" for longer than this: the disconnect was missed
     private Location wakeFrom;
     private long stopStart, lastCheck, lastFast;  // when the current stop began, the last motion check, the last fix at driving speed
     private Location stopAt;                       // where the current stop is (null while driving)
     private double maxAwayM;                       // furthest from home/office on this trip
     private boolean checking;
+    private long outAt, handledReset;              // when you left the car on this stop; the last new-trip reset handled
     static final float MAX_ACCURACY_M = 35f;
 
     private LocationManager lm;
@@ -91,10 +93,9 @@ public class TrackingService extends Service {
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         SharedPreferences p = prefs(this);
-        if (!p.getBoolean("active", false)) { stopSelf(); return START_NOT_STICKY; }
         meters = readMeters(this);
         makeChannel();
-        try {
+        try { // always first: Android stops the app if a started service doesn't show its notification
             if (Build.VERSION.SDK_INT >= 29) startForeground(NOTE_ID, note(), ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION);
             else startForeground(NOTE_ID, note());
         } catch (Exception e) {
@@ -104,6 +105,11 @@ public class TrackingService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
+        if (!p.getBoolean("active", false)) { // nothing to log (the trip just ended): stop quietly
+            if (!running) { stopForeground(true); stopSelf(); }
+            return START_NOT_STICKY;
+        }
+        String act = intent == null ? null : intent.getAction();
         if (!running) {
             running = true;
             lm = (LocationManager) getSystemService(Context.LOCATION_SERVICE);
@@ -114,19 +120,27 @@ public class TrackingService extends Service {
             lastDriving = 0; lastMoving = now - PARK_AFTER_MS + WAKE_GRACE_MS * 2;
             // GPS can take a minute or two to lock: start the route from where the phone last knew it was,
             // so the miles driven before the first fix still count
-            Location lk = lastKnown();
-            if (lk != null && now - lk.getTime() < 10 * 60_000L && (!lk.hasAccuracy() || lk.getAccuracy() < 150f)) wakeFrom = lk;
+            handledReset = p.getLong("resetAt", 0);
             maxAwayM = Double.longBitsToDouble(p.getLong("maxAway", 0L));
-            drive();
             handler.postDelayed(nag, 60_000L);
             handler.postDelayed(homeCheck, 60_000L);
+            if (restoreStop(p)) park();               // restarted while parked: carry on from the same stop
+            else { seedStart(now); drive(); }
+        } else if (p.getLong("resetAt", 0) != handledReset) { // a new trip started while the service was running
+            handledReset = p.getLong("resetAt", 0);
+            resetTrip();
         }
-        String act = intent == null ? null : intent.getAction();
+        // a trip that should already have ended at home (the phone was asleep): end it now, before anything else
+        if (endDue(System.currentTimeMillis())) {
+            autoEnd(ACTION_WAKE.equals(act)); // the car connecting again starts the next trip straight away
+            return START_STICKY;
+        }
+        if (ACTION_HOME.equals(act)) { WidgetProvider.refresh(this); return START_STICKY; }
         if (ACTION_WAKE.equals(act) && parked) wakeUp();       // the car connected again
         else if (ACTION_PARK.equals(act)) {                   // the car disconnected
             // a Bluetooth blip while you're still moving at driving speed: ignore it
             if (!parked && System.currentTimeMillis() - lastFast < 20_000L) { /* still driving */ }
-            else park();                                       // out of the car: GPS off now, not after 5 minutes
+            else { park(); outAt = System.currentTimeMillis(); saveStop(); scheduleHomeChecks(); } // out of the car: GPS off now
         }
         WidgetProvider.refresh(this);
         return START_STICKY;
@@ -146,11 +160,62 @@ public class TrackingService extends Service {
         }
     };
 
+    /** GPS can take a minute or two to lock: start from where the phone last was, if that's recent and accurate. */
+    private void seedStart(long now) {
+        Location lk = lastKnown();
+        if (lk != null && now - lk.getTime() < 2 * 60_000L && lk.hasAccuracy() && lk.getAccuracy() < 50f) wakeFrom = lk;
+    }
+    /** A new trip on a service that was already running: nothing from the last trip carries over. */
+    private void resetTrip() {
+        meters = readMeters(this); maxAwayM = 0; stopAt = null; stopStart = 0; outAt = 0; routeLast = null; last = null; anchor = null; wakeFrom = null;
+        clearStop(); seedStart(System.currentTimeMillis()); drive();
+    }
+    private void saveStop() {
+        if (stopAt == null) return;
+        prefs(this).edit().putString("stopAt", stopAt.getLatitude() + "," + stopAt.getLongitude() + "," + (stopAt.hasAccuracy() ? stopAt.getAccuracy() : 0))
+                .putLong("stopStart", stopStart).putLong("outAt", outAt).apply();
+    }
+    private void clearStop() { prefs(this).edit().remove("stopAt").remove("stopStart").remove("outAt").apply(); }
+    private boolean restoreStop(SharedPreferences p) {
+        String[] x = p.getString("stopAt", "").split(",");
+        if (x.length < 3 || !"parked".equals(p.getString("mode", ""))) return false;
+        try {
+            Location l = new Location("saved"); l.setLatitude(Double.parseDouble(x[0])); l.setLongitude(Double.parseDouble(x[1]));
+            float acc = Float.parseFloat(x[2]); if (acc > 0) l.setAccuracy(acc);
+            l.setTime(System.currentTimeMillis());
+            stopAt = l; anchor = l; stopStart = p.getLong("stopStart", System.currentTimeMillis()); outAt = p.getLong("outAt", 0);
+            return true;
+        } catch (Exception e) { return false; }
+    }
+    /** Should the trip have ended at home by now? Worked out from the clock, so a sleeping phone can't miss it. */
+    private boolean endDue(long now) {
+        if (!parked || stopAt == null || stopStart <= 0 || !atHome(stopAt)) return false;
+        long here = now - stopStart;
+        if (here >= 2 * 3_600_000L) return true;                     // 2 hours at home or the office
+        if (meters < 1609) return false;
+        boolean wentFar = maxAwayM > 16_000;                            // been 10 miles or more away
+        return wentFar && outAt >= stopStart - 120_000L && now - outAt >= 10 * 60_000L; // and out of the car 10 minutes
+    }
+    /** Alarms that still fire while the phone sleeps, to run the home check on time. */
+    private void scheduleHomeChecks() {
+        if (stopAt == null || !atHome(stopAt)) return;
+        android.app.AlarmManager am = (android.app.AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        if (am == null) return;
+        long[] at = { System.currentTimeMillis() + 10 * 60_000L + 30_000L, stopStart + 2 * 3_600_000L + 30_000L };
+        for (int i = 0; i < at.length; i++) {
+            Intent it = new Intent(this, ReminderReceiver.class).setAction(ReminderReceiver.HOME_CHECK);
+            PendingIntent pi = PendingIntent.getBroadcast(this, 9100 + i, it, PendingIntent.FLAG_UPDATE_CURRENT | ReminderReceiver.immutable());
+            try { if (Build.VERSION.SDK_INT >= 23) am.setAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, at[i], pi); else am.set(android.app.AlarmManager.RTC_WAKEUP, at[i], pi); }
+            catch (Exception e) { /* the minute check still runs while awake */ }
+        }
+    }
+
     // ---------- modes ----------
     private void drive() {
         parked = false;
         if (handler != null) handler.removeCallbacks(parkCheck);
         if (handler != null) handler.removeCallbacks(endCheck);
+        if (handler != null) handler.removeCallbacks(rearm);
         checking = false;
         stopAll();
         try {
@@ -169,7 +234,10 @@ public class TrackingService extends Service {
         return LocationManager.NETWORK_PROVIDER;
     }
 
-    private boolean carIn() { SharedPreferences p = prefs(this); return p.getLong("carIn", 0) > p.getLong("carOut", 0); }
+    private boolean carIn() { // connected, and not for so long that the disconnect must have been missed
+        SharedPreferences p = prefs(this); long in = p.getLong("carIn", 0);
+        return in > p.getLong("carOut", 0) && System.currentTimeMillis() - in < CAR_IN_MAX_MS;
+    }
 
     private void park() {
         boolean wasParked = parked;
@@ -177,7 +245,8 @@ public class TrackingService extends Service {
         if (!wasParked) {
             anchor = last != null ? last : lastKnown();
             last = null;
-            if (stopAt == null) { stopAt = anchor; stopStart = lastMoving > 0 ? Math.min(System.currentTimeMillis(), lastMoving) : System.currentTimeMillis(); }
+            if (stopAt == null) { stopAt = anchor; stopStart = lastMoving > 0 ? Math.min(System.currentTimeMillis(), lastMoving) : System.currentTimeMillis(); outAt = carIn() ? 0 : System.currentTimeMillis(); }
+            saveStop(); scheduleHomeChecks();
         }
         stopAll();
         if (carIn()) parkChecks(PARK_GPS_MS);     // sat in the car: you could pull away any second
@@ -226,12 +295,15 @@ public class TrackingService extends Service {
     }
 
     /** Moved by the motion sensor while parked: one cheap position check, not GPS left running. */
+    private final Runnable rearm = this::armMotionIfParked;
+    private void armMotionIfParked() { if (parked) armMotion(); }
     private void motionCheck() {
-        if (!parked || checking) { armMotion(); return; }
+        if (!parked) return;                 // driving: the motion sensor isn't needed
+        if (checking) { armMotion(); return; }
         long now = System.currentTimeMillis();
         boolean onBreak = stopAt != null && !atHome(stopAt) && now - stopStart < 45 * 60_000L; // a break on the way: you'll set off soon
         long gap = onBreak ? BREAK_CHECK_GAP_MS : CHECK_GAP_MS;
-        if (now - lastCheck < gap) { handler.postDelayed(this::armMotion, gap - (now - lastCheck)); return; }
+        if (now - lastCheck < gap) { handler.removeCallbacks(rearm); handler.postDelayed(rearm, gap - (now - lastCheck)); return; }
         lastCheck = now; checking = true;
         String pr = null;
         try { if (!onBreak && lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) pr = LocationManager.NETWORK_PROVIDER; } catch (Exception e) { /* none */ }
@@ -265,24 +337,19 @@ public class TrackingService extends Service {
             String line = String.format(Locale.UK, "%.5f,%.5f,%d,%d,%.0f\n", stopAt.getLatitude(), stopAt.getLongitude(), stopStart, end, meters);
             try (FileOutputStream out = new FileOutputStream(stopsFile(this), true)) { out.write(line.getBytes(StandardCharsets.UTF_8)); } catch (Exception e) { /* map only */ }
         }
-        stopAt = null;
+        stopAt = null; outAt = 0; clearStop();
     }
 
     /** Parked at home or the office: after a proper trip the trip is over, so it ends by itself. */
     private final Runnable homeCheck = new Runnable() {
         @Override public void run() {
             handler.postDelayed(this, 60_000L);
-            if (!parked || stopAt == null) return;
-            long here = System.currentTimeMillis() - stopStart;
-            if (!atHome(stopAt)) return;
-            if (meters < 1609) { if (here >= 2 * 3_600_000L) autoEnd(); return; } // never really went anywhere: the app drops it
-            boolean wentFar = maxAwayM > 16_000; // been 10 miles or more from home and the office
-            if ((wentFar && here >= 10 * 60_000L && !carIn()) || here >= 2 * 3_600_000L) autoEnd();
+            if (endDue(System.currentTimeMillis())) autoEnd(false);
         }
     };
 
     /** Ends the trip without a tap: keeps the miles, route and stops for the app to pick up. */
-    private void autoEnd() {
+    private void autoEnd(boolean restart) {
         long end = System.currentTimeMillis(), endAt = stopStart;
         Location at = stopAt;
         noteStop(end);
@@ -295,10 +362,20 @@ public class TrackingService extends Service {
                 at != null ? at.getLatitude() : 0, at != null ? at.getLongitude() : 0, p.getBoolean("tripOpen", false) ? "app" : "auto");
         try (FileOutputStream out = new FileOutputStream(new File(dir, "ended.txt"), true)) { out.write(line.getBytes(StandardCharsets.UTF_8)); } catch (Exception e) { /* ignore */ }
         double mi = meters / 1609.344;
+        clearStop();
+        if (mi >= 1) ReminderReceiver.tripDone(this, tag, mi);
+        if (restart) { // the car connected again: the next trip starts now, on this same service
+            long now = System.currentTimeMillis();
+            p.edit().putBoolean("active", true).putBoolean("tripOpen", false).putLong("meters", Double.doubleToLongBits(0)).putLong("maxAway", 0L)
+                    .putLong("since", now).putBoolean("auto", true).putLong("resetAt", now).apply();
+            handledReset = now;
+            meters = 0; maxAwayM = 0; stopAt = null; stopStart = 0; outAt = 0; routeLast = null; last = null; anchor = null; wakeFrom = null;
+            seedStart(now); drive();
+            return;
+        }
         p.edit().putBoolean("active", false).putBoolean("tripOpen", false).putString("mode", "stopped")
                 .putLong("meters", Double.doubleToLongBits(0)).putLong("maxAway", 0L).apply();
-        if (mi >= 1) ReminderReceiver.notify(this, ReminderReceiver.ID_OPEN, String.format(Locale.UK, "Trip done: %.0f mi", mi),
-                "Logged and saved. Add the job number and dash reading when you're ready.", "open", false);
+        stopForeground(true);
         stopSelf();
     }
 

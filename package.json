@@ -10,9 +10,6 @@
     "@capacitor/filesystem": "^6.0.3",
     "@capacitor/share": "^6.0.0",
     "leaflet": "1.9.4",
-    "tesseract.js": "5.1.1",
-    "tesseract.js-core": "5.1.1",
-    "@tesseract.js-data/eng": "1.0.0",
     "@fontsource/jetbrains-mono": "5.0.20",
     "@fontsource/plus-jakarta-sans": "5.0.20"
   }
