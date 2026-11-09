@@ -534,7 +534,8 @@ function buildMileageXlsx(data) {
   const sheet = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
 <sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>
-<sheetViews><sheetView workbookViewId="0" zoomScale="100"><selection activeCell="A5" sqref="A5"/></sheetView></sheetViews>
+<dimension ref="A1:N${tot}"/>
+<sheetViews><sheetView tabSelected="1" workbookViewId="0" zoomScale="40" zoomScaleNormal="40"><selection activeCell="A5" sqref="A5"/></sheetView></sheetViews>
 <sheetFormatPr defaultRowHeight="15"/>
 <cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols>
 <sheetData>${sheetRows}</sheetData>
@@ -544,13 +545,19 @@ function buildMileageXlsx(data) {
 <pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="1"/>
 </worksheet>`;
 
+  const xe = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
   const files = {
     '[Content_Types].xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>`,
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`,
     '_rels/.rels': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`,
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/></Relationships>`,
+    'docProps/core.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${xe('Mileage ' + (data.monthLabel || ''))}</dc:title><dc:creator>${xe(data.name || 'DrivR')}</dc:creator><cp:lastModifiedBy>${xe(data.name || 'DrivR')}</cp:lastModifiedBy><dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified></cp:coreProperties>`,
+    'docProps/app.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Application>Microsoft Excel</Application><DocSecurity>0</DocSecurity><ScaleCrop>false</ScaleCrop><HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Worksheets</vt:lpstr></vt:variant><vt:variant><vt:i4>1</vt:i4></vt:variant></vt:vector></HeadingPairs><TitlesOfParts><vt:vector size="1" baseType="lpstr"><vt:lpstr>Mileage</vt:lpstr></vt:vector></TitlesOfParts><AppVersion>16.0300</AppVersion></Properties>`,
     'xl/workbook.xml': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Mileage" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">Mileage!$A$1:$N$${tot}</definedName></definedNames><calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>`,
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><fileVersion appName="xl" lastEdited="7" lowestEdited="7" rupBuild="27425"/><workbookPr defaultThemeVersion="166925"/><bookViews><workbookView xWindow="0" yWindow="0" windowWidth="28800" windowHeight="12300" activeTab="0"/></bookViews><sheets><sheet name="Mileage" sheetId="1" r:id="rId1"/></sheets><definedNames><definedName name="_xlnm.Print_Area" localSheetId="0">Mileage!$A$1:$N$${tot}</definedName></definedNames><calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>`,
     'xl/_rels/workbook.xml.rels': `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`,
     'xl/styles.xml': styles,
@@ -634,7 +641,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     return null; }
   const FS = () => plug('Filesystem');
   const DIR = 'DrivR', OLD_DIRS = ['Odo', 'MileageBase Pro'], FILE = 'mileage-log.json', LS = 'mbp:log';
-  const APP_VERSION = 'v2.3', APP_BUILD = '__BUILD__';
+  const APP_VERSION = 'v2.4', APP_BUILD = '__BUILD__';
   // where the DrivR folder lives: its own folder at the top of internal storage once "All files access" is on, otherwise Documents
   let BASE = 'DOCUMENTS';
   const whereText = () => BASE === 'EXTERNAL_STORAGE' ? 'Internal storage › DrivR' : 'Documents › DrivR';
@@ -758,6 +765,18 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   }
   const parsePts = txt => String(txt || '').split('\n').map(l => l.split(',').map(Number)).filter(p => p.length === 2 && isFinite(p[0]) && isFinite(p[1]));
   const llCache = {};
+  // the town for a postcode, for the far-left box on the sheet: the parish (Castleford) where there is one, else the council area
+  const townSync = code => ((S.towns || {})[pc(code)] || '');
+  async function townOf(code) {
+    code = pc(code); if (!code) return ''; S.towns = S.towns || {};
+    if (S.towns[code]) return S.towns[code];
+    try { const j = await (await fetch('https://api.postcodes.io/postcodes/' + encodeURIComponent(code))).json(), r = j && j.result;
+      if (r) { const par = r.parish && !/unparished/i.test(r.parish) ? r.parish : '', t = par || r.admin_district || '';
+        if (t) { S.towns[code] = t; await saveS(); return t; } } } catch (e) {}
+    return '';
+  }
+  async function fetchTowns(rows) { let got = false; for (const r of rows) for (const s of (r.sites || [])) if (s.pc && !townSync(s.pc) && await townOf(s.pc)) got = true; return got; }
+  const siteName = s => s.desc || townSync(s.pc) || s.pc; // what you typed wins
   async function postcodeLL(code) { // a postcode's position, for the map
     code = pc(code); if (!code) return null;
     if (llCache[code]) return llCache[code];
@@ -1059,7 +1078,25 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
   let editing = null; // trip id being edited
   let newType = null; // 'bus' while filling in a new business trip
   const blankMonth = () => ({ startMiles: null, endMiles: null, trips: [], fuel: [] });
-  async function loadMonth(k) { if (!months[k]) months[k] = (await store.get('m-' + k)) || blankMonth(); return months[k]; }
+  let doublesGone = 0;
+  async function loadMonth(k) { if (!months[k]) { months[k] = (await store.get('m-' + k)) || blankMonth(); if (tidyMonth(months[k])) await saveMonth(k); } return months[k]; }
+  // HD92RQ -> HD9 2RQ on every trip; and the same drive saved twice (a bug before build 34) is taken out: two trips can't
+  // both have the same date and the same start and finish dash readings, so the extra copy goes
+  function tidyMonth(M) {
+    let changed = false;
+    for (const t of M.trips || []) {
+      for (const f of ['startPc', 'sitePc']) if (t[f] && pc(t[f]) !== t[f]) { t[f] = pc(t[f]); changed = true; }
+      for (const l of t.legs || []) if (l.sitePc && pc(l.sitePc) !== l.sitePc) { l.sitePc = pc(l.sitePc); changed = true; }
+    }
+    const seen = new Set(), keep = [];
+    for (const t of M.trips || []) {
+      const key = t.est && t.startMiles != null && t.finishMiles != null && t.finishMiles > t.startMiles ? [t.startDate, t.startMiles, t.finishMiles, t.type || 'bus', t.route || ''].join('|') : null;
+      if (key && seen.has(key)) { doublesGone++; changed = true; continue; }
+      if (key) seen.add(key); keep.push(t);
+    }
+    if (keep.length !== (M.trips || []).length) M.trips = keep;
+    return changed;
+  }
   const saveMonth = k => store.set('m-' + k, months[k]);
   const saveS = async () => { await store.set('settings', S); syncNative(); };
   function tripLabel(t) {
@@ -1317,7 +1354,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const ownBus = segs.find(x => x.kind === 'bus');
     for (let i = 0; i < segs.length; i++) {
       const s = segs[i], first = i === 0, last = i === segs.length - 1;
-      const r = { id: first ? t.id : uid(), startMiles: first ? t.startMiles : odo(s.from.m), finishMiles: last ? finishMiles : odo(s.to.m),
+      const r = { id: first ? t.id : t.id + '-' + i, startMiles: first ? t.startMiles : odo(s.from.m), finishMiles: last ? finishMiles : odo(s.to.m),
         startDate: first ? t.startDate : day(s.from.endTime, t.startDate), finishDate: last ? finishDate : day(s.to.time, finishDate),
         route: cutRoute(pts, s.from.m / total, s.to.m / total), gpsMiles: Math.round(MI(s.to.m - s.from.m) * 10) / 10, ...extra };
       if (first && t.privGap) r.privGap = true;
@@ -1367,15 +1404,22 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     return cl.filter(c => c.pc);
   }
   // trips the phone ended by itself when you parked at home: saved with a GPS estimate, details to add later
-  async function processEnded() {
+  let endedRun = null;
+  function processEnded() { // the live-miles update and opening the app both call this: only one pickup runs at once
+    if (endedRun) return endedRun;
+    return (endedRun = pickUpEnded().finally(() => { endedRun = null; }));
+  }
+  async function pickUpEnded() {
     const T = TR(); if (!T || !T.takeEnded) return 0;
     let r; try { r = await T.takeEnded(); } catch (e) { return 0; }
     const list = ((r && r.trips) || []).sort((x, y) => x.end - y.end); if (!list.length) return 0;
     const homes = await homeLLs(); let n = 0, lastMi = 0;
+    S.doneEnded = S.doneEnded || [];
     for (const e of list) {
+      if (S.doneEnded.includes(String(e.tag))) continue; // already saved; the phone just hadn't been told yet
       let t = S.openTrip && S.openTrip.startDate <= isoOf(e.since) ? S.openTrip : null;
       const fromOpen = !!t;
-      if (!t) t = { id: uid(), type: 'unsorted', startDate: isoOf(e.since), startMiles: suggestedStart() ?? 0 }; // weekdays and weekends alike: the rules decide
+      if (!t) t = { id: 'e' + e.tag, type: 'unsorted', startDate: isoOf(e.since), startMiles: suggestedStart() ?? 0 }; // weekdays and weekends alike: the rules decide
       if (t.startMiles == null) t.startMiles = suggestedStart() ?? 0;
       const pts = parsePts(e.points), stops = parseStops(e.stops), gpsMi = MI(e.meters);
       if (gpsMi < 1 && (!fromOpen || t.type === 'unsorted')) { if (fromOpen) S.openTrip = null; continue; } // the car connected but didn't go anywhere
@@ -1390,6 +1434,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
         await saveMonth(k);
       }
       if (fromOpen) S.openTrip = null;
+      S.doneEnded = [...S.doneEnded, String(e.tag)].slice(-60);
     }
     await saveS(); await recalcLast(); try { await T.clearEnded({ tags: list.map(e => String(e.tag)) }); } catch (e) {}
     renderTripCard(); renderMonth(); renderToday();
@@ -1986,13 +2031,14 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     rows.forEach(r => {
       const multi = r.sites && r.sites.length > 1, P = r.desc === 'Private' && !r.id;
       const tr = el('tr', { className: P ? 'pv' : '' }, [
-        el('td', { className: 'l', textContent: multi ? r.sites.map(s => s.desc || s.pc).join(' / ') : r.desc || '' }),
+        el('td', { className: 'l', textContent: multi ? r.sites.map(siteName).join(' / ') : r.desc || (r.id ? townSync(r.sitePc) : '') }),
         el('td', { textContent: r.startPc || '' }), el('td', { textContent: multi ? r.sites.map(s => s.pc).join('\n') : r.sitePc || '' }),
         el('td', { textContent: multi ? r.sites.map(s => s.job || '–').join('\n') : r.job || '' }), el('td', { textContent: dd(r.startDate) }),
         el('td', { textContent: r.finishMiles ?? '' }), el('td', { textContent: dd(r.finishDate) }), el('td', { textContent: r.priv || '' }), el('td', { textContent: r.bus || '' })]);
       t.append(tr); });
     t.append(el('tr', { className: 'tot' }, [el('td', { className: 'l', textContent: 'TOTAL' }), ...Array(6).fill(0).map(() => el('td')), el('td', { textContent: String(priv) }), el('td', { textContent: String(bus) })]));
     box.append(el('span', { className: 'lbl', textContent: 'Sheet preview' }), el('div', { className: 'xlwrap' }, [t]));
+    if (!renderSheetPreview.busy) { renderSheetPreview.busy = true; fetchTowns(rows).then(got => { renderSheetPreview.busy = false; if (got) renderSheetPreview(k, SR); }); }
   }
 
   function renderGlance() { renderToday(); }
@@ -2544,7 +2590,11 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       throw new Error(`your trip that started on ${fmtD(S.openTrip.startDate)} is still open. It goes on this sheet in one piece, so finish it first.`);
     if (needs.length) throw new Error(`${needs.length} trip${needs.length === 1 ? ' needs' : 's need'} details first (they're flagged on Trips and Month).`);
     if (unsorted.length) throw new Error(`${unsorted.reduce((s, u) => s + u.miles, 0)} mi between trips aren't sorted yet. Sort them first (they're flagged on Trips and Month).`);
-    const rows = rows0.map(r => r.sites && r.sites.length > 1 ? { ...r, sitePc: r.sites.map(s => s.pc).join('\n'), job: r.sites.map(s => s.job || '–').join('\n'), desc: r.sites.map(s => s.desc || s.pc).join(' / '), tall: r.sites.length } : r);
+    await fetchTowns(rows0);
+    const rows = rows0.map(r => { const o = { ...r, startPc: pc(r.startPc) };
+      if (r.sites && r.sites.length > 1) Object.assign(o, { sitePc: r.sites.map(s => pc(s.pc)).join('\n'), job: r.sites.map(s => s.job || '–').join('\n'), desc: r.sites.map(siteName).join(' / '), tall: r.sites.length });
+      else if (r.id) Object.assign(o, { sitePc: pc(r.sitePc), desc: r.desc || townSync(r.sitePc) });
+      return o; });
     const bytes = buildMileageXlsx({ name: S.name, reg: S.reg, monthLabel: mLabel(k), startMiles, office: S.office,
       rows, fuel: [] }); // fuel goes through your expenses app: the fuel columns are left blank
     const base = safeName(`Mileage ${mLabel(k)}${S.name ? ' - ' + S.name : ''}.xlsx`);
@@ -2608,6 +2658,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const T = TR(); if (!T || checking) return; checking = true;
     try {
       await processEnded(); // before anything else: a trip that ended by itself may still be the open one here
+      if (doublesGone) { toast(`Removed ${doublesGone} trip${doublesGone === 1 ? '' : 's'} saved twice by mistake (same day, same dash readings).`, 7000); doublesGone = 0; renderMonth(); renderToday(); }
       refreshHomes().catch(() => {});
       const st = await T.status();
       const act = await T.takeAction();
