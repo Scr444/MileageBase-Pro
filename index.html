@@ -1473,6 +1473,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     siteList(t).filter(s => s.pc && s.job).forEach(s => { S.sites = [{ pc: s.pc, job: s.job, desc: s.desc }, ...(S.sites || []).filter(x => x.pc !== s.pc)].slice(0, 12); });
   }
   // what a trip still needs before it can go on the sheet
+  const hardNeed = w => w === 'business or private'; // changes the miles: the sheet waits for it
   function needsOf(t) {
     if (t.type === 'priv') return [];
     if (t.type === 'unsorted') return ['business or private'];
@@ -1938,7 +1939,8 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     { const nd = SR.needs, w = $('needsNote'), sig = viewM + JSON.stringify(nd);
       w.hidden = !nd.length;
       if (nd.length && w.dataset.sig !== sig) { w.dataset.sig = sig; w.innerHTML = '';
-        w.append(el('b', { textContent: `${nd.length} trip${nd.length === 1 ? ' needs' : 's need'} details` }), el('span', { textContent: ' before the sheet can be built: ' + [...new Set(nd.flatMap(x => x.what))].join(', ') + '.' }));
+        const holds = nd.some(x => x.what.some(hardNeed));
+        w.append(el('b', { textContent: `${nd.length} trip${nd.length === 1 ? ' needs' : 's need'} details` }), el('span', { textContent: (holds ? ' before the sheet can be built: ' : ': ') + [...new Set(nd.flatMap(x => x.what))].join(', ') + '.' + (holds ? '' : ' The sheet still builds with these left blank, to fill in Excel or here.') }));
         const go = el('button', { type: 'button', className: 'secondary', textContent: 'Sort them', style: 'margin-top:10px;width:100%' }); go.onclick = () => openToSort(); w.append(go); }
       if (!nd.length) w.dataset.sig = ''; }
     { const un = SR.unsorted, w = $('unsortedNote');
@@ -2154,7 +2156,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const wrap = el('div', { style: 'display:flex;flex-direction:column;gap:10px' }); box.append(wrap);
     const draw = async () => {
       const nd = await needsAll(); wrap.innerHTML = '';
-      intro.textContent = nd.length ? `${nd.length} trip${nd.length === 1 ? ' needs' : 's need'} something before the sheet can be built.` : '';
+      intro.textContent = nd.length ? `${nd.length} trip${nd.length === 1 ? ' needs' : 's need'} something. Business or private has to be set before the sheet builds; a blank job number or site name can wait, or go in Excel.` : '';
       if (!nd.length) { wrap.append(el('p', { className: 'empty', textContent: 'All sorted.' })); renderMonth(); renderToday(); return; }
       for (const n of nd) wrap.append(sortCard(n, draw));
       renderMonth(); renderToday();
@@ -2588,8 +2590,9 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const { rows: rows0, startMiles, unsorted, needs } = sheetRows(k);
     if (S.openTrip && S.openTrip.startDate && S.openTrip.startDate <= lastDay(k) && mKey(S.openTrip.startDate) === k)
       throw new Error(`your trip that started on ${fmtD(S.openTrip.startDate)} is still open. It goes on this sheet in one piece, so finish it first.`);
-    if (needs.length) throw new Error(`${needs.length} trip${needs.length === 1 ? ' needs' : 's need'} details first (they're flagged on Trips and Month).`);
-    if (unsorted.length) throw new Error(`${unsorted.reduce((s, u) => s + u.miles, 0)} mi between trips aren't sorted yet. Sort them first (they're flagged on Trips and Month).`);
+    const hard = needs.filter(n => n.what.some(hardNeed)), soft = needs.filter(n => !n.what.some(hardNeed));
+    if (hard.length) { const er = new Error(`${hard.length} trip${hard.length === 1 ? ' isn\u2019t' : 's aren\u2019t'} marked business or private yet, and that changes the miles.`); er.tripId = hard[0].id; throw er; }
+    if (unsorted.length) throw Object.assign(new Error(`${unsorted.reduce((s, u) => s + u.miles, 0)} mi between trips aren't sorted yet. Sort them first (they're flagged on Trips and Month).`), { toSort: true });
     await fetchTowns(rows0);
     const rows = rows0.map(r => { const o = { ...r, startPc: pc(r.startPc) };
       if (r.sites && r.sites.length > 1) Object.assign(o, { sitePc: r.sites.map(s => pc(s.pc)).join('\n'), job: r.sites.map(s => s.job || '–').join('\n'), desc: r.sites.map(siteName).join(' / '), tall: r.sites.length });
@@ -2598,7 +2601,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const bytes = buildMileageXlsx({ name: S.name, reg: S.reg, monthLabel: mLabel(k), startMiles, office: S.office,
       rows, fuel: [] }); // fuel goes through your expenses app: the fuel columns are left blank
     const base = safeName(`Mileage ${mLabel(k)}${S.name ? ' - ' + S.name : ''}.xlsx`);
-    if (!NATIVE) { download(base, new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); return { name: base, note: 'Downloaded ' + base + '.' }; }
+    if (!NATIVE) { download(base, new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); return { name: base, blanks: blankText(k, soft), blankId: soft.length ? soft[0].id : null, note: 'Downloaded ' + base + '.' }; }
     let name = base.replace(/\.xlsx$/, '') + ` (${stampNow()}).xlsx`; // a name Excel hasn't seen before
     if (await exists(DIR + '/Sheets/' + name, BASE)) name = name.replace(/\)\.xlsx$/, `.${pad(new Date().getSeconds())})` + '.xlsx');
     const data = b64(bytes);
@@ -2611,7 +2614,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     lastSheet = { name, data };
     if (share) { try { await shareFile(base, data, true); } catch (e) { if (!/cancel/i.test(String(e && e.message || e))) toast('Could not share: ' + (e.message || e)); } }
     if (open) { try { await TR().openFile({ path: `${DIR}/Sheets/${name}`, base: BASE === 'EXTERNAL_STORAGE' ? 'root' : 'documents' }); } catch (e) { toast('Could not open it: ' + (e.message || e)); } }
-    return { name, edited, note: `Opened ${name}, just built, from ${whereText()} › Sheets.` + (edited ? ` ${edited} copy you changed in Excel ${edited === 1 ? 'is' : 'are'} kept as ${edited === 1 ? 'it was' : 'they were'}.` : '') };
+    return { name, edited, blanks: blankText(k, soft), blankId: soft.length ? soft[0].id : null, note: `Opened ${name}, just built, from ${whereText()} › Sheets.` + (edited ? ` ${edited} copy you changed in Excel ${edited === 1 ? 'is' : 'are'} kept as ${edited === 1 ? 'it was' : 'they were'}.` : '') };
   }
   $('exportBtn').onclick = async () => {
     const v = num($('endMiles').value), M = months[viewM];
@@ -2634,10 +2637,25 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     const over = M.trips.filter(t => t.finishMiles != null && t.finishDate > lastDay(k)).sort((x, y) => y.finishMiles - x.finishMiles)[0];
     return { open, over };
   }
+  // "1 job number is blank: Castleford, Mon 9 Nov" - left blank on the sheet, for you to fill in Excel or the app
+  function blankText(k, soft) {
+    if (!soft.length) return '';
+    const say = { 'job number': 'no job number', 'site postcode': 'no site postcode', 'start postcode': 'no start postcode', 'check the site postcode': 'site postcode to check' };
+    const what = [...new Set(soft.flatMap(n => n.what))].map(w => say[w] || w);
+    const names = soft.slice(0, 3).map(n => { const t = months[k].trips.find(x => x.id === n.id) || {}; return `${t.desc || townSync(t.sitePc) || t.sitePc || 'trip'}, ${fmtD(t.startDate)}`; });
+    return `${soft.length} trip${soft.length === 1 ? ' has' : 's have'} details to finish (${what.join(', ')}): ${names.join('; ')}${soft.length > 3 ? ' and more' : ''}. Fill them in Excel or here.`;
+  }
+  const showMe = (fn) => { const b = el('button', { type: 'button', className: 'linkb', textContent: 'Show me', style: 'padding:0 0 0 6px;min-height:0' }); b.onclick = fn; return b; };
   async function shareMonth(k, share) {
     const note = $('exportNote');
-    try { const r = await exportMonth(k, share, !share && NATIVE); note.textContent = r.note; if (share) { months[k].sent = true; await saveMonth(k); renderToday(); } if (NATIVE && !share) toast(r.edited ? 'Opened the sheet just built. Your edited copy is kept.' : 'Opened the sheet just built'); }
-    catch (e) { note.textContent = 'Could not build the sheet: ' + (e.message || e); toast('Could not build the sheet'); }
+    try { const r = await exportMonth(k, share, !share && NATIVE); note.textContent = r.note;
+      if (r.blanks) { note.append(document.createElement('br'), el('b', { textContent: r.blanks }), showMe(() => openTrip(r.blankId, k))); }
+      if (share) { months[k].sent = true; await saveMonth(k); renderToday(); }
+      if (NATIVE && !share) toast(r.blanks ? 'Opened the sheet. ' + r.blanks.split(' (')[0] + ', left blank.' : r.edited ? 'Opened the sheet just built. Your edited copy is kept.' : 'Opened the sheet just built');
+      else if (r.blanks) toast(r.blanks.split(' (')[0] + ', left blank.'); }
+    catch (e) { note.textContent = 'Could not build the sheet: ' + (e.message || e);
+      if (e.tripId) note.append(showMe(() => openTrip(e.tripId, k))); else if (e.toSort) note.append(showMe(() => $('unsortedNote').scrollIntoView({ block: 'center', behavior: 'smooth' })));
+      toast('Could not build the sheet'); }
   }
   // a dated copy of the log every week, keeping the last 8
   async function autoBackup() {
