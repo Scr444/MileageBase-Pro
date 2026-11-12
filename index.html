@@ -2537,27 +2537,32 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     box.append(el('p', { className: 'hint', textContent: `The dash reading at the start of ${mLabel(k)}. Now ${old ?? 'not set'}.` }),
       field('Dash reading', 'fsMiles', { className: 'odo', inputmode: 'numeric', autocomplete: 'off', value: old ?? '' }));
     const msg = el('p', { className: 'hint' }), go = el('button', { type: 'button', className: 'primary', textContent: 'Save', style: 'width:100%;margin-top:12px' });
-    box.append(msg, go);
-    const plan = v => {
+    const goAll = el('button', { type: 'button', className: 'secondary', style: 'width:100%;margin-top:8px', hidden: true });
+    box.append(msg, go, goAll);
+    // all: the whole month was counted from the wrong start, so readings you typed move too
+    const plan = (v, all) => {
       const d = old == null ? 0 : v - old, gps = M.trips.filter(t => t.est), typed = M.trips.filter(t => !t.est && t.startMiles != null);
-      if (d && typed.length) { // the GPS trips can't be pushed into a reading you typed
-        const lo = Math.min(...typed.map(t => t.startMiles)), hit = gps.find(t => t.startMiles < lo && (t.finishMiles ?? t.startMiles) + d > lo);
-        if (hit) return { err: `That would push your ${fmtD(hit.startDate)} trip past a reading you typed (${lo}). Check both readings.` };
-      }
+      const typedTxt = () => typed.slice(0, 4).map(t => `${fmtD(t.startDate)} (${t.startMiles} → ${t.finishMiles ?? '?'})`).join(', ') + (typed.length > 4 ? ` and ${typed.length - 4} more` : '');
       const prevEnd = (() => { let e = null; monthKeys().filter(x => x < k).forEach(x => { const P = DATA['m-' + x]; (P.trips || []).forEach(t => { if (t.finishMiles != null) e = Math.max(e ?? 0, t.finishMiles); }); if (P.endMiles != null) e = Math.max(e ?? 0, P.endMiles); }); return e; })();
       if (prevEnd != null && v < prevEnd) return { err: `${v} is below where last month finished (${prevEnd}).` };
+      if (all && d) return { d, n: M.trips.filter(t => t.startMiles != null).length, all: true };
+      if (d && typed.length) { // the GPS trips can't be pushed into a reading you typed
+        const lo = Math.min(...typed.map(t => t.startMiles)), hit = gps.find(t => t.startMiles < lo && (t.finishMiles ?? t.startMiles) + d > lo);
+        if (hit || v > lo) return { err: `${typed.length} trip${typed.length === 1 ? ' has' : 's have'} a reading saved as typed: ${typedTxt()}. Moving only the GPS trips would push your ${fmtD((hit || gps[0] || typed[0]).startDate)} trip past ${lo}. If the whole month was counted from the wrong start, move every trip.`, canAll: true };
+      }
       const first = M.trips.filter(t => !t.est && t.startMiles != null).map(t => t.startMiles);
       if (first.length && v > Math.min(...first)) return { err: `${v} is past a reading you typed on a trip (${Math.min(...first)}).` };
       return { d, n: d ? gps.length : 0 };
     };
-    const show = () => { const v = num($('fsMiles').value); if (v == null) { msg.textContent = ''; return; } const p = plan(v);
+    const show = () => { const v = num($('fsMiles').value); goAll.hidden = true; if (v == null) { msg.textContent = ''; return; } const p = plan(v);
+      if (p.canAll) { const d = v - old; goAll.hidden = false; goAll.textContent = `Move every trip ${d > 0 ? 'up' : 'down'} by ${Math.abs(d)}, including these`; }
       msg.className = p.err ? 'err' : 'hint';
       msg.textContent = p.err || (p.d ? `${p.n} GPS trip${p.n === 1 ? '' : 's'} move ${p.d > 0 ? 'up' : 'down'} by ${Math.abs(p.d)}. Each keeps its own miles, so the business and private totals stay the same.` : ''); };
     $('fsMiles').oninput = show;
-    go.onclick = async () => {
+    const save = async all => {
       const v = num($('fsMiles').value); if (v == null) { msg.className = 'err'; msg.textContent = 'Type the dash reading.'; return; }
-      const p = plan(v); if (p.err) { show(); return; }
-      if (p.d) for (const t of M.trips.filter(t => t.est)) {
+      const p = plan(v, all); if (p.err) { show(); return; }
+      if (p.d) for (const t of M.trips.filter(t => all || t.est)) {
         if (t.startMiles != null) t.startMiles += p.d; if (t.finishMiles != null) t.finishMiles += p.d;
         for (const l of t.legs || []) if (l.fromMiles != null) l.fromMiles += p.d;
       }
@@ -2566,6 +2571,7 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
       closeSheet(); renderMonth(); renderToday(); renderTripCard();
       toast(p.d ? `Start of ${mLabel(k)} is now ${v}. ${p.n} trip${p.n === 1 ? '' : 's'} moved by ${Math.abs(p.d)}, miles unchanged.` : `Start of ${mLabel(k)} is ${v}.`);
     };
+    go.onclick = () => save(false); goAll.onclick = () => save(true);
     setTimeout(() => { const i = $('fsMiles'); if (i) { i.focus(); i.select(); } }, 50); show();
   }
   $('endMiles').onchange = async () => { const v = num($('endMiles').value), key = viewM + ':' + v;
