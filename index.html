@@ -229,6 +229,7 @@ body.has-dock .toast { bottom: calc(var(--tab-h) + 92px + env(safe-area-inset-bo
 #tripList .item { background: var(--panel); border-radius: 16px; box-shadow: var(--shadow); border-bottom: 0; }
 .wkhead { display: flex; justify-content: space-between; font: 800 11.5px var(--body); letter-spacing: .07em; text-transform: uppercase; color: var(--sub); margin: 10px 4px 0; }
 .readout { font: 800 22px var(--mono); padding: 10px 2px; }
+.startbtn { background: none; border: 0; border-bottom: 2px dashed var(--line, #ccd); border-radius: 0; color: inherit; text-align: left; min-height: 0; cursor: pointer; }
 .hint.ok { color: var(--live); font-weight: 700; }
 .xlwrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: 10px; }
 .xl { width: 100%; border-collapse: collapse; font: 600 11px var(--body); min-width: 420px; }
@@ -247,6 +248,7 @@ details.fold > summary .hint { font-weight: 500; font-size: 13.5px; }
 .map { position: relative; }
 .map.still .maphint { position: absolute; right: 10px; bottom: 10px; z-index: 500; background: rgba(19,23,38,.85); color: #fff; border: 0; border-radius: 99px; font: 700 12.5px var(--body); padding: 8px 13px; pointer-events: none; }
 .map.still { cursor: pointer; }
+.map { isolation: isolate; position: relative; z-index: 0; } /* keeps the map's own layers under the header and pop-up sheets */
 .cntpin span { position: absolute; transform: translate(6px, -26px); color: #fff; font: 800 12px var(--body); padding: 3px 8px; border-radius: 99px; box-shadow: 0 2px 6px rgba(0,0,0,.25); white-space: nowrap; }
 .fullmap { position: fixed; inset: 0; z-index: 3000; background: var(--bg); isolation: isolate; }
 .fullmap .leaflet-top.leaflet-right { top: calc(env(safe-area-inset-top, 0px) + 64px); }
@@ -328,7 +330,7 @@ details.fold > summary .hint { font-weight: 500; font-size: 13.5px; }
     <div class="section-lbl">Mileage sheet</div>
     <div class="card" id="sheetCard">
       <div class="row">
-        <div class="field"><span class="lbl">Start of month</span><div class="readout" id="startShow">–</div></div>
+        <div class="field"><span class="lbl">Start of month</span><button type="button" class="readout startbtn" id="startShow">–</button><span class="hint" style="font-size:12px;margin-top:-4px">Tap to correct</span></div>
         <div class="field"><label class="lbl" for="endMiles">Dash reading at month end</label><input id="endMiles" class="odo" inputmode="numeric" autocomplete="off"></div>
       </div>
       <p class="hint" id="startHint"></p>
@@ -2528,6 +2530,44 @@ if (typeof module !== 'undefined') module.exports = { buildMileageXlsx };
     if (!n) out.append(el('p', { className: 'empty', textContent: 'No trips match.' }));
   });
   let endBusy = null; // the reading being lined up: a second change event for the same number is ignored
+  // correcting the start of the month: GPS trips move by the difference and keep their own miles; typed readings never move
+  $('startShow').onclick = () => fixStart(viewM);
+  function fixStart(k) {
+    const M = months[k], old = monthStart(k), box = openSheet('Start of month');
+    box.append(el('p', { className: 'hint', textContent: `The dash reading at the start of ${mLabel(k)}. Now ${old ?? 'not set'}.` }),
+      field('Dash reading', 'fsMiles', { className: 'odo', inputmode: 'numeric', autocomplete: 'off', value: old ?? '' }));
+    const msg = el('p', { className: 'hint' }), go = el('button', { type: 'button', className: 'primary', textContent: 'Save', style: 'width:100%;margin-top:12px' });
+    box.append(msg, go);
+    const plan = v => {
+      const d = old == null ? 0 : v - old, gps = M.trips.filter(t => t.est), typed = M.trips.filter(t => !t.est && t.startMiles != null);
+      if (d && typed.length) { // the GPS trips can't be pushed into a reading you typed
+        const lo = Math.min(...typed.map(t => t.startMiles)), hit = gps.find(t => t.startMiles < lo && (t.finishMiles ?? t.startMiles) + d > lo);
+        if (hit) return { err: `That would push your ${fmtD(hit.startDate)} trip past a reading you typed (${lo}). Check both readings.` };
+      }
+      const prevEnd = (() => { let e = null; monthKeys().filter(x => x < k).forEach(x => { const P = DATA['m-' + x]; (P.trips || []).forEach(t => { if (t.finishMiles != null) e = Math.max(e ?? 0, t.finishMiles); }); if (P.endMiles != null) e = Math.max(e ?? 0, P.endMiles); }); return e; })();
+      if (prevEnd != null && v < prevEnd) return { err: `${v} is below where last month finished (${prevEnd}).` };
+      const first = M.trips.filter(t => !t.est && t.startMiles != null).map(t => t.startMiles);
+      if (first.length && v > Math.min(...first)) return { err: `${v} is past a reading you typed on a trip (${Math.min(...first)}).` };
+      return { d, n: d ? gps.length : 0 };
+    };
+    const show = () => { const v = num($('fsMiles').value); if (v == null) { msg.textContent = ''; return; } const p = plan(v);
+      msg.className = p.err ? 'err' : 'hint';
+      msg.textContent = p.err || (p.d ? `${p.n} GPS trip${p.n === 1 ? '' : 's'} move ${p.d > 0 ? 'up' : 'down'} by ${Math.abs(p.d)}. Each keeps its own miles, so the business and private totals stay the same.` : ''); };
+    $('fsMiles').oninput = show;
+    go.onclick = async () => {
+      const v = num($('fsMiles').value); if (v == null) { msg.className = 'err'; msg.textContent = 'Type the dash reading.'; return; }
+      const p = plan(v); if (p.err) { show(); return; }
+      if (p.d) for (const t of M.trips.filter(t => t.est)) {
+        if (t.startMiles != null) t.startMiles += p.d; if (t.finishMiles != null) t.finishMiles += p.d;
+        for (const l of t.legs || []) if (l.fromMiles != null) l.fromMiles += p.d;
+      }
+      if (p.d && S.openTrip && S.openTrip.startMiles != null && mKey(S.openTrip.startDate || today()) === k) { S.openTrip.startMiles += p.d; await saveS(); }
+      M.startMiles = v; M.startSet = true; await saveMonth(k); await recalcLast();
+      closeSheet(); renderMonth(); renderToday(); renderTripCard();
+      toast(p.d ? `Start of ${mLabel(k)} is now ${v}. ${p.n} trip${p.n === 1 ? '' : 's'} moved by ${Math.abs(p.d)}, miles unchanged.` : `Start of ${mLabel(k)} is ${v}.`);
+    };
+    setTimeout(() => { const i = $('fsMiles'); if (i) { i.focus(); i.select(); } }, 50); show();
+  }
   $('endMiles').onchange = async () => { const v = num($('endMiles').value), key = viewM + ':' + v;
     if (endBusy === key || (v != null && months[viewM] && months[viewM].endMiles === v)) return;
     endBusy = key;
